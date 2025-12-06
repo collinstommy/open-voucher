@@ -128,7 +128,7 @@ When you request a voucher, you spend coins
       await sendTelegramMessage(chatId, `💰 You have ${user.coins} coins.`);
       return;
     } else if (lowerText === "/help" || lowerText === "help") {
-      await sendTelegramMessage(chatId, `Commands:\n📸 Send photo to upload\n💳 "claim 5/10/20"\n💰 /balance`);
+      await sendTelegramMessage(chatId, `📸 Send screenshot to upload vouchers and earn coins\n💳 Send <b>5</b> , <b>10</b>, or <b>20</b> to claim a voucher\n💰 <b>balance</b> to view your balance of coin`);
       return;
     }
 

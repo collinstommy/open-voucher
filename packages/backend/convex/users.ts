@@ -1,5 +1,5 @@
-import { mutation, internalMutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import { internalMutation, mutation, query } from "./_generated/server";
 import { SIGNUP_BONUS } from "./constants";
 
 /**
