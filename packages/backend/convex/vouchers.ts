@@ -1,17 +1,17 @@
-import { internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
-import { UPLOAD_REWARDS, MAX_COINS } from "./constants";
+import { internalMutation } from "./_generated/server";
+import { MAX_COINS, UPLOAD_REWARDS } from "./constants";
 
-import { MutationCtx } from "./_generated/server";
-import { Id } from "./_generated/dataModel";
 import dayjs from "dayjs";
+import { Id } from "./_generated/dataModel";
+import { MutationCtx } from "./_generated/server";
 
 // Shared helper to mark voucher as failed/rejected
 async function failVoucherHelper(
-    ctx: MutationCtx, 
-    voucherId: Id<"vouchers">, 
-    error: string, 
+    ctx: MutationCtx,
+    voucherId: Id<"vouchers">,
+    error: string,
     reason: "EXPIRED" | "COULD_NOT_READ_AMOUNT" | "COULD_NOT_READ_BARCODE" | "COULD_NOT_READ_EXPIRY_DATE" | "INVALID_TYPE" | "UNKNOWN_ERROR",
     detectedExpiryDate?: number
 ) {
@@ -24,7 +24,7 @@ async function failVoucherHelper(
         }
 
         await ctx.db.patch(voucherId, {
-            status: "expired", 
+            status: "expired",
             ocrRawResponse: JSON.stringify({ error, reason }),
         });
 
@@ -46,7 +46,6 @@ async function failVoucherHelper(
              } else {
                  userMessage += `We encountered an unknown error while processing your voucher. Please try again or contact support.`;
              }
-             userMessage += `\n\nError details: ${error}`;
 
              await ctx.scheduler.runAfter(0, internal.telegram.sendMessageAction, {
                chatId: uploader.telegramChatId,
@@ -126,7 +125,6 @@ export const updateVoucherFromOcr = internalMutation({
     }
 
     const now = Date.now();
-
     // Check for duplicates
     if (barcodeNumber) {
         const duplicate = await ctx.db
@@ -154,12 +152,12 @@ export const updateVoucherFromOcr = internalMutation({
     // Check if voucher is already expired
     // We assume expiryDate is set to the END of the valid day
     const isExpired = expiryDate < now;
-    
+
     if (isExpired) {
          await failVoucherHelper(
-            ctx, 
-            voucherId, 
-            `Voucher expired on ${dayjs(expiryDate).format('DD-MM-YYYY')}`, 
+            ctx,
+            voucherId,
+            `Voucher expired on ${dayjs(expiryDate).format('DD-MM-YYYY')}`,
             "EXPIRED",
             expiryDate
         );

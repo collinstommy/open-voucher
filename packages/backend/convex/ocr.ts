@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { internalAction } from "./_generated/server";
+import dayjs from "dayjs";
 
 type VoucherOcrFailureReason =
   | "EXPIRED"
@@ -135,12 +136,11 @@ If expiry is unknown: null.`;
       let expiryDate: number = 0;
 
       if (extracted.expiryDate) {
+        const dayjsDate = dayjs(extracted.expiryDate);
         // Parse YYYY-MM-DD
-        const date = new Date(extracted.expiryDate);
-        if (!isNaN(date.getTime()) && date.getTime() > Date.now() - 365 * 24 * 60 * 60 * 1000) {
+        if (dayjsDate.isValid() && dayjsDate.valueOf() > Date.now() - 365 * 24 * 60 * 60 * 1000) {
              // Set to end of the day (23:59:59.999) to be inclusive
-             date.setHours(23, 59, 59, 999);
-             expiryDate = date.getTime();
+             expiryDate = dayjsDate.endOf('day').valueOf();
         } else {
              throw new VoucherValidationError("EXPIRED", "Invalid or past expiry date");
         }
