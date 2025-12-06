@@ -14,22 +14,6 @@ This project was created with [Better-T-Stack](https://github.com/AmanVarshney01
 
 ## Getting Started
 
-First, install the dependencies:
-
-```bash
-bun install
-```
-
-## Convex Setup
-
-This project uses Convex as a backend. You'll need to set up Convex before running the app:
-
-```bash
-bun run dev:setup
-```
-
-Follow the prompts to create a new Convex project and connect it to your application.
-
 Then, run the development server:
 
 ```bash
@@ -38,11 +22,6 @@ bun run dev
 
 Open [http://localhost:3001](http://localhost:3001) in your browser to see the web application.
 Your app will connect to the Convex cloud backend automatically.
-
-
-
-
-
 
 
 ## Project Structure
@@ -63,3 +42,7 @@ open-router/
 - `bun run dev:setup`: Setup and configure your Convex project
 - `bun run check-types`: Check TypeScript types across all apps
 - `bun run check`: Run Biome formatting and linting
+
+
+## ToDo
+- [ ] unify the validation, we do this in two places right now

@@ -11,8 +11,10 @@
 import type * as constants from "../constants.js";
 import type * as healthCheck from "../healthCheck.js";
 import type * as http from "../http.js";
+import type * as ocr from "../ocr.js";
 import type * as telegram from "../telegram.js";
 import type * as users from "../users.js";
+import type * as vouchers from "../vouchers.js";
 
 import type {
   ApiFromModules,
@@ -24,8 +26,10 @@ declare const fullApi: ApiFromModules<{
   constants: typeof constants;
   healthCheck: typeof healthCheck;
   http: typeof http;
+  ocr: typeof ocr;
   telegram: typeof telegram;
   users: typeof users;
+  vouchers: typeof vouchers;
 }>;
 
 /**

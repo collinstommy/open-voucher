@@ -16,6 +16,7 @@ export const handleTelegramMessage = internalAction({
     const username = message.from.username;
     const firstName = message.from.first_name;
     const isImage = !!message.photo;
+    const mediaGroupId = message.media_group_id;
 
     // 1. Idempotency Check & Storage
     // Store message immediately. If it exists, this returns null.
@@ -26,6 +27,7 @@ export const handleTelegramMessage = internalAction({
       direction: "inbound",
       messageType: isImage ? "image" : "text",
       text: text,
+      mediaGroupId,
       imageStorageId: undefined, // Ignoring image storage for this step
     });
 
@@ -87,12 +89,60 @@ When you request a voucher, you spend coins
       return;
     }
 
-    // 4. Temporary: Reply to confirm storage
-    if (text) {
-        await sendTelegramMessage(chatId, `Received and stored: "${text}"`);
-    } else if (isImage) {
-        await sendTelegramMessage(chatId, "Received image (storage pending implementation).");
+    // 4. Handle Image (Voucher Upload)
+    if (isImage) {
+      // Telegram sends multiple sizes, take the largest (last one)
+      const photo = message.photo[message.photo.length - 1];
+      const fileId = photo.file_id;
+
+      try {
+        const imageUrl = await getTelegramFileUrl(fileId);
+        const imageBlob = await fetch(imageUrl).then(r => r.blob());
+        const storageId = await ctx.storage.store(imageBlob);
+
+        // Update message with storage ID
+        if (messageDbId) {
+            await ctx.runMutation(internal.users.patchMessageImage, {
+                messageId: messageDbId,
+                imageStorageId: storageId
+            });
+        }
+
+        await ctx.runMutation(internal.vouchers.uploadVoucher, {
+          userId: user._id,
+          imageStorageId: storageId,
+        });
+
+        await sendTelegramMessage(chatId, "📸 Processing your voucher...");
+      } catch (e) {
+        console.error(e);
+        await sendTelegramMessage(chatId, "❌ Failed to process image.");
+      }
+      return;
     }
+
+    // 5. Handle Commands
+    const lowerText = text.toLowerCase();
+
+    if (lowerText === "/balance" || lowerText === "balance") {
+      await sendTelegramMessage(chatId, `💰 You have ${user.coins} coins.`);
+    } else if (lowerText === "/help" || lowerText === "help") {
+      await sendTelegramMessage(chatId, `Commands:\n📸 Send photo to upload\n💳 "claim 5/10/20"\n💰 /balance`);
+    } 
+    // Claim logic deferred to next step
+  },
+});
+
+/**
+ * Send a message via Telegram (Internal Action for scheduling).
+ */
+export const sendMessageAction = internalAction({
+  args: {
+    chatId: v.string(),
+    text: v.string(),
+  },
+  handler: async (ctx, { chatId, text }) => {
+    await sendTelegramMessage(chatId, text);
   },
 });
 
@@ -118,4 +168,14 @@ async function sendTelegramMessage(chatId: string, text: string) {
   } catch (error) {
       console.error("Network error sending Telegram message:", error);
   }
+}
+
+async function getTelegramFileUrl(fileId: string): Promise<string> {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  const res = await fetch(`https://api.telegram.org/bot${token}/getFile?file_id=${fileId}`);
+  const data = await res.json();
+  if (!data.ok) {
+      throw new Error(`Failed to get file path: ${data.description}`);
+  }
+  return `https://api.telegram.org/file/bot${token}/${data.result.file_path}`;
 }

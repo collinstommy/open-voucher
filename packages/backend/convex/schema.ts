@@ -50,6 +50,8 @@ export default defineSchema({
     messageType: v.union(v.literal("text"), v.literal("image")),
     // Text content (or caption for images)
     text: v.optional(v.string()),
+    // Media Group ID for grouping albums
+    mediaGroupId: v.optional(v.string()),
     // Convex storage ID if message contained an image
     imageStorageId: v.optional(v.id("_storage")),
     // Unix timestamp
@@ -60,8 +62,8 @@ export default defineSchema({
 
   // Vouchers table - stores uploaded voucher images and metadata
   vouchers: defineTable({
-    // Voucher denomination: "5" = €5 off €25, "10" = €10 off €50, "20" = €20 off €100
-    type: v.union(v.literal("5"), v.literal("10"), v.literal("20")),
+    // Voucher denomination: "5" = €5 off €25, "10" = €10 off €50, "20" = €20 off €100, "0" = Invalid/Unknown
+    type: v.union(v.literal("5"), v.literal("10"), v.literal("20"), v.literal("0")),
     // Current voucher status
     status: v.union(
       v.literal("processing"),  // OCR in progress
@@ -89,7 +91,8 @@ export default defineSchema({
   })
     .index("by_status_type", ["status", "type"])
     .index("by_uploader", ["uploaderId"])
-    .index("by_claimer_status", ["claimerId", "status"]),
+    .index("by_claimer_status", ["claimerId", "status"])
+    .index("by_barcode", ["barcodeNumber"]),
 
   // Reports table - tracks "already used" reports
   reports: defineTable({

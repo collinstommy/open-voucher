@@ -13,6 +13,7 @@
     "typescript": "^5.9.2"
   },
   "dependencies": {
-    "convex": "catalog:"
+    "convex": "catalog:",
+    "dayjs": "^1.11.19"
   }
 }

@@ -131,19 +131,14 @@ export const createUserWithInvite = internalMutation({
       telegramChatId,
       username,
       firstName,
-      coins: SIGNUP_BONUS,
+      coins: 0, // No signup bonus for launch
       isBanned: false,
       inviteCode: inviteCode.toUpperCase(),
       createdAt: now,
       lastActiveAt: now,
     });
 
-    await ctx.db.insert("transactions", {
-      userId,
-      type: "signup_bonus",
-      amount: SIGNUP_BONUS,
-      createdAt: now,
-    });
+    // Removed signup bonus transaction entry
 
     return {
       _id: userId,
@@ -165,6 +160,7 @@ export const storeMessage = internalMutation({
     direction: v.union(v.literal("inbound"), v.literal("outbound")),
     messageType: v.union(v.literal("text"), v.literal("image")),
     text: v.optional(v.string()),
+    mediaGroupId: v.optional(v.string()),
     imageStorageId: v.optional(v.id("_storage")),
   },
   handler: async (ctx, args) => {
@@ -185,5 +181,19 @@ export const storeMessage = internalMutation({
       ...args,
       createdAt: Date.now(),
     });
+  },
+});
+
+/**
+ * Update a message with the image storage ID after upload.
+ * Internal mutation.
+ */
+export const patchMessageImage = internalMutation({
+  args: {
+    messageId: v.id("messages"),
+    imageStorageId: v.id("_storage"),
+  },
+  handler: async (ctx, { messageId, imageStorageId }) => {
+    await ctx.db.patch(messageId, { imageStorageId });
   },
 });
