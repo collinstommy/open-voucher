@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { internalMutation } from "./_generated/server";
-import { MAX_COINS, UPLOAD_REWARDS } from "./constants";
+import { CLAIM_COSTS, MAX_COINS, UPLOAD_REWARDS } from "./constants";
 
 import dayjs from "dayjs";
 import { Id } from "./_generated/dataModel";
@@ -46,6 +46,7 @@ async function failVoucherHelper(
              } else {
                  userMessage += `We encountered an unknown error while processing your voucher. Please try again or contact support.`;
              }
+             userMessage += `\n\nError details: ${error}`;
 
              await ctx.scheduler.runAfter(0, internal.telegram.sendMessageAction, {
                chatId: uploader.telegramChatId,
@@ -95,6 +96,83 @@ export const uploadVoucher = internalMutation({
     });
 
     return voucherId;
+  },
+});
+
+/**
+ * Request a voucher.
+ * Checks balance, finds available voucher, claims it, and records transaction.
+ */
+export const requestVoucher = internalMutation({
+  args: {
+    userId: v.id("users"),
+    type: v.union(v.literal("5"), v.literal("10"), v.literal("20")),
+  },
+  handler: async (ctx, { userId, type }) => {
+    const user = await ctx.db.get(userId);
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    const cost = CLAIM_COSTS[type];
+    if (user.coins < cost) {
+      return { success: false, error: `Insufficient coins. You need ${cost} coins.` };
+    }
+
+    // Find oldest available voucher of this type
+    const voucher = await ctx.db
+      .query("vouchers")
+      .withIndex("by_status_type", (q) => q.eq("status", "available").eq("type", type))
+      .first();
+
+    if (!voucher) {
+      return { success: false, error: `No €${type} vouchers currently available.` };
+    }
+
+    // Deduct coins
+    const newCoins = user.coins - cost;
+    await ctx.db.patch(userId, { coins: newCoins });
+
+    // Mark voucher as claimed
+    const now = Date.now();
+
+
+    // Attempt to get image URL - if this fails, revert and error
+    const imageUrl = await ctx.storage.getUrl(voucher.imageStorageId);
+    if (!imageUrl) {
+        // Revert voucher status
+        await ctx.db.patch(voucher._id, {
+            status: "available",
+            claimerId: undefined,
+            claimedAt: undefined,
+        });
+        // Revert user coins
+        await ctx.db.patch(userId, { coins: user.coins });
+        return { success: false, error: "Failed to retrieve voucher image. No coins used. Please try again." };
+    }
+
+    await ctx.db.patch(voucher._id, {
+      status: "claimed",
+      claimerId: userId,
+      claimedAt: now,
+    });
+
+    // Record transaction
+    await ctx.db.insert("transactions", {
+      userId,
+      type: "claim_spend",
+      amount: -cost,
+      voucherId: voucher._id,
+      createdAt: now,
+    });
+
+    return {
+      success: true,
+      voucherId: voucher._id,
+      imageUrl, // Return the actual image URL
+      remainingCoins: newCoins,
+      expiryDate: voucher.expiryDate
+    };
   },
 });
 

@@ -122,14 +122,38 @@ When you request a voucher, you spend coins
     }
 
     // 5. Handle Commands
-    const lowerText = text.toLowerCase();
+    const lowerText = text.toLowerCase().trim();
 
     if (lowerText === "/balance" || lowerText === "balance") {
       await sendTelegramMessage(chatId, `💰 You have ${user.coins} coins.`);
+      return;
     } else if (lowerText === "/help" || lowerText === "help") {
       await sendTelegramMessage(chatId, `Commands:\n📸 Send photo to upload\n💳 "claim 5/10/20"\n💰 /balance`);
-    } 
-    // Claim logic deferred to next step
+      return;
+    }
+
+    // Handle Voucher Requests
+    // Support "5", "10", "20", "claim 5", "get 10", etc.
+    const match = lowerText.match(/\b(5|10|20)\b/);
+    if (match) {
+        const type = match[1] as "5" | "10" | "20";
+        // If the user just typed a number or a simple claim phrase, assume they want that voucher
+        // We do a loose check: if message length is short (< 20 chars) and contains the number
+        if (lowerText.length < 10) {
+             const result = await ctx.runMutation(internal.vouchers.requestVoucher, {
+                 userId: user._id,
+                 type
+             });
+
+             if (!result.success) {
+                 await sendTelegramMessage(chatId, `❌ ${result.error}`);
+             } else {
+                 // Image URL is now guaranteed to be present if success is true
+                 await sendTelegramPhoto(chatId, result.imageUrl!, `✅ <b>Here is your €${type} voucher!</b>\nRemaining coins: ${result.remainingCoins}`);
+             }
+             return;
+        }
+    }
   },
 });
 
@@ -167,6 +191,32 @@ async function sendTelegramMessage(chatId: string, text: string) {
     }
   } catch (error) {
       console.error("Network error sending Telegram message:", error);
+  }
+}
+
+async function sendTelegramPhoto(chatId: string, photoUrl: string, caption?: string) {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token) { return; }
+
+  const url = `https://api.telegram.org/bot${token}/sendPhoto`;
+  try {
+    const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            chat_id: chatId,
+            photo: photoUrl,
+            caption: caption,
+            parse_mode: "HTML"
+        }),
+    });
+
+    if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Failed to send Telegram photo:", errorText);
+    }
+  } catch (error) {
+      console.error("Network error sending Telegram photo:", error);
   }
 }
 
