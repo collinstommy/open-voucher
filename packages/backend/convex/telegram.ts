@@ -149,7 +149,7 @@ When you request a voucher, you spend coins
                  await sendTelegramMessage(chatId, `❌ ${result.error}`);
              } else {
                  // Image URL is now guaranteed to be present if success is true
-                 await sendTelegramPhoto(chatId, result.imageUrl!, `✅ <b>Here is your €${type} voucher!</b>\nRemaining coins: ${result.remainingCoins}`);
+                 await sendTelegramPhoto(chatId, result.imageUrl!, `✅ <b>Here is your €${type} voucher!</b>\n\nExpires: ${new Date(result.expiryDate!).toLocaleDateString('en-GB')}\nRemaining coins: ${result.remainingCoins}`);
              }
              return;
         }
