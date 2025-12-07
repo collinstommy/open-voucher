@@ -1,6 +1,10 @@
 import { v } from "convex/values";
 import { api, internal } from "./_generated/api";
+import { Id } from "./_generated/dataModel";
 import { internalAction } from "./_generated/server";
+import dayjs from "dayjs";
+import advancedFormat from "dayjs/plugin/advancedFormat";
+dayjs.extend(advancedFormat);
 
 /**
  * Handle incoming Telegram message.
@@ -149,7 +153,16 @@ When you request a voucher, you spend coins
                  await sendTelegramMessage(chatId, `❌ ${result.error}`);
              } else {
                  // Image URL is now guaranteed to be present if success is true
-                 await sendTelegramPhoto(chatId, result.imageUrl!, `✅ <b>Here is your €${type} voucher!</b>\n\nExpires: ${new Date(result.expiryDate!).toLocaleDateString('en-GB')}\nRemaining coins: ${result.remainingCoins}`);
+                 await sendTelegramPhoto(
+                    chatId,
+                    result.imageUrl!,
+                    `✅ <b>Here is your €${type} voucher!</b>\n\nExpires: ${dayjs(result.expiryDate!).format("MMM Do")}\nRemaining coins: ${result.remainingCoins}`,
+                    {
+                        inline_keyboard: [[
+                            { text: "⚠️ Already used", callback_data: `report:${result.voucherId}` }
+                        ]]
+                    }
+                );
              }
              return;
         }
@@ -194,21 +207,37 @@ async function sendTelegramMessage(chatId: string, text: string) {
   }
 }
 
-async function sendTelegramPhoto(chatId: string, photoUrl: string, caption?: string) {
+async function sendTelegramPhoto(chatId: string, photoUrl: string, caption?: string, replyMarkup?: any) {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   if (!token) { return; }
 
   const url = `https://api.telegram.org/bot${token}/sendPhoto`;
   try {
+    // 1. Fetch the image from the Storage URL
+    const imageRes = await fetch(photoUrl);
+    if (!imageRes.ok) {
+        console.error(`Failed to fetch image from storage URL: ${photoUrl} - ${imageRes.statusText}`);
+        return;
+    }
+    const imageBlob = await imageRes.blob();
+
+    // 2. Construct FormData to upload the image file
+    const formData = new FormData();
+    formData.append("chat_id", chatId);
+    formData.append("photo", imageBlob, "voucher.jpg");
+    if (caption) {
+        formData.append("caption", caption);
+        formData.append("parse_mode", "HTML");
+    }
+    if (replyMarkup) {
+        // reply_markup must be a JSON string when using multipart/form-data
+        formData.append("reply_markup", JSON.stringify(replyMarkup));
+    }
+
+    // 3. Send to Telegram
     const response = await fetch(url, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            chat_id: chatId,
-            photo: photoUrl,
-            caption: caption,
-            parse_mode: "HTML"
-        }),
+        body: formData,
     });
 
     if (!response.ok) {
@@ -218,6 +247,70 @@ async function sendTelegramPhoto(chatId: string, photoUrl: string, caption?: str
   } catch (error) {
       console.error("Network error sending Telegram photo:", error);
   }
+}
+
+/**
+ * Handle Telegram Callback Query (Button Press)
+ */
+export const handleTelegramCallback = internalAction({
+    args: {
+        callbackQuery: v.any(),
+    },
+    handler: async (ctx, { callbackQuery }) => {
+        const chatId = String(callbackQuery.message.chat.id);
+        const data = callbackQuery.data;
+
+        if (data.startsWith("report:")) {
+            const voucherId = data.split(":")[1];
+
+            // Acknowledge the callback immediately
+            await answerTelegramCallback(callbackQuery.id, "Checking...");
+
+            const result = await ctx.runMutation(internal.vouchers.reportVoucher, {
+                telegramChatId: chatId,
+                voucherId: voucherId as Id<"vouchers">,
+            });
+
+            if (result.status === "already_reported") {
+                await sendTelegramMessage(chatId, `⚠️ ${result.message}`);
+            } else if (result.status === "replaced" && result.voucher) {
+                 await sendTelegramPhoto(
+                    chatId,
+                    result.voucher.imageUrl,
+                    `🔄 <b>Here is a replacement €${result.voucher.type} voucher.</b>\n\nExpires: ${dayjs(result.voucher.expiryDate).format("MMM Do")}`,
+                     {
+                        inline_keyboard: [[
+                            { text: "⚠️ Already used", callback_data: `report:${result.voucher._id}` } // Allow reporting the replacement too
+                        ]]
+                    }
+                );
+            } else if (result.status === "refunded") {
+                await sendTelegramMessage(chatId, "⚠️ No replacement vouchers available. Your coins have been refunded.");
+            } else if (result.status === "reported") {
+                 // Should not happen if everything goes right, but just in case
+                 await sendTelegramMessage(chatId, "✅ Report received.");
+            }
+        }
+    }
+});
+
+async function answerTelegramCallback(callbackQueryId: string, text?: string) {
+    const token = process.env.TELEGRAM_BOT_TOKEN;
+    if (!token) { return; }
+
+    const url = `https://api.telegram.org/bot${token}/answerCallbackQuery`;
+    try {
+      await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+              callback_query_id: callbackQueryId,
+              text: text,
+          }),
+      });
+    } catch (error) {
+        console.error("Network error answering callback:", error);
+    }
 }
 
 async function getTelegramFileUrl(fileId: string): Promise<string> {

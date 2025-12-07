@@ -24,6 +24,10 @@ http.route({
         await ctx.runAction(internal.telegram.handleTelegramMessage, {
           message: body.message,
         });
+      } else if (body.callback_query) {
+        await ctx.runAction(internal.telegram.handleTelegramCallback, {
+          callbackQuery: body.callback_query,
+        });
       }
 
       return new Response("OK", { status: 200 });

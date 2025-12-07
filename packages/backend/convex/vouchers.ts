@@ -299,3 +299,117 @@ export const markVoucherOcrFailed = internalMutation({
     await failVoucherHelper(ctx, voucherId, error, reason, expiryDate);
   },
 });
+
+/**
+ * Report a voucher as not working (Already Used).
+ * Marks as reported, checks ban threshold, and tries to send a replacement.
+ */
+export const reportVoucher = internalMutation({
+    args: {
+      telegramChatId: v.string(),
+      voucherId: v.id("vouchers"),
+    },
+    handler: async (ctx, { telegramChatId, voucherId }) => {
+      // 1. Get User
+      const user = await ctx.db
+        .query("users")
+        .withIndex("by_chat_id", (q) => q.eq("telegramChatId", telegramChatId))
+        .first();
+      if (!user) throw new Error("User not found");
+  
+      // 2. Get Voucher
+      const voucher = await ctx.db.get(voucherId);
+      if (!voucher) throw new Error("Voucher not found");
+  
+      // Verify this user actually claimed this voucher
+      if (voucher.claimerId !== user._id) {
+          throw new Error("You did not claim this voucher");
+      }
+  
+      // Check if this user already reported this specific voucher
+      const existingReport = await ctx.db
+          .query("reports")
+          .withIndex("by_voucher", (q) => q.eq("voucherId", voucherId))
+          .filter(q => q.eq(q.field("reporterId"), user._id))
+          .first();
+  
+      if (existingReport) {
+          return { status: "already_reported", message: "You have already reported this voucher." };
+      }
+
+      // 3. Mark as Reported
+      // Check if already reported to avoid double counting
+      let reportId: Id<"reports"> | undefined;
+      if (voucher.status !== "reported") {
+          await ctx.db.patch(voucherId, { status: "reported" });
+          reportId = await ctx.db.insert("reports", {
+              voucherId,
+              reporterId: user._id,
+              uploaderId: voucher.uploaderId,
+              reason: "not_working",
+              createdAt: Date.now(),
+          });
+      }
+  
+      // 4. Check Ban Threshold (for Uploader)
+      const uploaderReports = await ctx.db
+          .query("reports")
+          .withIndex("by_uploader", (q) => q.eq("uploaderId", voucher.uploaderId))
+          .collect(); 
+  
+      if (uploaderReports.length > 10) {
+          await ctx.db.patch(voucher.uploaderId, { isBanned: true });
+          
+          // Notify the uploader
+          const uploader = await ctx.db.get(voucher.uploaderId);
+          if (uploader) {
+               await ctx.scheduler.runAfter(0, internal.telegram.sendMessageAction, {
+                   chatId: uploader.telegramChatId,
+                   text: "🚫 <b>Account Banned</b>\n\nYour account has been banned because multiple vouchers you uploaded were reported as not working."
+               });
+          }
+      }
+  
+      // 5. Replacement Logic (No charge)
+      // Find replacement of same type
+      const replacement = await ctx.db
+          .query("vouchers")
+          .withIndex("by_status_type", (q) => q.eq("status", "available").eq("type", voucher.type))
+          .first();
+  
+      if (replacement) {
+          const imageUrl = await ctx.storage.getUrl(replacement.imageStorageId);
+          if (!imageUrl) {
+               // Edge case: image missing. Refund coins.
+               await ctx.db.patch(user._id, { coins: user.coins + CLAIM_COSTS[voucher.type] });
+               return { status: "refunded", message: "Replacement found but image missing. Coins refunded." };
+          }
+  
+          await ctx.db.patch(replacement._id, {
+              status: "claimed",
+              claimerId: user._id,
+              claimedAt: Date.now(),
+          });
+
+          // Link replacement to report
+          if (reportId) {
+              await ctx.db.patch(reportId, { replacementVoucherId: replacement._id });
+          }
+  
+          return {
+              status: "replaced",
+              voucher: {
+                  _id: replacement._id,
+                  type: replacement.type,
+                  imageUrl,
+                  expiryDate: replacement.expiryDate
+              }
+          };
+  
+      } else {
+          // Refund coins
+          await ctx.db.patch(user._id, { coins: user.coins + CLAIM_COSTS[voucher.type] });
+          return { status: "refunded" };
+      }
+    }
+  });

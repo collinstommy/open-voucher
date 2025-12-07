@@ -102,13 +102,16 @@ export default defineSchema({
     reporterId: v.id("users"),
     // User who uploaded the voucher
     uploaderId: v.id("users"),
+    // Reason for report
+    reason: v.string(),
     // If a replacement was given, reference to the new voucher
     replacementVoucherId: v.optional(v.id("vouchers")),
     // Unix timestamp when report was created
     createdAt: v.number(),
   })
     .index("by_voucher", ["voucherId"])
-    .index("by_uploader", ["uploaderId"]),
+    .index("by_uploader", ["uploaderId"])
+    .index("by_reporterId", ["reporterId"]),
 
   // Transactions table - audit log of all coin changes
   transactions: defineTable({
