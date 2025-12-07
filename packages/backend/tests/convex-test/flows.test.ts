@@ -403,7 +403,7 @@ describe("Voucher Claim Flow", () => {
     const userId = await t.run(async (ctx) => {
       return await ctx.db.insert("users", {
         telegramChatId: chatId,
-        coins: 5, // Not enough for €10 voucher (cost 10)
+        coins: 5,
         isBanned: false,
         createdAt: Date.now(),
         lastActiveAt: Date.now(),
@@ -599,7 +599,7 @@ describe("OCR Flow with Mocked Gemini", () => {
 
   test("duplicate barcode is rejected via Telegram webhook", async () => {
     // Use a barcode that the mock OCR will return
-    const duplicateBarcode = "1234567890002"; // This is what valid_10 returns
+    const duplicateBarcode = "1234567890002";
     const chatId = "123456";
     setupFetchMock("valid_10");
     vi.stubEnv("GOOGLE_GENERATIVE_AI_API_KEY", "test-api-key");
@@ -741,6 +741,6 @@ describe("Report Flow", () => {
     const claimer = await t.run(async (ctx) => {
       return await ctx.db.get(claimerId);
     });
-    expect(claimer?.coins).toBe(20); // 10 + 10 refund
+    expect(claimer?.coins).toBe(20);
   });
 });
