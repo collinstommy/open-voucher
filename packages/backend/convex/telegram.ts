@@ -1,9 +1,9 @@
 import { v } from "convex/values";
+import dayjs from "dayjs";
+import advancedFormat from "dayjs/plugin/advancedFormat";
 import { api, internal } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
 import { internalAction } from "./_generated/server";
-import dayjs from "dayjs";
-import advancedFormat from "dayjs/plugin/advancedFormat";
 dayjs.extend(advancedFormat);
 
 /**
@@ -285,7 +285,7 @@ export const handleTelegramCallback = internalAction({
                     }
                 );
             } else if (result.status === "refunded") {
-                await sendTelegramMessage(chatId, "⚠️ No replacement vouchers available. Your coins have been refunded.");
+                await sendTelegramMessage(chatId, "⚠️ No replacement vouchers available.");
             } else if (result.status === "reported") {
                  // Should not happen if everything goes right, but just in case
                  await sendTelegramMessage(chatId, "✅ Report received.");
