@@ -1,18 +1,29 @@
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
-import { internalMutation } from "./_generated/server";
+import { internalMutation, internalQuery } from "./_generated/server";
 import { CLAIM_COSTS, MAX_COINS, UPLOAD_REWARDS } from "./constants";
 
 import dayjs from "dayjs";
 import { Id } from "./_generated/dataModel";
 import { MutationCtx } from "./_generated/server";
 
+
+export const getVoucherByBarcode = internalQuery({
+  args: { barcodeNumber: v.string() },
+  handler: async (ctx, { barcodeNumber }) => {
+    return await ctx.db
+      .query("vouchers")
+      .withIndex("by_barcode", (q) => q.eq("barcodeNumber", barcodeNumber))
+      .first();
+  },
+});
+
 // Shared helper to mark voucher as failed/rejected
 async function failVoucherHelper(
     ctx: MutationCtx,
     voucherId: Id<"vouchers">,
     error: string,
-    reason: "EXPIRED" | "COULD_NOT_READ_AMOUNT" | "COULD_NOT_READ_BARCODE" | "COULD_NOT_READ_EXPIRY_DATE" | "INVALID_TYPE" | "UNKNOWN_ERROR",
+    reason: "EXPIRED" | "COULD_NOT_READ_AMOUNT" | "COULD_NOT_READ_BARCODE" | "COULD_NOT_READ_EXPIRY_DATE" | "INVALID_TYPE" | "DUPLICATE_BARCODE" | "UNKNOWN_ERROR",
     detectedExpiryDate?: number
 ) {
     const voucher = await ctx.db.get(voucherId);
@@ -43,6 +54,8 @@ async function failVoucherHelper(
                  userMessage += `This voucher expired on ${dayjs(dateToUse).format('DD-MM-YYYY')}.`;
              } else if (reason === "INVALID_TYPE") {
                  userMessage += `This voucher does not appear to be a valid €5, €10, or €20 Dunnes voucher. We only accept these specific general spend vouchers.`;
+             } else if (reason === "DUPLICATE_BARCODE") {
+                 userMessage += `This voucher has already been uploaded by someone. Each voucher can only be uploaded once.`;
              } else {
                  userMessage += `We encountered an unknown error while processing your voucher. Please try again or contact support.`;
              }
@@ -291,6 +304,7 @@ export const markVoucherOcrFailed = internalMutation({
         v.literal("COULD_NOT_READ_BARCODE"),
         v.literal("COULD_NOT_READ_EXPIRY_DATE"),
         v.literal("INVALID_TYPE"),
+        v.literal("DUPLICATE_BARCODE"),
         v.literal("UNKNOWN_ERROR")
     ),
     expiryDate: v.optional(v.number()),
@@ -316,23 +330,23 @@ export const reportVoucher = internalMutation({
         .withIndex("by_chat_id", (q) => q.eq("telegramChatId", telegramChatId))
         .first();
       if (!user) throw new Error("User not found");
-  
+
       // 2. Get Voucher
       const voucher = await ctx.db.get(voucherId);
       if (!voucher) throw new Error("Voucher not found");
-  
+
       // Verify this user actually claimed this voucher
       if (voucher.claimerId !== user._id) {
           throw new Error("You did not claim this voucher");
       }
-  
+
       // Check if this user already reported this specific voucher
       const existingReport = await ctx.db
           .query("reports")
           .withIndex("by_voucher", (q) => q.eq("voucherId", voucherId))
           .filter(q => q.eq(q.field("reporterId"), user._id))
           .first();
-  
+
       if (existingReport) {
           return { status: "already_reported", message: "You have already reported this voucher." };
       }
@@ -350,16 +364,16 @@ export const reportVoucher = internalMutation({
               createdAt: Date.now(),
           });
       }
-  
+
       // 4. Check Ban Threshold (for Uploader)
       const uploaderReports = await ctx.db
           .query("reports")
           .withIndex("by_uploader", (q) => q.eq("uploaderId", voucher.uploaderId))
-          .collect(); 
-  
+          .collect();
+
       if (uploaderReports.length > 10) {
           await ctx.db.patch(voucher.uploaderId, { isBanned: true });
-          
+
           // Notify the uploader
           const uploader = await ctx.db.get(voucher.uploaderId);
           if (uploader) {
@@ -369,14 +383,14 @@ export const reportVoucher = internalMutation({
                });
           }
       }
-  
+
       // 5. Replacement Logic (No charge)
       // Find replacement of same type
       const replacement = await ctx.db
           .query("vouchers")
           .withIndex("by_status_type", (q) => q.eq("status", "available").eq("type", voucher.type))
           .first();
-  
+
       if (replacement) {
           const imageUrl = await ctx.storage.getUrl(replacement.imageStorageId);
           if (!imageUrl) {
@@ -384,7 +398,7 @@ export const reportVoucher = internalMutation({
                await ctx.db.patch(user._id, { coins: user.coins + CLAIM_COSTS[voucher.type] });
                return { status: "refunded", message: "Replacement found but image missing. Coins refunded." };
           }
-  
+
           await ctx.db.patch(replacement._id, {
               status: "claimed",
               claimerId: user._id,
@@ -395,7 +409,7 @@ export const reportVoucher = internalMutation({
           if (reportId) {
               await ctx.db.patch(reportId, { replacementVoucherId: replacement._id });
           }
-  
+
           return {
               status: "replaced",
               voucher: {
@@ -405,7 +419,7 @@ export const reportVoucher = internalMutation({
                   expiryDate: replacement.expiryDate
               }
           };
-  
+
       } else {
           // Refund coins
           await ctx.db.patch(user._id, { coins: user.coins + CLAIM_COSTS[voucher.type] });

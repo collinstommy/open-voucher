@@ -9,6 +9,7 @@ type VoucherOcrFailureReason =
   | "COULD_NOT_READ_BARCODE"
   | "COULD_NOT_READ_EXPIRY_DATE"
   | "INVALID_TYPE"
+  | "DUPLICATE_BARCODE"
   | "UNKNOWN_ERROR";
 
 class VoucherValidationError extends Error {
@@ -148,8 +149,18 @@ If expiry is unknown: null.`;
         throw new VoucherValidationError("COULD_NOT_READ_EXPIRY_DATE", "Could not determine expiry date");
       }
 
-      // Get barcode (optional)
-      const barcodeNumber = extracted.barcode || undefined;
+      const barcodeNumber = extracted.barcode;
+      if (!barcodeNumber) {
+        throw new VoucherValidationError("COULD_NOT_READ_BARCODE", "Could not read barcode from voucher");
+      }
+
+      // Check for duplicate barcode before saving
+      const existingVoucher = await ctx.runQuery(internal.vouchers.getVoucherByBarcode, {
+        barcodeNumber,
+      });
+      if (existingVoucher) {
+        throw new VoucherValidationError("DUPLICATE_BARCODE", "This voucher has already been uploaded");
+      }
 
       // Update voucher with extracted data
       await ctx.runMutation(internal.vouchers.updateVoucherFromOcr, {
@@ -160,7 +171,7 @@ If expiry is unknown: null.`;
         ocrRawResponse: rawResponse,
       });
 
-      console.log(`OCR completed for voucher ${voucherId}: type=${voucherType}, expiry=${new Date(expiryDate).toISOString()}, barcode=${barcodeNumber}, rawResponse=${JSON.stringify(rawResponse)}`);
+      console.log(`OCR completed for voucher ${voucherId}: type=${voucherType}, expiry=${new Date(expiryDate).toISOString()}, barcode=${barcodeNumber}`);
     } catch (error: any) {
       console.error(`OCR failed for voucher ${voucherId}:`, error);
 
