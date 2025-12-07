@@ -89,9 +89,6 @@ export const uploadVoucher = internalMutation({
       throw new Error("You have been banned from this service");
     }
 
-    // Create voucher in processing status
-    // Type defaults to "0" and will be updated by OCR
-    // ExpiryDate defaults to 0 and will be updated by OCR
     const now = Date.now();
     const voucherId = await ctx.db.insert("vouchers", {
       type: "0",
@@ -203,7 +200,6 @@ export const updateVoucherFromOcr = internalMutation({
     ocrRawResponse: v.string(),
   },
   handler: async (ctx, { voucherId, type, expiryDate, barcodeNumber, ocrRawResponse }) => {
-    // Get voucher
     const voucher = await ctx.db.get(voucherId);
     if (!voucher) {
       throw new Error("Voucher not found");
@@ -211,38 +207,11 @@ export const updateVoucherFromOcr = internalMutation({
 
     const uploader = await ctx.db.get(voucher.uploaderId);
     if (!uploader) {
-       // Should not happen, but safe check
        return;
     }
 
-    const now = Date.now();
-    // Check for duplicates
-    if (barcodeNumber) {
-        const duplicate = await ctx.db
-            .query("vouchers")
-            .withIndex("by_barcode", (q) => q.eq("barcodeNumber", barcodeNumber))
-            .first();
-
-        if (duplicate && duplicate._id !== voucherId) {
-             await ctx.db.patch(voucherId, {
-                type,
-                expiryDate,
-                barcodeNumber,
-                ocrRawResponse,
-                status: "expired", // Rejected as duplicate
-            });
-
-            await ctx.scheduler.runAfter(0, internal.telegram.sendMessageAction, {
-                chatId: uploader.telegramChatId,
-                text: `⚠️ <b>Duplicate Voucher</b>\n\nThis voucher (barcode ending in ${barcodeNumber.slice(-4)}) has already been uploaded by someone else.`
-            });
-            return;
-        }
-    }
-
     // Check if voucher is already expired
-    // We assume expiryDate is set to the END of the valid day
-    const isExpired = expiryDate < now;
+    const isExpired = expiryDate < Date.now();
 
     if (isExpired) {
          await failVoucherHelper(
@@ -278,7 +247,7 @@ export const updateVoucherFromOcr = internalMutation({
           type: "upload_reward",
           amount: reward,
           voucherId,
-          createdAt: now,
+          createdAt: Date.now(),
         });
 
         // Notify user
