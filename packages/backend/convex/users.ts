@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { internalMutation, mutation, query } from "./_generated/server";
+import { internalMutation, query } from "./_generated/server";
 import { SIGNUP_BONUS } from "./constants";
 
 /**
@@ -17,7 +17,7 @@ function generateShortCode(): string {
 /**
  * Create a new invite code.
  */
-export const createInviteCode = mutation({
+export const createInviteCode = internalMutation({
   args: {
     code: v.optional(v.string()),
     label: v.optional(v.string()),

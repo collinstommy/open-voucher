@@ -34,7 +34,7 @@ open-router/
 │   ├── backend/     # Convex backend functions and schema
 ```
 
-## Available Scripts
+## Available pacakges/backend
 
 - `bun run dev`: Start all applications in development mode
 - `bun run build`: Build all applications
@@ -116,6 +116,60 @@ curl -X POST "https://api.telegram.org/bot{PROD_TOKEN}/setWebhook" \
      -d "{\"url\": \"{PROD_URL_WEBHOOK}\"}"
 ```
 
+## Admin CLI Tools
+
+### Create Invite Codes
+
+The project includes a CLI tool for creating invite codes for user onboarding:
+
+**Setup:**
+```bash
+# Make the script executable (if not already)
+chmod +x pacakges/backend/createInviteCode.sh
+```
+
+**Usage Examples:**
+
+1. **Create an auto-generated invite code:**
+   ```bash
+   ./pacakges/backend/createInviteCode.sh
+   ```
+
+2. **Create a custom code with a label:**
+   ```bash
+   ./pacakges/backend/createInviteCode.sh -c "REDDIT50" -l "Reddit launch campaign"
+   ```
+
+3. **Create code with limits and expiry:**
+   ```bash
+   ./pacakges/backend/createInviteCode.sh -c "TWITTER100" -l "Twitter giveaway" -m 100 -e 30
+   ```
+
+4. **Create code for production environment:**
+   ```bash
+   ./pacakges/backend/createInviteCode.sh -c "PARTY25" -l "Birthday party" -p
+   ```
+
+**Parameters:**
+- `-c, --code CODE` - Custom invite code (optional, auto-generated if not provided)
+- `-l, --label LABEL` - Description for tracking purposes (optional)
+- `-m, --max-uses NUM` - Maximum number of uses (default: 50)
+- `-e, --expires NUM` - Expiry in days (default: no expiry)
+- `-p, --prod` - Use production environment (default: development)
+- `-h, --help` - Show help message
+
+**Example Output:**
+```
+✅ Invite code created successfully!
+
+📋 Details:
+   Code: REDDIT50
+   Label: Reddit launch campaign
+   Max Uses: 50
+   Environment: development
+
+🔗 Share: https://t.me/your_bot?start=REDDIT50
+```
 
 ## ToDo
 - [ ] unify the validation, we do this in two places right now
