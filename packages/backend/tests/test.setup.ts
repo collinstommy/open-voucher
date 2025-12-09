@@ -1,5 +1,7 @@
+/// <reference types="vite/client" />
+
 /**
  * Module loader for convex-test
- * Using empty modules object for now since we're not using dynamic imports in tests
+ * This file uses import.meta.glob which requires Vite
  */
-export const modules = {};
+export const modules = import.meta.glob("./**/!(*.*.*)*.*s");
