@@ -1,15 +1,15 @@
 // Coin rewards for uploading vouchers (by type)
 export const UPLOAD_REWARDS: Record<string, number> = {
-  "5": 15,   // €5 voucher = 15 coins
-  "10": 10,  // €10 voucher = 10 coins
-  "20": 5,   // €20 voucher = 5 coins
+	"5": 15, // €5 voucher = 15 coins
+	"10": 10, // €10 voucher = 10 coins
+	"20": 5, // €20 voucher = 5 coins
 };
 
 // Coin costs for claiming vouchers (by type)
 export const CLAIM_COSTS: Record<string, number> = {
-  "5": 15,   // €5 voucher = 15 coins
-  "10": 10,  // €10 voucher = 10 coins
-  "20": 5,   // €20 voucher = 5 coins
+	"5": 15, // €5 voucher = 15 coins
+	"10": 10, // €10 voucher = 10 coins
+	"20": 5, // €20 voucher = 5 coins
 };
 
 // Signup bonus
