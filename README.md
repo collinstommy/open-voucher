@@ -10,7 +10,6 @@ This project was created with [Better-T-Stack](https://github.com/AmanVarshney01
 - **shadcn/ui** - Reusable UI components
 - **Convex** - Reactive backend-as-a-service platform
 - **Turborepo** - Optimized monorepo build system
-- **Biome** - Linting and formatting
 
 ## Getting Started
 
@@ -41,7 +40,6 @@ open-router/
 - `bun run dev:web`: Start only the web application
 - `bun run dev:setup`: Setup and configure your Convex project
 - `bun run check-types`: Check TypeScript types across all apps
-- `bun run check`: Run Biome formatting and linting
 
 ## Environment Setup
 

@@ -10,7 +10,6 @@ This project, `open-router`, is a modern TypeScript monorepo built with Better-T
 *   **shadcn/ui:** Provides a collection of reusable UI components.
 *   **Convex:** A reactive backend-as-a-service platform, used for the backend logic and data storage.
 *   **Turborepo:** An optimized build system for managing the monorepo structure.
-*   **Biome:** Utilized for linting and formatting the codebase, ensuring code quality and consistency.
 
 ## Architecture
 
@@ -40,7 +39,6 @@ The following `bun run` scripts are available from the root directory:
 *   `bun run dev`: Starts all applications (web and backend) in development mode using Turborepo.
 *   `bun run build`: Builds all applications for production.
 *   `bun run check-types`: Runs TypeScript type checking across all packages.
-*   `bun run check`: Executes Biome for code formatting and linting.
 *   `bun run dev:web`: Starts only the web frontend application in development mode.
 *   `bun run dev:server`: Starts only the Convex backend server in development mode.
 *   `bun run dev:setup`: Sets up and configures the Convex project.
@@ -48,5 +46,4 @@ The following `bun run` scripts are available from the root directory:
 ## Development Conventions
 
 *   **TypeScript:** All code is written in TypeScript for strong typing.
-*   **Linting & Formatting:** Biome is used to enforce consistent code style and identify potential issues. Run `bun run check` to apply formatting and linting rules.
 *   **Monorepo Management:** Turborepo is used for efficient management and building of different applications/packages within the monorepo.
