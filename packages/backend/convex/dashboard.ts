@@ -1,4 +1,4 @@
-import { query } from "./_generated/server";
+import { internalQuery, query } from "./_generated/server";
 
 export const getStats = query({
 	handler: async (ctx) => {
@@ -25,5 +25,39 @@ export const getStats = query({
 			totalUploaded,
 			userCount,
 		};
+	},
+});
+
+export const getExpiringVouchers = internalQuery({
+	handler: async (ctx) => {
+		const now = new Date();
+		const startOfToday = new Date(
+			now.getFullYear(),
+			now.getMonth(),
+			now.getDate(),
+		).getTime();
+		const endOfTomorrow = new Date(
+			now.getFullYear(),
+			now.getMonth(),
+			now.getDate() + 2,
+		).getTime();
+
+		const vouchers = await ctx.db.query("vouchers").collect();
+
+		const expiringVouchers = vouchers
+			.filter(
+				(v) =>
+					v.expiryDate >= startOfToday &&
+					v.expiryDate < endOfTomorrow &&
+					v.status === "available",
+			)
+			.map((v) => ({
+				id: v._id,
+				type: v.type,
+				expiryDate: new Date(v.expiryDate).toISOString().split("T")[0],
+				status: v.status,
+			}));
+
+		return expiringVouchers;
 	},
 });
