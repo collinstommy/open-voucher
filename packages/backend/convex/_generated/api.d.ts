@@ -9,6 +9,7 @@
  */
 
 import type * as constants from "../constants.js";
+import type * as dashboard from "../dashboard.js";
 import type * as healthCheck from "../healthCheck.js";
 import type * as http from "../http.js";
 import type * as ocr from "../ocr.js";
@@ -24,6 +25,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   constants: typeof constants;
+  dashboard: typeof dashboard;
   healthCheck: typeof healthCheck;
   http: typeof http;
   ocr: typeof ocr;

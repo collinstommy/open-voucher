@@ -7,10 +7,21 @@ import { routeTree } from "./routeTree.gen";
 import Loader from "./components/loader";
 import "./index.css";
 
+const DEPLOYMENTS = {
+	dev: "https://fastidious-okapi-116.convex.cloud",
+	prod: "https://whimsical-kudu-895.convex.cloud",
+};
+
 export function getRouter() {
-	const CONVEX_URL = (import.meta as any).env.VITE_CONVEX_URL!;
+	const storedDeployment =
+		typeof window !== "undefined"
+			? (localStorage.getItem("convex-deployment") as keyof typeof DEPLOYMENTS)
+			: null;
+	const CONVEX_URL =
+		DEPLOYMENTS[storedDeployment || "prod"] ||
+		(import.meta as any).env.VITE_CONVEX_URL!;
 	if (!CONVEX_URL) {
-		console.error("missing envar VITE_CONVEX_URL");
+		console.error("missing convex URL");
 	}
 	const convex = new ConvexReactClient(CONVEX_URL, {
 		unsavedChangesWarning: false,
