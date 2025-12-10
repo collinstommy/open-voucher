@@ -1,7 +1,7 @@
 import { v } from "convex/values";
+import dayjs from "dayjs";
 import { internal } from "./_generated/api";
 import { internalAction } from "./_generated/server";
-import dayjs from "dayjs";
 
 type VoucherOcrFailureReason =
   | "EXPIRED"
@@ -49,8 +49,11 @@ export const processVoucherImage = internalAction({
       const prompt = `You are analyzing an image of a voucher.
 We are ONLY looking for specific Dunnes Stores vouchers (Ireland) of these exact types:
 - €5 off €25
+- €10 off €40
 - €10 off €50
+- €20 off €80
 - €20 off €100
+
 
 Any other voucher type (e.g. "€1 off", "€3 off", product specific, or from other stores) is INVALID.
 
