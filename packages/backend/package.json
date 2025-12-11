@@ -7,7 +7,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "bun test tests/convex-test/",
-    "deploy": "convex deploy"
+    "deploy": "convex deploy",
+    "expiring": "convex run dashboard:getExpiringVouchers --prod",
+    "expiring:dev": "convex run dashboard:getExpiringVouchers"
   },
   "author": "",
   "license": "ISC",

@@ -59,7 +59,8 @@ async function failVoucherHelper(
              } else {
                  userMessage += `We encountered an unknown error while processing your voucher. Please try again or contact support.`;
              }
-             userMessage += `\n\nError details: ${error}`;
+
+             console.error('Error details:', error);
 
              await ctx.scheduler.runAfter(0, internal.telegram.sendMessageAction, {
                chatId: uploader.telegramChatId,
@@ -129,15 +130,18 @@ export const requestVoucher = internalMutation({
       return { success: false, error: `Insufficient coins. You need ${cost} coins.` };
     }
 
-    // Find oldest available voucher of this type
-    const voucher = await ctx.db
+    // Find available voucher expiring soonest
+    const vouchers = await ctx.db
       .query("vouchers")
       .withIndex("by_status_type", (q) => q.eq("status", "available").eq("type", type))
-      .first();
+      .collect();
 
-    if (!voucher) {
+    if (vouchers.length === 0) {
       return { success: false, error: `No €${type} vouchers currently available.` };
     }
+
+    // Sort by expiry date ascending (soonest first)
+    const voucher = vouchers.sort((a, b) => a.expiryDate - b.expiryDate)[0];
 
     // Deduct coins
     const newCoins = user.coins - cost;
