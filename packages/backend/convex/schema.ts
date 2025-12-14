@@ -90,6 +90,8 @@ export default defineSchema({
     ocrRawResponse: v.optional(v.string()),
   })
     .index("by_status_type", ["status", "type"])
+    .index("by_status_created", ["status", "createdAt"])
+    .index("by_claimed_at", ["claimedAt"])
     .index("by_uploader", ["uploaderId"])
     .index("by_claimer_status", ["claimerId", "status"])
     .index("by_barcode", ["barcodeNumber"]),
