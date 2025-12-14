@@ -90,6 +90,7 @@ When you request a voucher, you spend coins
     }
 
     if (user.isBanned) {
+      await sendTelegramMessage(chatId, "🚫 Your account has been banned from this service.");
       return;
     }
 
@@ -258,6 +259,7 @@ export const handleTelegramCallback = internalAction({
     },
     handler: async (ctx, { callbackQuery }) => {
         const chatId = String(callbackQuery.message.chat.id);
+        const telegramUserId = String(callbackQuery.from.id);
         const data = callbackQuery.data;
 
         if (data.startsWith("report:")) {
@@ -266,8 +268,17 @@ export const handleTelegramCallback = internalAction({
             // Acknowledge the callback immediately
             await answerTelegramCallback(callbackQuery.id, "Checking...");
 
+            // Look up the user by their Telegram chat ID
+            const user = await ctx.runQuery(api.users.getUserByTelegramChatId, {
+                telegramChatId: telegramUserId,
+            });
+
+            if (!user) {
+                return;
+            }
+
             const result = await ctx.runMutation(internal.vouchers.reportVoucher, {
-                telegramChatId: chatId,
+                userId: user._id,
                 voucherId: voucherId as Id<"vouchers">,
             });
 

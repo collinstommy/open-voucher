@@ -293,15 +293,12 @@ export const markVoucherOcrFailed = internalMutation({
  */
 export const reportVoucher = internalMutation({
     args: {
-      telegramChatId: v.string(),
+      userId: v.id("users"),
       voucherId: v.id("vouchers"),
     },
-    handler: async (ctx, { telegramChatId, voucherId }) => {
+    handler: async (ctx, { userId, voucherId }) => {
       // 1. Get User
-      const user = await ctx.db
-        .query("users")
-        .withIndex("by_chat_id", (q) => q.eq("telegramChatId", telegramChatId))
-        .first();
+      const user = await ctx.db.get(userId);
       if (!user) throw new Error("User not found");
 
       // 2. Get Voucher
@@ -344,7 +341,7 @@ export const reportVoucher = internalMutation({
           .withIndex("by_uploader", (q) => q.eq("uploaderId", voucher.uploaderId))
           .collect();
 
-      if (uploaderReports.length > 10) {
+      if (uploaderReports.length >= 10) {
           await ctx.db.patch(voucher.uploaderId, { isBanned: true });
 
           // Notify the uploader

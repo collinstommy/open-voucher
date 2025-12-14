@@ -34,10 +34,12 @@ type OCRSenario = "valid_10" | "valid_5" | "valid_20" | "expired" | "invalid_typ
 
 // Helper to create a text message
 function createTelegramMessage(text: string, chatId: string = "123456", username: string = "testuser") {
+  // Parse chatId as number if it's numeric, otherwise use it as-is
+  const numericChatId = isNaN(Number(chatId)) ? chatId : Number(chatId);
   return {
     message_id: Math.floor(Math.random() * 100000),
-    chat: { id: Number(chatId) },
-    from: { id: Number(chatId), username, first_name: "Test" },
+    chat: { id: numericChatId },
+    from: { id: numericChatId, username, first_name: "Test" },
     text,
     date: Math.floor(Date.now() / 1000),
   };
@@ -45,10 +47,12 @@ function createTelegramMessage(text: string, chatId: string = "123456", username
 
 // Helper to create a photo message
 function createTelegramPhotoMessage(chatId: string = "123456") {
+  // Parse chatId as number if it's numeric, otherwise use it as-is
+  const numericChatId = isNaN(Number(chatId)) ? chatId : Number(chatId);
   return {
     message_id: Math.floor(Math.random() * 100000),
-    chat: { id: Number(chatId) },
-    from: { id: Number(chatId), username: "testuser", first_name: "Test" },
+    chat: { id: numericChatId },
+    from: { id: numericChatId, username: "testuser", first_name: "Test" },
     photo: [
       { file_id: "small_photo_id", width: 100, height: 100 },
       { file_id: "large_photo_id", width: 800, height: 600 },
@@ -59,14 +63,16 @@ function createTelegramPhotoMessage(chatId: string = "123456") {
 
 // Helper to create a callback query
 function createTelegramCallback(data: string, chatId: string = "123456") {
+  // Parse chatId as number if it's numeric, otherwise use it as-is
+  const numericChatId = isNaN(Number(chatId)) ? chatId : Number(chatId);
   return {
     id: "callback_id_" + Math.floor(Math.random() * 100000),
     data,
     message: {
       message_id: Math.floor(Math.random() * 100000),
-      chat: { id: Number(chatId) },
+      chat: { id: numericChatId },
     },
-    from: { id: Number(chatId), username: "testuser", first_name: "Test" },
+    from: { id: numericChatId, username: "testuser", first_name: "Test" },
   };
 }
 
@@ -731,7 +737,7 @@ describe("Report Flow", () => {
 
     // Report the voucher
     const result = await t.mutation(internal.vouchers.reportVoucher, {
-      telegramChatId: "claimer456",
+      userId: claimerId,
       voucherId,
     });
 
@@ -757,6 +763,7 @@ describe("Ban Flow", () => {
   });
 
   test("uploader gets banned after 10 reports and receives ban message", async () => {
+    vi.useFakeTimers();
     const t = convexTest(schema, modules);
     const uploaderChatId = "uploader_ban_test";
     const reporterChatId = "reporter_test";
@@ -849,6 +856,10 @@ describe("Ban Flow", () => {
       callbackQuery
     });
 
+    // Wait for scheduled functions (ban notification) to complete
+    vi.runAllTimers();
+    await t.finishInProgressScheduledFunctions();
+
     // Verify the uploader is now banned
     const uploader = await t.run(async (ctx) => {
       return await ctx.db.get(uploaderId);
@@ -868,6 +879,12 @@ describe("Ban Flow", () => {
       return await ctx.db.get(availableVoucherId);
     });
     expect(availableVoucher?.status).toBe("reported");
+
+    // Verify reporter got appropriate response (replacement or refund)
+    const reporterResponse = sentMessages.find(m =>
+      m.chatId === reporterChatId
+    );
+    expect(reporterResponse).toBeDefined();
 
     // Now test that the banned user gets a ban message when trying to interact
     sentMessages.length = 0; // Clear sent messages
@@ -900,10 +917,6 @@ describe("Ban Flow", () => {
     );
     expect(banMessage).toBeDefined();
 
-    // Verify reporter got appropriate response (replacement or refund)
-    const reporterResponse = sentMessages.find(m =>
-      m.chatId === reporterChatId
-    );
-    expect(reporterResponse).toBeDefined();
+    vi.useRealTimers();
   });
 });
