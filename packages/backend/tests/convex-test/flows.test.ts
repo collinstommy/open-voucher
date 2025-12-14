@@ -944,7 +944,6 @@ describe("Reminder Flow", () => {
 
     const t = convexTest(schema, modules);
 
-    // Create claimer user (will receive reminder)
     const claimerId = await t.run(async (ctx) => {
       return await ctx.db.insert("users", {
         telegramChatId: "claimer123",
@@ -955,7 +954,6 @@ describe("Reminder Flow", () => {
       });
     });
 
-    // Create uploader user (won't receive reminder)
     const uploaderId = await t.run(async (ctx) => {
       return await ctx.db.insert("users", {
         telegramChatId: "uploader456",
