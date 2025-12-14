@@ -10,12 +10,10 @@ import { internalAction, internalQuery } from "./_generated/server";
 export const sendDailyUploadReminders = internalAction({
   args: {},
   handler: async (ctx) => {
-    // Get users who claimed vouchers yesterday
     const telegramChatIds = await ctx.runQuery(
       internal.reminders.getUsersWhoClaimedYesterday
     );
 
-    // Send reminder to each user
     for (const chatId of telegramChatIds) {
       await ctx.scheduler.runAfter(0, internal.telegram.sendMessageAction, {
         chatId,
@@ -32,12 +30,9 @@ export const sendDailyUploadReminders = internalAction({
 export const getUsersWhoClaimedYesterday = internalQuery({
   args: {},
   handler: async (ctx) => {
-    // Calculate yesterday's date range
     const startOfYesterday = dayjs().subtract(1, 'day').startOf('day').valueOf();
     const endOfYesterday = dayjs().startOf('day').valueOf();
 
-    // Query vouchers claimed yesterday
-    // Uses index to efficiently filter by claimedAt timestamp
     const vouchers = await ctx.db
       .query("vouchers")
       .withIndex("by_claimed_at", (q) =>
@@ -49,7 +44,6 @@ export const getUsersWhoClaimedYesterday = internalQuery({
       vouchers.map((v) => v.claimerId).filter((id): id is Id<"users"> => id !== undefined)
     )];
 
-    // Fetch users and extract their telegram chat IDs
     const chatIds = (
       await Promise.all(claimerIds.map((id) => ctx.db.get(id)))
     )
