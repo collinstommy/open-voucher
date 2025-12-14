@@ -920,3 +920,123 @@ describe("Ban Flow", () => {
     vi.useRealTimers();
   });
 });
+
+describe("Reminder Flow", () => {
+  beforeEach(() => {
+    setupFetchMock();
+    vi.stubEnv("TELEGRAM_BOT_TOKEN", "test-bot-token");
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
+  test("sends reminders to users who claimed vouchers yesterday", async () => {
+    vi.useFakeTimers();
+
+    const now = Date.now();
+    const oneDayMs = 24 * 60 * 60 * 1000;
+    const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+    const yesterday = now - oneDayMs;
+    const twoDaysAgo = now - (2 * oneDayMs);
+    const futureExpiry = now + sevenDaysMs;
+
+    const t = convexTest(schema, modules);
+
+    // Create claimer user (will receive reminder)
+    const claimerId = await t.run(async (ctx) => {
+      return await ctx.db.insert("users", {
+        telegramChatId: "claimer123",
+        coins: 100,
+        isBanned: false,
+        createdAt: now,
+        lastActiveAt: now,
+      });
+    });
+
+    // Create uploader user (won't receive reminder)
+    const uploaderId = await t.run(async (ctx) => {
+      return await ctx.db.insert("users", {
+        telegramChatId: "uploader456",
+        coins: 50,
+        isBanned: false,
+        createdAt: now,
+        lastActiveAt: now,
+      });
+    });
+
+    // Create voucher claimed yesterday (should trigger reminder)
+    const yesterdayVoucherId = await t.run(async (ctx) => {
+      const imageStorageId = await ctx.storage.store(new Blob(["test"]));
+      return await ctx.db.insert("vouchers", {
+        type: "10",
+        status: "claimed",
+        imageStorageId,
+        uploaderId,
+        claimerId,
+        claimedAt: yesterday,
+        expiryDate: futureExpiry,
+        createdAt: yesterday,
+      });
+    });
+
+    // Create voucher claimed today (should NOT trigger)
+    const todayVoucherId = await t.run(async (ctx) => {
+      const imageStorageId = await ctx.storage.store(new Blob(["test"]));
+      return await ctx.db.insert("vouchers", {
+        type: "5",
+        status: "claimed",
+        imageStorageId,
+        uploaderId,
+        claimerId,
+        claimedAt: now,
+        expiryDate: futureExpiry,
+        createdAt: now,
+      });
+    });
+
+    // Create voucher claimed 2 days ago (should NOT trigger)
+    const oldVoucherId = await t.run(async (ctx) => {
+      const imageStorageId = await ctx.storage.store(new Blob(["test"]));
+      return await ctx.db.insert("vouchers", {
+        type: "20",
+        status: "claimed",
+        imageStorageId,
+        uploaderId,
+        claimerId,
+        claimedAt: twoDaysAgo,
+        expiryDate: futureExpiry,
+        createdAt: twoDaysAgo,
+      });
+    });
+
+    // Query users who claimed yesterday
+    const chatIds = await t.query(internal.reminders.getUsersWhoClaimedYesterday, {});
+
+    // Verify only yesterday's claimer is returned
+    expect(chatIds).toHaveLength(1);
+    expect(chatIds[0]).toBe("claimer123");
+
+    // Clear sent messages and run the reminder action
+    sentMessages.length = 0;
+    await t.action(internal.reminders.sendDailyUploadReminders, {});
+
+    // Wait for scheduled messages
+    vi.runAllTimers();
+    await t.finishInProgressScheduledFunctions();
+
+    // Verify reminder was sent to the right user
+    const reminderMessage = sentMessages.find(m =>
+      m.chatId === "claimer123" &&
+      m.text?.includes("Upload your new vouchers")
+    );
+    expect(reminderMessage).toBeDefined();
+
+    // Verify no message was sent to uploader
+    const uploaderMessage = sentMessages.find(m => m.chatId === "uploader456");
+    expect(uploaderMessage).toBeUndefined();
+
+    vi.useRealTimers();
+  });
+});
