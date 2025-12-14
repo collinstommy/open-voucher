@@ -1009,29 +1009,23 @@ describe("Reminder Flow", () => {
       });
     });
 
-    // Query users who claimed yesterday
     const chatIds = await t.query(internal.reminders.getUsersWhoClaimedYesterday, {});
 
-    // Verify only yesterday's claimer is returned
     expect(chatIds).toHaveLength(1);
     expect(chatIds[0]).toBe("claimer123");
 
-    // Clear sent messages and run the reminder action
     sentMessages.length = 0;
     await t.action(internal.reminders.sendDailyUploadReminders, {});
 
-    // Wait for scheduled messages
     vi.runAllTimers();
     await t.finishInProgressScheduledFunctions();
 
-    // Verify reminder was sent to the right user
     const reminderMessage = sentMessages.find(m =>
       m.chatId === "claimer123" &&
       m.text?.includes("Upload your new vouchers")
     );
     expect(reminderMessage).toBeDefined();
 
-    // Verify no message was sent to uploader
     const uploaderMessage = sentMessages.find(m => m.chatId === "uploader456");
     expect(uploaderMessage).toBeUndefined();
 
