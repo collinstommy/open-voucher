@@ -13,7 +13,7 @@ export const CLAIM_COSTS: Record<string, number> = {
 };
 
 // Signup bonus
-export const SIGNUP_BONUS = 0;
+export const SIGNUP_BONUS = 10;
 
 // Coin limits
 export const MAX_COINS = 100;

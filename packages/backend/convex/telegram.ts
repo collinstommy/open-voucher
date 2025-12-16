@@ -67,17 +67,22 @@ export const handleTelegramMessage = internalAction({
                firstName,
                inviteCode: code
              });
-             await sendTelegramMessage(chatId, `Welcome to the Dunnes Voucher Bot. You can request Dunnes vouchers and upload unused vouchers
-You will earn coins when you upload a Voucher.
-When you upload a voucher, you get coins
-When you request a voucher, you spend coins
-€5 voucher → 15 coins
-€10 voucher → 10 coins
-€20 voucher → 5 coins
+             await sendTelegramMessage(chatId, `🎉 <b>Welcome to Dunnes Voucher Bot!</b>
+You've been started with <b>${newUser.coins} coins</b> to get you going! 🚀
 
-📤 <b>Got a voucher to share?</b> Upload a screenshot from the Dunnes app or a receipt photo
-🙏 <b>Want a voucher?</b> Reply with just <b>5, 10, or 20</b>
-❓ Send <b>help</b> for more info`);
+<b>How it works:</b>
+• Upload a voucher → Earn coins
+• Claim a voucher → Spend coins
+
+<b>Coin Values:</b>
+€5 voucher = 15 coins
+€10 voucher = 10 coins
+€20 voucher = 5 coins
+
+📤 <b>Got a voucher?</b> Upload a screenshot via the paperclip icon
+🙏 <b>Need a voucher?</b> Reply with just <b>5</b>, <b>10</b>, or <b>20</b>
+💰 <b>Check Balance:</b> Send <b>balance</b>
+❓ <b>Get Help:</b> Send <b>help</b>`);
              return;
            } else {
              await sendTelegramMessage(chatId, `❌ ${result.reason}`);

@@ -131,14 +131,19 @@ export const createUserWithInvite = internalMutation({
       telegramChatId,
       username,
       firstName,
-      coins: 0, // No signup bonus for launch
+      coins: SIGNUP_BONUS,
       isBanned: false,
       inviteCode: inviteCode.toUpperCase(),
       createdAt: now,
       lastActiveAt: now,
     });
 
-    // Removed signup bonus transaction entry
+    await ctx.db.insert("transactions", {
+      userId,
+      type: "signup_bonus",
+      amount: SIGNUP_BONUS,
+      createdAt: now,
+    });
 
     return {
       _id: userId,
