@@ -83,6 +83,7 @@ You've been started with <b>${newUser.coins} coins</b> to get you going! 🚀
 🙏 <b>Need a voucher?</b> Reply with just <b>5</b>, <b>10</b>, or <b>20</b>
 💰 <b>Check Balance:</b> Send <b>balance</b>
 ❓ <b>Get Help:</b> Send <b>help</b>`);
+             await sendTelegramMessage(chatId, `� <b>We're in beta!</b>\nWe're keen to hear about bugs or general feedback.\n\n📝 To send feedback send <b>feedback [your message]</b>`);
              return;
            } else {
              await sendTelegramMessage(chatId, `❌ ${result.reason}`);
@@ -138,7 +139,19 @@ You've been started with <b>${newUser.coins} coins</b> to get you going! 🚀
       await sendTelegramMessage(chatId, `💰 You have ${user.coins} coins.`);
       return;
     } else if (lowerText === "/help" || lowerText === "help") {
-      await sendTelegramMessage(chatId, `📸 Send screenshot to upload vouchers and earn coins\n💳 Send <b>5</b> , <b>10</b>, or <b>20</b> to claim a voucher\n💰 <b>balance</b> to view your balance of coin`);
+      await sendTelegramMessage(chatId, `📸 Send screenshot to upload vouchers and earn coins\n💳 Send <b>5</b> , <b>10</b>, or <b>20</b> to claim a voucher\n💰 <b>balance</b> to view your balance of coin\n📝 <b>feedback [msg]</b> to send us feedback`);
+      return;
+    } else if (lowerText.startsWith("feedback ")) {
+      const feedbackText = text.slice(9).trim();
+      if (feedbackText.length > 0) {
+        await ctx.runMutation(internal.users.submitFeedback, {
+          userId: user._id,
+          text: feedbackText
+        });
+        await sendTelegramMessage(chatId, "✅ Thanks for your feedback! We read every message.");
+      } else {
+        await sendTelegramMessage(chatId, "⚠️ Please include a message, e.g., 'feedback fix this bug!'");
+      }
       return;
     }
 

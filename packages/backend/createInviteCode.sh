@@ -114,7 +114,7 @@ echo ""
 
 # Run the command
 cd packages/backend
-RESULT=$(npx convex run createInviteCode $ENV_FLAG --args="$ARGS" 2>&1)
+RESULT=$(npx convex run users:createInviteCode "$ARGS" $ENV_FLAG 2>&1)
 EXIT_CODE=$?
 
 if [ $EXIT_CODE -eq 0 ]; then

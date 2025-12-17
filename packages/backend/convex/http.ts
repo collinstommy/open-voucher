@@ -13,6 +13,19 @@ http.route({
   method: "POST",
   handler: httpAction(async (ctx, request) => {
     try {
+      const secretToken = request.headers.get("x-telegram-bot-api-secret-token");
+      const configuredSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
+
+      if (!configuredSecret) {
+        console.error("TELEGRAM_WEBHOOK_SECRET is not set");
+        return new Response("Server Configuration Error", { status: 500 });
+      }
+
+      if (secretToken !== configuredSecret) {
+        console.error("Unauthorized webhook attempt");
+        return new Response("Unauthorized", { status: 403 });
+      }
+
       const body = await request.json();
 
       // Log incoming webhook for debugging

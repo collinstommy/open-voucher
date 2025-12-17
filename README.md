@@ -65,13 +65,13 @@ open-router/
    # Required for local development
    TELEGRAM_BOT_TOKEN=your-telegram-bot-token
    GOOGLE_GENERATIVE_AI_API_KEY=your-gemini-api-key
-   
+
    # Production deployment
    PROD_TOKEN=your-prod-telegram-bot-token
    PROD_URL_WEBHOOK=https://your-prod-deployment-url.com/telegram/webhook
    PROD_GOOGLE_GENERATIVE_AI_API_KEY=your-prod-gemini-api-key
-   
-   # Development deployment  
+
+   # Development deployment
    DEV_TOKEN=your-dev-telegram-bot-token
    DEV_URL_WEBHOOK=https://your-dev-convex-deployment.convex.site/telegram/webhook
    DEV_GOOGLE_GENERATIVE_AI_API_KEY=your-dev-gemini-api-key
@@ -135,7 +135,7 @@ chmod +x pacakges/backend/createInviteCode.sh
 
 2. **Create a custom code with a label:**
    ```bash
-   ./pacakges/backend/createInviteCode.sh -c "REDDIT50" -l "Reddit launch campaign"
+   ./pacakges/backend/createInviteCode.sh -c "REDDIT" -l "Reddit launch campaign"
    ```
 
 3. **Create code with limits and expiry:**

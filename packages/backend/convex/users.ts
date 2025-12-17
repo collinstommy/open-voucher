@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { internalMutation, query } from "./_generated/server";
+import { internalMutation, internalQuery, query } from "./_generated/server";
 import { SIGNUP_BONUS } from "./constants";
 
 /**
@@ -105,6 +105,13 @@ export const getUserByTelegramChatId = query({
  * Create a new user with a validated invite code.
  * Internal mutation.
  */
+export const getAllUsers = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.db.query("users").collect();
+  },
+});
+
 export const createUserWithInvite = internalMutation({
   args: {
     telegramChatId: v.string(),
@@ -200,5 +207,20 @@ export const patchMessageImage = internalMutation({
   },
   handler: async (ctx, { messageId, imageStorageId }) => {
     await ctx.db.patch(messageId, { imageStorageId });
+  },
+});
+
+export const submitFeedback = internalMutation({
+  args: {
+    userId: v.id("users"),
+    text: v.string(),
+  },
+  handler: async (ctx, { userId, text }) => {
+    await ctx.db.insert("feedback", {
+      userId,
+      text,
+      status: "new",
+      createdAt: Date.now(),
+    });
   },
 });

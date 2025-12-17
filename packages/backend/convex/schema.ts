@@ -132,5 +132,13 @@ export default defineSchema({
     voucherId: v.optional(v.id("vouchers")),
     // Unix timestamp
     createdAt: v.number(),
-  }).index("by_user", ["userId"]),
+    }).index("by_user", ["userId"]),
+
+  // Feedback table
+  feedback: defineTable({
+    userId: v.id("users"),
+    text: v.string(),
+    createdAt: v.number(),
+    status: v.string(), // "new", "read", "archived"
+  }).index("by_status", ["status"]),
 });

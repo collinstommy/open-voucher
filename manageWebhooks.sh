@@ -73,10 +73,17 @@ set_webhook() {
     local token=$1
     local url=$2
     local env_name=$3
-    echo "Setting ${env_name} webhook to: ${url}"
-    response=$(curl -s -X POST "https://api.telegram.org/bot${token}/setWebhook" \
-                   -H "Content-Type: application/json" \
-                   -d "{\"url\": \"${url}\"}")
+    local secret=$4
+
+    echo "Setting ${env_name} webhook to: ${url} with secret token"
+
+    # Check if secret is provided
+    local secret_param=""
+    if [ ! -z "$secret" ]; then
+        secret_param="&secret_token=${secret}"
+    fi
+
+    response=$(curl -s -X POST "https://api.telegram.org/bot${token}/setWebhook?url=${url}${secret_param}")
     echo "Response: $response"
     echo ""
 }
@@ -88,6 +95,7 @@ set_convex_vars() {
     local telegram_token=$3
     local gemini_token=$4
     local env_name=$5
+    local webhook_secret=$6
 
     echo "Setting Convex environment variables for ${env_name}..."
 
@@ -101,6 +109,12 @@ set_convex_vars() {
     if [ ! -z "$telegram_token" ]; then
         echo "Setting TELEGRAM_BOT_TOKEN..."
         (cd packages/backend && npx convex env set TELEGRAM_BOT_TOKEN "$telegram_token" $prod_flag)
+    fi
+
+    # Set Telegram Webhook Secret
+    if [ ! -z "$webhook_secret" ]; then
+        echo "Setting TELEGRAM_WEBHOOK_SECRET..."
+        (cd packages/backend && npx convex env set TELEGRAM_WEBHOOK_SECRET "$webhook_secret" $prod_flag)
     fi
 
     # Set Gemini token
@@ -118,8 +132,8 @@ delete_webhook "$DEV_TOKEN" "DEV"
 
 # Set new webhooks
 echo "=== Step 2: Setting new webhooks ==="
-set_webhook "$PROD_TOKEN" "$PROD_URL_WEBHOOK" "PROD"
-set_webhook "$DEV_TOKEN" "$DEV_URL_WEBHOOK" "DEV"
+set_webhook "$PROD_TOKEN" "$PROD_URL_WEBHOOK" "PROD" "$PROD_TELEGRAM_WEBHOOK_SECRET"
+set_webhook "$DEV_TOKEN" "$DEV_URL_WEBHOOK" "DEV" "$DEV_TELEGRAM_WEBHOOK_SECRET"
 
 # Set Convex environment variables
 echo "=== Step 3: Setting Convex environment variables ==="
@@ -131,7 +145,7 @@ echo "=== Step 3: Setting Convex environment variables ==="
 # DEV_PROJECT=your-dev-project-name
 # DEV_GEMINI_TOKEN=your-dev-gemini-token
 
-set_convex_vars "" "" "$PROD_TOKEN" "$PROD_GOOGLE_GENERATIVE_AI_API_KEY" "PROD"
-set_convex_vars "" "" "$DEV_TOKEN" "$DEV_GOOGLE_GENERATIVE_AI_API_KEY" "DEV"
+set_convex_vars "" "" "$PROD_TOKEN" "$PROD_GOOGLE_GENERATIVE_AI_API_KEY" "PROD" "$PROD_TELEGRAM_WEBHOOK_SECRET"
+set_convex_vars "" "" "$DEV_TOKEN" "$DEV_GOOGLE_GENERATIVE_AI_API_KEY" "DEV" "$DEV_TELEGRAM_WEBHOOK_SECRET"
 
 echo "=== Complete webhook and environment setup ==="
