@@ -91,6 +91,24 @@ export const uploadVoucher = internalMutation({
     }
 
     const now = Date.now();
+    const oneDayAgo = now - 24 * 60 * 60 * 1000;
+
+    // Check upload limit (10 per 24h)
+    const recentUploads = await ctx.db
+      .query("vouchers")
+      .withIndex("by_uploader_created", (q) =>
+        q.eq("uploaderId", userId).gt("createdAt", oneDayAgo)
+      )
+      .collect();
+
+    if (recentUploads.length >= 10) {
+      await ctx.scheduler.runAfter(0, internal.telegram.sendMessageAction, {
+        chatId: user.telegramChatId,
+        text: "🚫 <b>Daily Upload Limit Reached</b>\n\nYou can only upload 10 vouchers per 24 hours. Please try again later.",
+      });
+      return null;
+    }
+
     const voucherId = await ctx.db.insert("vouchers", {
       type: "0",
       status: "processing",
@@ -130,6 +148,21 @@ export const requestVoucher = internalMutation({
       return { success: false, error: `Insufficient coins. You need ${cost} coins.` };
     }
 
+    const now = Date.now();
+    const oneDayAgo = now - 24 * 60 * 60 * 1000;
+
+    // Check claim limit (5 per 24h)
+    const recentClaims = await ctx.db
+      .query("vouchers")
+      .withIndex("by_claimer_claimed_at", (q) =>
+        q.eq("claimerId", userId).gt("claimedAt", oneDayAgo)
+      )
+      .collect();
+
+    if (recentClaims.length >= 5) {
+      return { success: false, error: "🚫 <b>Daily Claim Limit Reached</b>\n\nYou can only claim 5 vouchers per 24 hours. Please try again later." };
+    }
+
     // Find available voucher expiring soonest
     const vouchers = await ctx.db
       .query("vouchers")
@@ -148,8 +181,6 @@ export const requestVoucher = internalMutation({
     await ctx.db.patch(userId, { coins: newCoins });
 
     // Mark voucher as claimed
-    const now = Date.now();
-
 
     // Attempt to get image URL - if this fails, revert and error
     const imageUrl = await ctx.storage.getUrl(voucher.imageStorageId);

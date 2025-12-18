@@ -176,19 +176,6 @@ export const storeMessage = internalMutation({
     imageStorageId: v.optional(v.id("_storage")),
   },
   handler: async (ctx, args) => {
-    const existing = await ctx.db
-      .query("messages")
-      .withIndex("by_message_id", (q) =>
-        q
-          .eq("telegramChatId", args.telegramChatId)
-          .eq("telegramMessageId", args.telegramMessageId)
-      )
-      .first();
-
-    if (existing) {
-      return null;
-    }
-
     return await ctx.db.insert("messages", {
       ...args,
       createdAt: Date.now(),

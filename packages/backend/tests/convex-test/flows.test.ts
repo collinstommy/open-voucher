@@ -218,7 +218,7 @@ describe("User Signup Flow", () => {
     expect(user?.isBanned).toBe(false);
 
     // Verify welcome message
-    const welcomeMsg = sentMessages.find(m => m.chatId === chatId && m.text?.includes("Welcome to the Dunnes Voucher Bot"));
+    const welcomeMsg = sentMessages.find(m => m.chatId === chatId && m.text?.includes("Welcome to Dunnes Voucher Bot!"));
     expect(welcomeMsg).toBeDefined();
   });
 
@@ -1030,5 +1030,163 @@ describe("Reminder Flow", () => {
     expect(uploaderMessage).toBeUndefined();
 
     vi.useRealTimers();
+  });
+});
+
+describe("Rate Limiting Flow", () => {
+  beforeEach(() => {
+    setupFetchMock();
+    vi.stubEnv("TELEGRAM_BOT_TOKEN", "test-bot-token");
+    vi.stubEnv("GOOGLE_GENERATIVE_AI_API_KEY", "test-api-key");
+    // Enable fake timers with current real time for predictable time checks
+    vi.useFakeTimers({ now: Date.now() });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
+  test("upload limit (10 per 24h) blocks subsequent uploads", async () => {
+    const t = convexTest(schema, modules);
+    const chatId = "11223344";
+
+    const userId = await t.run(async (ctx) => {
+      return await ctx.db.insert("users", {
+        telegramChatId: chatId,
+        coins: 100,
+        isBanned: false,
+        createdAt: Date.now(),
+        lastActiveAt: Date.now(),
+      });
+    });
+
+    const imageStorageId = await t.run(async (ctx) => {
+      return await ctx.storage.store(new Blob(["test_image"]));
+    });
+
+    // Upload 10 vouchers (the limit)
+    for (let i = 0; i < 10; i++) {
+       // We can directly use the mutation to populate history quickly
+       // or assume the user has existing uploads
+       await t.run(async (ctx) => {
+           await ctx.db.insert("vouchers", {
+               type: "10",
+               status: "available",
+               imageStorageId,
+               uploaderId: userId,
+               expiryDate: 0,
+               createdAt: Date.now() - 1000, // Just now
+           });
+       });
+    }
+
+    // Try to upload the 11th voucher via Telegram
+    // (Simulating a user sending an image)
+    const telegramMessage = createTelegramPhotoMessage(chatId);
+
+    // This action eventually calls uploadVoucher internal mutation
+    await t.action(internal.telegram.handleTelegramMessage, {
+        message: telegramMessage
+    });
+
+    // Wait for any scheduled messages
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+    // Verify limit message was sent
+    const limitMessage = sentMessages.find(m =>
+        m.chatId === chatId &&
+        m.text?.includes("Daily Upload Limit Reached") &&
+        m.text?.includes("10 vouchers")
+    );
+    expect(limitMessage).toBeDefined();
+
+    // Verify no new voucher was created (count remains 10)
+    const count = await t.run(async (ctx) => {
+        return (await ctx.db.query("vouchers").withIndex("by_uploader", q => q.eq("uploaderId", userId)).collect()).length;
+    });
+    expect(count).toBe(10);
+  });
+
+  test("claim limit (5 per 24h) blocks subsequent claims", async () => {
+      const t = convexTest(schema, modules);
+      const claimerChatId = "55667788";
+      const uploaderChatId = "99887766";
+
+      const claimerId = await t.run(async (ctx) => {
+        return await ctx.db.insert("users", {
+          telegramChatId: claimerChatId,
+          coins: 500, // Plenty of coins
+          isBanned: false,
+          createdAt: Date.now(),
+          lastActiveAt: Date.now(),
+        });
+      });
+
+      const uploaderId = await t.run(async (ctx) => {
+        return await ctx.db.insert("users", {
+            telegramChatId: uploaderChatId,
+            coins: 0,
+            isBanned: false,
+            createdAt: Date.now(),
+            lastActiveAt: Date.now(),
+        });
+    });
+
+      const imageStorageId = await t.run(async (ctx) => {
+        return await ctx.storage.store(new Blob(["test_image"]));
+      });
+
+      // Simulate 5 existing claims in the last 24h
+      for (let i = 0; i < 5; i++) {
+        await t.run(async (ctx) => {
+            await ctx.db.insert("vouchers", {
+                type: "5",
+                status: "claimed",
+                imageStorageId,
+                uploaderId,
+                claimerId,
+                claimedAt: Date.now() - 1000, // Just now
+                expiryDate: Date.now() + 86400000,
+                createdAt: Date.now() - 10000,
+            });
+        });
+      }
+
+      // Create an available voucher to try and claim
+      await t.run(async (ctx) => {
+        await ctx.db.insert("vouchers", {
+            type: "5",
+            status: "available",
+            imageStorageId,
+            uploaderId,
+            expiryDate: Date.now() + 86400000,
+            createdAt: Date.now(),
+        });
+      });
+
+      // Try to claim the 6th voucher via Telegram
+      await t.action(internal.telegram.handleTelegramMessage, {
+          message: createTelegramMessage("5", claimerChatId)
+      });
+
+      // Wait for any scheduled messages
+      await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+      // Verify limit message was sent
+      const limitMessage = sentMessages.find(m =>
+          m.chatId === claimerChatId &&
+          m.text?.includes("Daily Claim Limit Reached") &&
+          m.text?.includes("5 vouchers")
+      );
+      expect(limitMessage).toBeDefined();
+
+      // Verify transaction count for claims is still 5 (actually 0 transactions created in this test setup,
+      // but we can check the claimable voucher is still available)
+      const availableVoucher = await t.run(async (ctx) => {
+         return await ctx.db.query("vouchers").withIndex("by_status_type", q => q.eq("status", "available").eq("type", "5")).first();
+      });
+      expect(availableVoucher).toBeDefined(); // Still available, not claimed
   });
 });

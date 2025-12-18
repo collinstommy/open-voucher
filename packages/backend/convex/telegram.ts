@@ -119,12 +119,14 @@ You've been started with <b>${newUser.coins} coins</b> to get you going! 🚀
             });
         }
 
-        await ctx.runMutation(internal.vouchers.uploadVoucher, {
+        const voucherId = await ctx.runMutation(internal.vouchers.uploadVoucher, {
           userId: user._id,
           imageStorageId: storageId,
         });
 
-        await sendTelegramMessage(chatId, "📸 Processing your voucher...");
+        if (voucherId) {
+            await sendTelegramMessage(chatId, "📸 Processing your voucher...");
+        }
       } catch (e) {
         console.error(e);
         await sendTelegramMessage(chatId, "❌ Failed to process image.");
