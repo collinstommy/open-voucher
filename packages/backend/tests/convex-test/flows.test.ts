@@ -1190,3 +1190,113 @@ describe("Rate Limiting Flow", () => {
       expect(availableVoucher).toBeDefined(); // Still available, not claimed
   });
 });
+
+describe("Voucher Expiration Flow", () => {
+  test("expireOldVouchers marks past vouchers as expired", async () => {
+    const t = convexTest(schema, modules);
+    const uploaderChatId = "222222";
+
+    const uploaderId = await t.run(async (ctx) => {
+      return await ctx.db.insert("users", {
+        telegramChatId: uploaderChatId,
+        coins: 0,
+        isBanned: false,
+        createdAt: Date.now(),
+        lastActiveAt: Date.now(),
+      });
+    });
+
+    const imageStorageId = await t.run(async (ctx) => {
+      return await ctx.storage.store(new Blob(["test"]));
+    });
+
+    const now = Date.now();
+
+    const futureVoucherId = await t.run(async (ctx) => {
+      return await ctx.db.insert("vouchers", {
+        type: "5",
+        status: "available",
+        uploaderId,
+        imageStorageId,
+        expiryDate: now + 86400000, // Tomorrow
+        createdAt: now,
+      });
+    });
+
+    const expiredVoucherId = await t.run(async (ctx) => {
+      return await ctx.db.insert("vouchers", {
+        type: "5",
+        status: "available",
+        uploaderId,
+        imageStorageId,
+        expiryDate: now - 86400000, // Yesterday
+        createdAt: now - 172800000,
+      });
+    });
+
+    const count = await t.mutation(internal.vouchers.expireOldVouchers, {});
+
+    expect(count).toBe(1);
+
+    const futureVoucher = await t.run(async (ctx) => {
+      return await ctx.db.get(futureVoucherId);
+    });
+    expect(futureVoucher?.status).toBe("available");
+
+    const expiredVoucher = await t.run(async (ctx) => {
+      return await ctx.db.get(expiredVoucherId);
+    });
+    expect(expiredVoucher?.status).toBe("expired");
+  });
+
+  test("requestVoucher does not return expired vouchers", async () => {
+    const t = convexTest(schema, modules);
+    const uploaderChatId = "222222";
+    const claimerChatId = "333333";
+
+    const uploaderId = await t.run(async (ctx) => {
+      return await ctx.db.insert("users", {
+        telegramChatId: uploaderChatId,
+        coins: 0,
+        isBanned: false,
+        createdAt: Date.now(),
+        lastActiveAt: Date.now(),
+      });
+    });
+
+    const claimerId = await t.run(async (ctx) => {
+      return await ctx.db.insert("users", {
+        telegramChatId: claimerChatId,
+        coins: 100, // Enough coins
+        isBanned: false,
+        createdAt: Date.now(),
+        lastActiveAt: Date.now(),
+      });
+    });
+
+    const imageStorageId = await t.run(async (ctx) => {
+      return await ctx.storage.store(new Blob(["test"]));
+    });
+
+    const now = Date.now();
+
+    await t.run(async (ctx) => {
+      return await ctx.db.insert("vouchers", {
+        type: "5",
+        status: "available",
+        uploaderId,
+        imageStorageId,
+        expiryDate: now - 86400000, // Expired yesterday
+        createdAt: now - 172800000,
+      });
+    });
+
+    const result = await t.mutation(internal.vouchers.requestVoucher, {
+      userId: claimerId,
+      type: "5",
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("No €5 vouchers currently available");
+  });
+});

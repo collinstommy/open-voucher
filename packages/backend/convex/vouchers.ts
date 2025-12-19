@@ -429,3 +429,31 @@ export const reportVoucher = internalMutation({
       }
     }
   });
+
+export const expireOldVouchers = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const now = Date.now();
+
+    const availableVouchers = await ctx.db
+      .query("vouchers")
+      .withIndex("by_status_created", (q) => q.eq("status", "available"))
+      .collect();
+
+    let expiredCount = 0;
+
+    for (const voucher of availableVouchers) {
+      if (voucher.expiryDate < now) {
+        await ctx.db.patch(voucher._id, { status: "expired" });
+        console.log(`Expired voucher: ${voucher._id}`);
+        expiredCount++;
+      }
+    }
+
+    if (expiredCount > 0) {
+      console.log(`Expired ${expiredCount} old vouchers.`);
+    }
+
+    return expiredCount;
+  },
+});
