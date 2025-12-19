@@ -167,6 +167,7 @@ export const requestVoucher = internalMutation({
     const vouchers = await ctx.db
       .query("vouchers")
       .withIndex("by_status_type", (q) => q.eq("status", "available").eq("type", type))
+      .filter((q) => q.gt(q.field("expiryDate"), now))
       .collect();
 
     if (vouchers.length === 0) {
