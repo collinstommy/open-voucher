@@ -1,0 +1,10 @@
+{
+  "name": "openvouchers/landing",
+  "private": true,
+  "scripts": {
+    "deploy": "wrangler pages deploy . --project-name openvouchers"
+  },
+  "devDependencies": {
+    "wrangler": "^4.54.0"
+  }
+}
