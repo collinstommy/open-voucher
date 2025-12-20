@@ -280,7 +280,7 @@ export default defineSchema({
 
 | Action | Coins | Notes |
 |--------|-------|-------|
-| Signup bonus | +20 | One-time on first message |
+| Signup bonus | +10 | One-time on first message |
 | Upload €5 voucher | +15 | Highest reward (smallest voucher) |
 | Upload €10 voucher | +10 | Medium reward |
 | Upload €20 voucher | +5 | Lowest reward (largest voucher) |
@@ -325,7 +325,7 @@ export const CLAIM_COSTS: Record<string, number> = {
 };
 
 // Signup bonus
-export const SIGNUP_BONUS = 20;
+export const SIGNUP_BONUS = 10;
 
 // Coin limits
 export const MAX_COINS = 100;

@@ -172,3 +172,5 @@ chmod +x pacakges/backend/createInviteCode.sh
 ## ToDo
 - [ ] unify the validation, we do this in two places right now
 - [ ] return vouchers that are expires soonest
+- [ ] restrict uploads for expiring today to before 9pm
+- [ ] if voucher are not Available right now, send message once Available
