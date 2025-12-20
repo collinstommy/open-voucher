@@ -1,0 +1,139 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dunnes Voucher Swap - Open Community</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Set default font to Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 flex flex-col min-h-screen">
+
+    <!-- Navbar -->
+    <nav class="bg-white border-b border-gray-100 py-4">
+        <div class="container mx-auto px-6 flex justify-between items-center">
+            <div class="flex items-center gap-2">
+                <span class="text-2xl">🛒</span>
+                <span class="font-bold text-xl tracking-tight text-gray-900">VoucherSwap</span>
+            </div>
+            <div class="text-sm text-gray-500 font-medium">Free</div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <header class="bg-white pb-16 pt-12 lg:pt-24">
+        <div class="container mx-auto px-6 text-center">
+            <div class="max-w-3xl mx-auto">
+                <span class="inline-block py-1 px-3 rounded-full bg-green-100 text-green-700 text-xs font-semibold uppercase tracking-wider mb-4">
+                    Community Driven
+                </span>
+                <h1 class="text-4xl lg:text-6xl font-extrabold text-gray-900 leading-tight mb-6">
+                    Bank & Swap Your <span class="text-blue-600">Dunnes Vouchers</span>
+                </h1>
+                <p class="text-lg lg:text-xl text-gray-600 mb-10 leading-relaxed">
+                    The smart, community-run way to manage vouchers. Bank the ones you won't use, and grab the exact €10 or €20 voucher you need for your next big shop.
+                </p>
+
+                <!-- Dynamic CTA Button -->
+                <a id="telegram-cta" href="#" target="_blank" class="inline-flex items-center justify-center px-8 py-4 text-lg font-bold text-white transition-all duration-200 bg-blue-600 rounded-full hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-500 focus:ring-offset-2 shadow-xl hover:shadow-2xl hover:-translate-y-1">
+                    <svg class="w-6 h-6 mr-2" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.562 8.161c-.18 1.897-.962 6.502-1.361 8.627-.168.9-.5 1.201-.82 1.23-.697.064-1.226-.461-1.901-.903-1.056-.692-1.653-1.123-2.678-1.799-1.185-.781-.417-1.21.258-1.911.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.139-5.062 3.345-.479.329-.913.489-1.302.481-.428-.008-1.252-.241-1.865-.44-.751-.244-1.349-.374-1.297-.789.027-.216.324-.437.893-.663 3.498-1.524 5.831-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.477-1.635.099-.002.321.023.465.141.119.098.152.228.166.33.016.116.021.312.016.353z"/>
+                    </svg>
+                    Open Bot in Telegram
+                </a>
+                <p class="mt-4 text-sm text-gray-400">Includes 10-Coin Welcome Bonus</p>
+            </div>
+        </div>
+    </header>
+
+    <!-- How It Works Section -->
+    <section class="py-16 bg-white">
+        <div class="container mx-auto px-6">
+            <div class="text-center mb-16">
+                <h2 class="text-3xl font-bold text-gray-900">How It Works</h2>
+                <p class="text-gray-500 mt-2">Join the community economy in three simple steps.</p>
+            </div>
+
+            <div class="grid md:grid-cols-3 gap-10 max-w-5xl mx-auto">
+                <!-- Step 1 -->
+                <div class="bg-gray-50 p-8 rounded-2xl border border-gray-100 text-center hover:shadow-lg transition-shadow">
+                    <div class="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-2xl mx-auto mb-6">
+                        📸
+                    </div>
+                    <h3 class="text-xl font-bold text-gray-900 mb-3">1. Upload</h3>
+                    <p class="text-gray-600 leading-relaxed">
+                        Got a voucher you won't use this week? Simply snap a photo or screenshot of it and send it to the bot.
+                    </p>
+                </div>
+
+                <!-- Step 2 -->
+                <div class="bg-gray-50 p-8 rounded-2xl border border-gray-100 text-center hover:shadow-lg transition-shadow">
+                    <div class="w-16 h-16 bg-yellow-100 text-yellow-600 rounded-full flex items-center justify-center text-2xl mx-auto mb-6">
+                        🪙
+                    </div>
+                    <h3 class="text-xl font-bold text-gray-900 mb-3">2. Earn Coins</h3>
+                    <p class="text-gray-600 leading-relaxed">
+                        The bot verifies your voucher instantly and credits your account with community coins.
+                    </p>
+                </div>
+
+                <!-- Step 3 -->
+                <div class="bg-gray-50 p-8 rounded-2xl border border-gray-100 text-center hover:shadow-lg transition-shadow">
+                    <div class="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-2xl mx-auto mb-6">
+                        🎟️
+                    </div>
+                    <h3 class="text-xl font-bold text-gray-900 mb-3">3. Swap</h3>
+                    <p class="text-gray-600 leading-relaxed">
+                        Use your coins to grab the exact €10 or €20 voucher you need, exactly when you need it.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="mt-auto bg-gray-900 text-gray-400 py-12">
+        <div class="container mx-auto px-6 text-center">
+            <div class="text-sm opacity-60">
+                <p>Not affiliated with Dunnes Stores.</p>
+                <p id="debug-link-display" class="mt-2 text-xs font-mono"></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- JavaScript for Dynamic Links -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // 1. Get the URL parameters (e.g., "?invite=reddit")
+            const urlParams = new URLSearchParams(window.location.search);
+
+            // 2. Get the 'invite' value.
+            const inviteCode = urlParams.get('invite');
+
+            // 3. Construct the full Telegram deep link
+            let fullLink = 'https://t.me/DunnesVoucherBot';
+
+            if (inviteCode) {
+                // Encode the code to be safe
+                const encodedInviteCode = encodeURIComponent(inviteCode.toLowerCase());
+                fullLink += '?text=code%20' + encodedInviteCode;
+            }
+
+            // 4. Update the CTA button's href
+            const ctaButton = document.getElementById('telegram-cta');
+            if (ctaButton) {
+                ctaButton.href = fullLink;
+            }
+
+            // 5. Optional: Display debug info in footer (hidden from casual view usually, but kept for verification)
+            // console.log(`Dynamic Telegram link generated: ${fullLink}`);
+        });
+    </script>
+</body>
+</html>
