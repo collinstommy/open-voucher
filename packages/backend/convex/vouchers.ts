@@ -348,7 +348,7 @@ export const markVoucherOcrFailed = internalMutation({
 });
 
 /**
- * Report a voucher as not working (Already Used).
+ * Report a voucher as not working
  * Marks as reported, checks ban threshold, and tries to send a replacement.
  */
 export const reportVoucher = internalMutation({

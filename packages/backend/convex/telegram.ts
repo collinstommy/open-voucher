@@ -215,7 +215,7 @@ You've been started with <b>${newUser.coins} coins</b> to get you going! 🚀
 							inline_keyboard: [
 								[
 									{
-										text: "⚠️ Already used",
+										text: "⚠️ Its not working",
 										callback_data: `report:${result.voucherId}`,
 									},
 								],
@@ -360,7 +360,7 @@ export const handleTelegramCallback = internalAction({
 						inline_keyboard: [
 							[
 								{
-									text: "⚠️ Already used",
+									text: "⚠️ Its not working",
 									callback_data: `report:${result.voucher._id}`,
 								}, // Allow reporting the replacement too
 							],
