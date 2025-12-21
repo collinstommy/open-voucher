@@ -34,6 +34,15 @@ function AdminIndex() {
 					View user feedback submissions
 				</p>
 			</Link>
+			<Link
+				to="/admin/banned"
+				className="rounded-lg border p-6 transition-colors hover:bg-muted"
+			>
+				<h2 className="mb-2 text-lg font-medium">Banned Users</h2>
+				<p className="text-muted-foreground text-sm">
+					View recently banned users and ban reasons
+				</p>
+			</Link>
 		</div>
 	);
 }

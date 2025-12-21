@@ -15,6 +15,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as AdminVouchersRouteImport } from './routes/admin/vouchers'
 import { Route as AdminFeedbackRouteImport } from './routes/admin/feedback'
+import { Route as AdminBannedRouteImport } from './routes/admin/banned'
 import { Route as AdminUsersIndexRouteImport } from './routes/admin/users/index'
 import { Route as AdminUsersUserIdRouteImport } from './routes/admin/users/$userId'
 
@@ -48,6 +49,11 @@ const AdminFeedbackRoute = AdminFeedbackRouteImport.update({
   path: '/feedback',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminBannedRoute = AdminBannedRouteImport.update({
+  id: '/banned',
+  path: '/banned',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminUsersIndexRoute = AdminUsersIndexRouteImport.update({
   id: '/users/',
   path: '/users/',
@@ -63,6 +69,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
   '/todos': typeof TodosRoute
+  '/admin/banned': typeof AdminBannedRoute
   '/admin/feedback': typeof AdminFeedbackRoute
   '/admin/vouchers': typeof AdminVouchersRoute
   '/admin/': typeof AdminIndexRoute
@@ -72,6 +79,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/todos': typeof TodosRoute
+  '/admin/banned': typeof AdminBannedRoute
   '/admin/feedback': typeof AdminFeedbackRoute
   '/admin/vouchers': typeof AdminVouchersRoute
   '/admin': typeof AdminIndexRoute
@@ -83,6 +91,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
   '/todos': typeof TodosRoute
+  '/admin/banned': typeof AdminBannedRoute
   '/admin/feedback': typeof AdminFeedbackRoute
   '/admin/vouchers': typeof AdminVouchersRoute
   '/admin/': typeof AdminIndexRoute
@@ -95,6 +104,7 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/todos'
+    | '/admin/banned'
     | '/admin/feedback'
     | '/admin/vouchers'
     | '/admin/'
@@ -104,6 +114,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/todos'
+    | '/admin/banned'
     | '/admin/feedback'
     | '/admin/vouchers'
     | '/admin'
@@ -114,6 +125,7 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/todos'
+    | '/admin/banned'
     | '/admin/feedback'
     | '/admin/vouchers'
     | '/admin/'
@@ -171,6 +183,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminFeedbackRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/banned': {
+      id: '/admin/banned'
+      path: '/banned'
+      fullPath: '/admin/banned'
+      preLoaderRoute: typeof AdminBannedRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/users/': {
       id: '/admin/users/'
       path: '/users'
@@ -189,6 +208,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface AdminRouteChildren {
+  AdminBannedRoute: typeof AdminBannedRoute
   AdminFeedbackRoute: typeof AdminFeedbackRoute
   AdminVouchersRoute: typeof AdminVouchersRoute
   AdminIndexRoute: typeof AdminIndexRoute
@@ -197,6 +217,7 @@ interface AdminRouteChildren {
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
+  AdminBannedRoute: AdminBannedRoute,
   AdminFeedbackRoute: AdminFeedbackRoute,
   AdminVouchersRoute: AdminVouchersRoute,
   AdminIndexRoute: AdminIndexRoute,
