@@ -201,14 +201,15 @@ export const submitFeedback = internalMutation({
 	args: {
 		userId: v.id("users"),
 		text: v.string(),
+		type: v.optional(v.string()),
 	},
-	handler: async (ctx, { userId, text }) => {
+	handler: async (ctx, { userId, text, type }) => {
 		await ctx.db.insert("feedback", {
 			userId,
 			text,
 			status: "new",
+			type: type || "feedback",
 			createdAt: Date.now(),
 		});
 	},
 });
-

@@ -99,7 +99,10 @@ export default defineSchema({
 		text: v.string(),
 		createdAt: v.number(),
 		status: v.string(), // "new", "read", "archived"
-	}).index("by_status", ["status"]),
+		type: v.optional(v.string()), // "feedback", "support"
+	})
+		.index("by_status", ["status"])
+		.index("by_type", ["type"]),
 
 	adminSessions: defineTable({
 		token: v.string(),

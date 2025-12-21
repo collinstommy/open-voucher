@@ -116,7 +116,7 @@ You've been started with <b>${newUser.coins} coins</b> to get you going! 🚀
 		if (user.isBanned) {
 			await sendTelegramMessage(
 				chatId,
-				"🚫 Your account has been banned from this service.",
+				"🚫 Your account has been banned from this service.\n\nIf you believe this is a mistake, you can dispute this ban by sending: 'support YOUR_MESSAGE'",
 			);
 			return;
 		}
@@ -185,6 +185,25 @@ You've been started with <b>${newUser.coins} coins</b> to get you going! 🚀
 				await sendTelegramMessage(
 					chatId,
 					"⚠️ Please include a message, e.g., 'feedback fix this bug!'",
+				);
+			}
+			return;
+		} else if (lowerText.startsWith("support ")) {
+			const supportText = text.slice(8).trim();
+			if (supportText.length > 0) {
+				await ctx.runMutation(internal.users.submitFeedback, {
+					userId: user._id,
+					text: supportText,
+					type: "support",
+				});
+				await sendTelegramMessage(
+					chatId,
+					"✅ Your support request has been received. We'll review your case and get back to you.",
+				);
+			} else {
+				await sendTelegramMessage(
+					chatId,
+					"⚠️ Please include your message, e.g., 'support I believe this ban is a mistake because...'",
 				);
 			}
 			return;

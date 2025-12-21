@@ -274,6 +274,7 @@ export const getAllFeedback = adminQuery({
 					_id: f._id,
 					text: f.text,
 					status: f.status,
+					type: f.type,
 					createdAt: f.createdAt,
 					user: user
 						? {
