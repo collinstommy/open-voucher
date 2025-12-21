@@ -10,11 +10,22 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TodosRouteImport } from './routes/todos'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AdminIndexRouteImport } from './routes/admin/index'
+import { Route as AdminVouchersRouteImport } from './routes/admin/vouchers'
+import { Route as AdminFeedbackRouteImport } from './routes/admin/feedback'
+import { Route as AdminUsersIndexRouteImport } from './routes/admin/users/index'
+import { Route as AdminUsersUserIdRouteImport } from './routes/admin/users/$userId'
 
 const TodosRoute = TodosRouteImport.update({
   id: '/todos',
   path: '/todos',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -22,30 +33,97 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminIndexRoute = AdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminVouchersRoute = AdminVouchersRouteImport.update({
+  id: '/vouchers',
+  path: '/vouchers',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminFeedbackRoute = AdminFeedbackRouteImport.update({
+  id: '/feedback',
+  path: '/feedback',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminUsersIndexRoute = AdminUsersIndexRouteImport.update({
+  id: '/users/',
+  path: '/users/',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminUsersUserIdRoute = AdminUsersUserIdRouteImport.update({
+  id: '/users/$userId',
+  path: '/users/$userId',
+  getParentRoute: () => AdminRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRouteWithChildren
   '/todos': typeof TodosRoute
+  '/admin/feedback': typeof AdminFeedbackRoute
+  '/admin/vouchers': typeof AdminVouchersRoute
+  '/admin/': typeof AdminIndexRoute
+  '/admin/users/$userId': typeof AdminUsersUserIdRoute
+  '/admin/users': typeof AdminUsersIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/todos': typeof TodosRoute
+  '/admin/feedback': typeof AdminFeedbackRoute
+  '/admin/vouchers': typeof AdminVouchersRoute
+  '/admin': typeof AdminIndexRoute
+  '/admin/users/$userId': typeof AdminUsersUserIdRoute
+  '/admin/users': typeof AdminUsersIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admin': typeof AdminRouteWithChildren
   '/todos': typeof TodosRoute
+  '/admin/feedback': typeof AdminFeedbackRoute
+  '/admin/vouchers': typeof AdminVouchersRoute
+  '/admin/': typeof AdminIndexRoute
+  '/admin/users/$userId': typeof AdminUsersUserIdRoute
+  '/admin/users/': typeof AdminUsersIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/todos'
+  fullPaths:
+    | '/'
+    | '/admin'
+    | '/todos'
+    | '/admin/feedback'
+    | '/admin/vouchers'
+    | '/admin/'
+    | '/admin/users/$userId'
+    | '/admin/users'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/todos'
-  id: '__root__' | '/' | '/todos'
+  to:
+    | '/'
+    | '/todos'
+    | '/admin/feedback'
+    | '/admin/vouchers'
+    | '/admin'
+    | '/admin/users/$userId'
+    | '/admin/users'
+  id:
+    | '__root__'
+    | '/'
+    | '/admin'
+    | '/todos'
+    | '/admin/feedback'
+    | '/admin/vouchers'
+    | '/admin/'
+    | '/admin/users/$userId'
+    | '/admin/users/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminRoute: typeof AdminRouteWithChildren
   TodosRoute: typeof TodosRoute
 }
 
@@ -58,6 +136,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TodosRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -65,11 +150,65 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/': {
+      id: '/admin/'
+      path: '/'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/vouchers': {
+      id: '/admin/vouchers'
+      path: '/vouchers'
+      fullPath: '/admin/vouchers'
+      preLoaderRoute: typeof AdminVouchersRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/feedback': {
+      id: '/admin/feedback'
+      path: '/feedback'
+      fullPath: '/admin/feedback'
+      preLoaderRoute: typeof AdminFeedbackRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/users/': {
+      id: '/admin/users/'
+      path: '/users'
+      fullPath: '/admin/users'
+      preLoaderRoute: typeof AdminUsersIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/users/$userId': {
+      id: '/admin/users/$userId'
+      path: '/users/$userId'
+      fullPath: '/admin/users/$userId'
+      preLoaderRoute: typeof AdminUsersUserIdRouteImport
+      parentRoute: typeof AdminRoute
+    }
   }
 }
 
+interface AdminRouteChildren {
+  AdminFeedbackRoute: typeof AdminFeedbackRoute
+  AdminVouchersRoute: typeof AdminVouchersRoute
+  AdminIndexRoute: typeof AdminIndexRoute
+  AdminUsersUserIdRoute: typeof AdminUsersUserIdRoute
+  AdminUsersIndexRoute: typeof AdminUsersIndexRoute
+}
+
+const AdminRouteChildren: AdminRouteChildren = {
+  AdminFeedbackRoute: AdminFeedbackRoute,
+  AdminVouchersRoute: AdminVouchersRoute,
+  AdminIndexRoute: AdminIndexRoute,
+  AdminUsersUserIdRoute: AdminUsersUserIdRoute,
+  AdminUsersIndexRoute: AdminUsersIndexRoute,
+}
+
+const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminRoute: AdminRouteWithChildren,
   TodosRoute: TodosRoute,
 }
 export const routeTree = rootRouteImport

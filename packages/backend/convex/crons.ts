@@ -19,4 +19,12 @@ crons.daily(
 	internal.vouchers.expireOldVouchers,
 );
 
+// Run at 2am UTC
+// Cleans up expired admin sessions
+crons.daily(
+	"cleanup admin sessions",
+	{ hourUTC: 2, minuteUTC: 0 },
+	internal.admin.cleanupExpiredSessions,
+);
+
 export default crons;
