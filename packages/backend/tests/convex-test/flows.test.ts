@@ -8,6 +8,7 @@
 import { convexTest } from "convex-test";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { internal } from "../../convex/_generated/api";
+import { Id } from "../../convex/_generated/dataModel";
 import schema from "../../convex/schema";
 import { modules } from "../test.setup";
 
@@ -76,7 +77,7 @@ function createTelegramCallback(data: string, chatId: string = "123456") {
   };
 }
 
-function setupFetchMock(geminiScenario: OCRSenario = "valid_10") {
+function setupFetchMock(geminiScenario: OCRSenario = "valid_10", customExpiryDate?: string) {
   sentMessages = [];
 
   const futureDate = new Date();
@@ -88,7 +89,7 @@ function setupFetchMock(geminiScenario: OCRSenario = "valid_10") {
   const pastDateStr = pastDate.toISOString().split("T")[0];
 
   const scenarios = {
-    valid_5: mockGeminiResponse("5", futureDateStr, "1234567890001"),
+    valid_5: mockGeminiResponse("5", customExpiryDate || futureDateStr, "1234567890001"),
     valid_10: mockGeminiResponse("10", futureDateStr, "1234567890002"),
     valid_20: mockGeminiResponse("20", futureDateStr, "1234567890003"),
     expired: mockGeminiResponse("10", pastDateStr, "1234567890004"),
@@ -603,7 +604,87 @@ describe("OCR Flow with Mocked Gemini", () => {
     expect(user?.coins).toBe(0);
   });
 
-  test("duplicate barcode is rejected via Telegram webhook", async () => {
+    test("test vouchers expiring today are rejected after 9 PM", async () => {
+      const t = convexTest(schema, modules);
+      const chatId = "12345";
+
+      // Create user
+      await t.mutation(internal.users.createUserWithInvite, {
+        telegramChatId: chatId,
+        inviteCode: "TEST",
+      });
+
+      // Set fixed date for test: 2025-12-21 21:30:00
+      const todayStr = "2025-12-21";
+      const mockNow = new Date(`${todayStr}T21:30:00`);
+      vi.setSystemTime(mockNow);
+
+      // Mock response with expiration date set to today
+      setupFetchMock("valid_5", todayStr);
+
+      // Stub Gemini API key
+      vi.stubEnv("GOOGLE_GENERATIVE_AI_API_KEY", "test-api-key");
+      vi.stubEnv("TELEGRAM_BOT_TOKEN", "test-bot-token");
+
+      // Send telegram photo message
+      const message = createTelegramPhotoMessage(chatId);
+
+      await t.action(internal.telegram.handleTelegramMessage, { message });
+
+          // Verify user received the rejection message
+
+          await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+          const user = await t.query(internal.users.getUserByTelegramChatId, { telegramChatId: chatId });
+
+          const vouchers = await t.run((ctx) => {
+
+              return ctx.db.query("vouchers")
+
+                  .withIndex("by_uploader", (q) => q.eq("uploaderId", user!._id))
+
+                  .collect();
+
+          });
+
+
+
+          expect(vouchers.length).toBe(1);
+
+          const voucher = vouchers[0];
+
+
+
+          expect(voucher.status).toBe("expired");
+
+          expect(voucher.ocrRawResponse).toContain("Voucher expires today and it's too late to use");
+
+
+
+                    const failureMessage = sentMessages.find(m =>
+
+
+
+                      m.chatId === chatId &&
+
+
+
+                      m.text?.includes("Voucher Processing Failed") &&
+
+
+
+                      m.text?.includes("This voucher expired on 21-12-2025")
+
+
+
+                    );
+
+
+
+          expect(failureMessage).toBeDefined();
+
+        });
+      test("test duplicate barcode is rejected via Telegram webhook", async () => {
     // Use a barcode that the mock OCR will return
     const duplicateBarcode = "1234567890002";
     const chatId = "123456";
@@ -824,7 +905,7 @@ describe("Ban Flow", () => {
     };
 
     // Create 9 existing reported vouchers (will trigger ban on 10th report)
-    const reportedVoucherIds = [];
+    const reportedVoucherIds: Id<"vouchers">[] = []
     for (let i = 0; i < 9; i++) {
       const voucherId = await createReportedVoucher(i);
       reportedVoucherIds.push(voucherId);

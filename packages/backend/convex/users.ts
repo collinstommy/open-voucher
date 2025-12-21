@@ -91,7 +91,7 @@ export const validateAndUseInviteCode = internalMutation({
 /**
  * Get user by Telegram Chat ID.
  */
-export const getUserByTelegramChatId = query({
+export const getUserByTelegramChatId = internalQuery({
   args: { telegramChatId: v.string() },
   handler: async (ctx, { telegramChatId }) => {
     return await ctx.db

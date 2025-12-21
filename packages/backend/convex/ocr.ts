@@ -13,7 +13,7 @@ type VoucherOcrFailureReason =
   | "UNKNOWN_ERROR";
 
 class VoucherValidationError extends Error {
-  constructor(public reason: VoucherOcrFailureReason, message?: string) {
+  constructor(public reason: VoucherOcrFailureReason, message?: string, public expiryDate?: number) {
     super(message || reason);
     this.name = "VoucherValidationError";
   }
@@ -141,10 +141,23 @@ If expiry is unknown: null.`;
 
       if (extracted.expiryDate) {
         const dayjsDate = dayjs(extracted.expiryDate);
+        const now = dayjs();
+
         // Parse YYYY-MM-DD
         if (dayjsDate.isValid() && dayjsDate.valueOf() > Date.now() - 365 * 24 * 60 * 60 * 1000) {
              // Set to end of the day (23:59:59.999) to be inclusive
              expiryDate = dayjsDate.endOf('day').valueOf();
+
+             // Check if already expired (yesterday or older)
+             if (dayjsDate.isBefore(now, 'day')) {
+                 throw new VoucherValidationError("EXPIRED", "Voucher has already expired", expiryDate);
+             }
+
+             // Check if expiring today and it's too late (after 9 PM)
+             if (dayjsDate.isSame(now, 'day') && now.hour() >= 21) {
+                 throw new VoucherValidationError("EXPIRED", "Voucher expires today and it's too late to use (after 9 PM)", expiryDate);
+             }
+
         } else {
              throw new VoucherValidationError("EXPIRED", "Invalid or past expiry date");
         }
@@ -179,9 +192,11 @@ If expiry is unknown: null.`;
       console.error(`OCR failed for voucher ${voucherId}:`, error);
 
       let reason: VoucherOcrFailureReason = "UNKNOWN_ERROR";
+      let expiryDate: number | undefined;
 
       if (error instanceof VoucherValidationError) {
           reason = error.reason;
+          expiryDate = error.expiryDate;
       }
 
       // Mark voucher as failed
@@ -189,6 +204,7 @@ If expiry is unknown: null.`;
         voucherId,
         error: error.message || "Unknown error",
         reason,
+        expiryDate,
       });
     }
   },

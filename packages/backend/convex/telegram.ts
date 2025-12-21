@@ -42,7 +42,7 @@ export const handleTelegramMessage = internalAction({
 
     // 2. Get User
     // Note: We are using the 'users' file now, so it's api.users...
-    const user = await ctx.runQuery(api.users.getUserByTelegramChatId, {
+    const user = await ctx.runQuery(internal.users.getUserByTelegramChatId, {
       telegramChatId: chatId,
     });
 
@@ -289,7 +289,7 @@ export const handleTelegramCallback = internalAction({
             await answerTelegramCallback(callbackQuery.id, "Checking...");
 
             // Look up the user by their Telegram chat ID
-            const user = await ctx.runQuery(api.users.getUserByTelegramChatId, {
+            const user = await ctx.runQuery(internal.users.getUserByTelegramChatId, {
                 telegramChatId: telegramUserId,
             });
 
