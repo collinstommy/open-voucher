@@ -47,6 +47,13 @@ function AdminLayout() {
 							>
 								Users
 							</Link>
+							<Link
+								to="/admin/feedback"
+								className="text-muted-foreground hover:text-foreground text-sm"
+								activeProps={{ className: "text-foreground" }}
+							>
+								Feedback
+							</Link>
 						</div>
 					</div>
 					<Button variant="ghost" size="sm" onClick={logout}>
