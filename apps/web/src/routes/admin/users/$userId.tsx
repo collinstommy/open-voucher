@@ -134,16 +134,16 @@ function UserDetailPage() {
 
 			<div>
 				<h2 className="mb-4 text-xl font-semibold">
-					Reports Filed by User ({reports.length})
+					Reports Filed by User ({reportsFiledByUser.length})
 				</h2>
 
-				{reports.length === 0 ? (
+				{reportsFiledByUser.length === 0 ? (
 					<div className="text-muted-foreground rounded-lg border p-12 text-center">
 						No reports filed
 					</div>
 				) : (
 					<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-						{reports.map((report) => (
+						{reportsFiledByUser.map((report) => (
 							<div key={report._id} className="rounded-lg border p-4">
 								{report.voucher?.imageUrl ? (
 									<img
@@ -163,8 +163,7 @@ function UserDetailPage() {
 										€{report.voucher?.type} Voucher
 									</div>
 									<div className="text-muted-foreground mb-1 text-sm">
-										Reported on{" "}
-										{new Date(report.createdAt).toLocaleString()}
+										Reported on {new Date(report.createdAt).toLocaleString()}
 									</div>
 									<div className="text-muted-foreground text-sm">
 										Uploaded by{" "}
@@ -178,7 +177,64 @@ function UserDetailPage() {
 									<div className="text-muted-foreground mb-1 text-xs">
 										Reason
 									</div>
-									<div className="whitespace-pre-wrap text-sm">{report.reason}</div>
+									<div className="whitespace-pre-wrap text-sm">
+										{report.reason}
+									</div>
+								</div>
+							</div>
+						))}
+					</div>
+				)}
+			</div>
+
+			<div>
+				<h2 className="mb-4 text-xl font-semibold">
+					Reports Against User's Uploads ({reportsAgainstUploads.length})
+				</h2>
+
+				{reportsAgainstUploads.length === 0 ? (
+					<div className="text-muted-foreground rounded-lg border p-12 text-center">
+						No reports against uploads
+					</div>
+				) : (
+					<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+						{reportsAgainstUploads.map((report) => (
+							<div key={report._id} className="rounded-lg border p-4">
+								{report.voucher?.imageUrl ? (
+									<img
+										src={report.voucher.imageUrl}
+										alt="Voucher"
+										className="mb-3 h-96 w-full rounded border object-contain bg-muted"
+									/>
+								) : (
+									<div className="bg-muted mb-3 flex h-96 w-full items-center justify-center rounded">
+										<span className="text-muted-foreground text-xs">
+											No image
+										</span>
+									</div>
+								)}
+								<div className="mb-3">
+									<div className="mb-2 font-medium">
+										€{report.voucher?.type} Voucher
+									</div>
+									<div className="text-muted-foreground mb-1 text-sm">
+										Reported on {new Date(report.createdAt).toLocaleString()}
+									</div>
+									<div className="text-muted-foreground text-sm">
+										Reported by{" "}
+										{report.reporter?.username ||
+											report.reporter?.firstName ||
+											"Unknown"}{" "}
+										({report.reporter?.telegramChatId})
+									</div>
+								</div>
+								<div className="rounded bg-muted p-3">
+									<div className="text-muted-foreground mb-1 text-xs">
+										Reason
+									</div>
+									<div className="whitespace-pre-wrap text-sm">
+										{report.reason}
+									</div>
 								</div>
 							</div>
 						))}

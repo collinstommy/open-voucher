@@ -1,12 +1,14 @@
-import { customMutation, customQuery } from "convex-helpers/server/customFunctions";
+import {
+	customMutation,
+	customQuery,
+} from "convex-helpers/server/customFunctions";
 import { v } from "convex/values";
 import {
-    internalMutation,
-    mutation,
-    query,
-    QueryCtx
+	internalMutation,
+	mutation,
+	query,
+	QueryCtx,
 } from "./_generated/server";
-
 
 const SESSION_DURATION_MS = 24 * 60 * 60 * 1000;
 
@@ -263,10 +265,7 @@ export const getUsersWithStats = adminQuery({
 export const getAllFeedback = adminQuery({
 	args: {},
 	handler: async (ctx) => {
-		const feedback = await ctx.db
-			.query("feedback")
-			.order("desc")
-			.collect();
+		const feedback = await ctx.db.query("feedback").order("desc").collect();
 
 		const feedbackWithUsers = await Promise.all(
 			feedback.map(async (f) => {
@@ -327,13 +326,13 @@ export const getUserDetails = adminQuery({
 			.withIndex("by_uploader", (q) => q.eq("uploaderId", userId))
 			.collect();
 
-		const reportsFiledByUser = await ctx.db
+		const reportsFiledByUserRaw = await ctx.db
 			.query("reports")
 			.withIndex("by_reporterId", (q) => q.eq("reporterId", userId))
 			.collect();
 
 		const reportsFiledByUser = await Promise.all(
-			reportsFiledByUser.map(async (report) => {
+			reportsFiledByUserRaw.map(async (report) => {
 				const voucher = await ctx.db.get(report.voucherId);
 				const uploader = voucher ? await ctx.db.get(voucher.uploaderId) : null;
 				const imageUrl = voucher
