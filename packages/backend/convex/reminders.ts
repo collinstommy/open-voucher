@@ -8,19 +8,19 @@ import { internalAction, internalQuery } from "./_generated/server";
  * Runs at 10am UTC.
  */
 export const sendDailyUploadReminders = internalAction({
-  args: {},
-  handler: async (ctx) => {
-    const telegramChatIds = await ctx.runQuery(
-      internal.reminders.getUsersWhoClaimedYesterday
-    );
+	args: {},
+	handler: async (ctx) => {
+		const telegramChatIds = await ctx.runQuery(
+			internal.reminders.getUsersWhoClaimedYesterday,
+		);
 
-    for (const chatId of telegramChatIds) {
-      await ctx.scheduler.runAfter(0, internal.telegram.sendMessageAction, {
-        chatId,
-        text: `🛒 You saved on your shopping yesterday!\n\nUpload your new vouchers today to ensure no vouchers go to waste.`,
-      });
-    }
-  },
+		for (const chatId of telegramChatIds) {
+			await ctx.scheduler.runAfter(0, internal.telegram.sendMessageAction, {
+				chatId,
+				text: `🛒 You saved on your shopping yesterday!\n\nUpload your new vouchers today to ensure no vouchers go to waste.`,
+			});
+		}
+	},
 });
 
 /**
@@ -28,28 +28,33 @@ export const sendDailyUploadReminders = internalAction({
  * Returns deduplicated list of telegram chat IDs.
  */
 export const getUsersWhoClaimedYesterday = internalQuery({
-  args: {},
-  handler: async (ctx) => {
-    const startOfYesterday = dayjs().subtract(1, 'day').startOf('day').valueOf();
-    const endOfYesterday = dayjs().startOf('day').valueOf();
+	args: {},
+	handler: async (ctx) => {
+		const startOfYesterday = dayjs()
+			.subtract(1, "day")
+			.startOf("day")
+			.valueOf();
+		const endOfYesterday = dayjs().startOf("day").valueOf();
 
-    const vouchers = await ctx.db
-      .query("vouchers")
-      .withIndex("by_claimed_at", (q) =>
-        q.gte("claimedAt", startOfYesterday).lt("claimedAt", endOfYesterday)
-      )
-      .collect();
+		const vouchers = await ctx.db
+			.query("vouchers")
+			.withIndex("by_claimed_at", (q) =>
+				q.gte("claimedAt", startOfYesterday).lt("claimedAt", endOfYesterday),
+			)
+			.collect();
 
-    const claimerIds = [...new Set(
-      vouchers.map((v) => v.claimerId).filter((id): id is Id<"users"> => id !== undefined)
-    )];
+		const claimerIds = [
+			...new Set(
+				vouchers
+					.map((v) => v.claimerId)
+					.filter((id): id is Id<"users"> => id !== undefined),
+			),
+		];
 
-    const chatIds = (
-      await Promise.all(claimerIds.map((id) => ctx.db.get(id)))
-    )
-      .filter((user) => user !== null)
-      .map((user) => user.telegramChatId);
+		const chatIds = (await Promise.all(claimerIds.map((id) => ctx.db.get(id))))
+			.filter((user) => user !== null)
+			.map((user) => user.telegramChatId);
 
-    return chatIds;
-  },
+		return chatIds;
+	},
 });
