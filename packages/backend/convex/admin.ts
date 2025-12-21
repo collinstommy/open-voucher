@@ -1,12 +1,12 @@
+import { customMutation, customQuery } from "convex-helpers/server/customFunctions";
 import { v } from "convex/values";
 import {
-    customMutation,
-    customQuery,
+    internalMutation,
     mutation,
-    MutationCtx,
     query,
     QueryCtx
 } from "./_generated/server";
+
 
 const SESSION_DURATION_MS = 24 * 60 * 60 * 1000;
 
@@ -65,7 +65,7 @@ export const logout = mutation({
 });
 
 export async function verifyAdminSession(
-	ctx: QueryCtx | MutationCtx,
+	ctx: QueryCtx,
 	token: string,
 ): Promise<void> {
 	const session = await ctx.db
@@ -79,32 +79,25 @@ export async function verifyAdminSession(
 
 	const now = Date.now();
 	if (session.expiresAt < now) {
-		await ctx.db.delete(session._id);
 		throw new Error("Unauthorized: Session expired");
 	}
 }
 
-export const adminQuery = customQuery(
-	query,
-	{
-		args: { token: v.string() },
-		input: async (ctx, { token }) => {
-			await verifyAdminSession(ctx, token);
-			return { ctx };
-		},
+export const adminQuery = customQuery(query, {
+	args: { token: v.string() },
+	input: async (ctx, { token }) => {
+		await verifyAdminSession(ctx, token);
+		return { ctx: {}, args: {} };
 	},
-);
+});
 
-export const adminMutation = customMutation(
-	mutation,
-	{
-		args: { token: v.string() },
-		input: async (ctx, { token }) => {
-			await verifyAdminSession(ctx, token);
-			return { ctx };
-		},
+export const adminMutation = customMutation(mutation, {
+	args: { token: v.string() },
+	input: async (ctx, { token }) => {
+		await verifyAdminSession(ctx, token);
+		return { ctx: {}, args: {} };
 	},
-);
+});
 
 export const checkSession = query({
 	args: {
