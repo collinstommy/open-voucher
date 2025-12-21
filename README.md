@@ -174,11 +174,15 @@ chmod +x pacakges/backend/createInviteCode.sh
 Session-based authentication for admin endpoints.
 
 **Setup:**
+Dev
 ```bash
 bunx convex env set ADMIN_PASSWORD "your-secure-password-here"
 ```
 
-For usage documentation, see `packages/backend/convex/ADMIN_AUTH.md`.
+Prod`
+```bash
+bunx convex env set ADMIN_PASSWORD "your-secure-password-here" --prod
+```
 
 ## ToDo
 - [ ] unify the validation, we do this in two places right now

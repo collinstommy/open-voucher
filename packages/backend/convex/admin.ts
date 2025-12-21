@@ -182,3 +182,68 @@ export const unbanUser = adminMutation({
 		return { success: true };
 	},
 });
+
+export const getTodaysVouchers = adminQuery({
+	args: {},
+	handler: async (ctx) => {
+		const now = new Date();
+		const startOfDay = new Date(
+			now.getFullYear(),
+			now.getMonth(),
+			now.getDate(),
+		).getTime();
+
+		const vouchers = await ctx.db
+			.query("vouchers")
+			.filter((q) => q.gte(q.field("createdAt"), startOfDay))
+			.collect();
+
+		const vouchersWithImages = await Promise.all(
+			vouchers.map(async (v) => ({
+				_id: v._id,
+				type: v.type,
+				status: v.status,
+				createdAt: v.createdAt,
+				expiryDate: v.expiryDate,
+				imageUrl: await ctx.storage.getUrl(v.imageStorageId),
+			})),
+		);
+
+		return { vouchers: vouchersWithImages };
+	},
+});
+
+export const getUsersWithStats = adminQuery({
+	args: {},
+	handler: async (ctx) => {
+		const users = await ctx.db.query("users").collect();
+
+		const usersWithStats = await Promise.all(
+			users.map(async (u) => {
+				const uploaded = await ctx.db
+					.query("vouchers")
+					.withIndex("by_uploader", (q) => q.eq("uploaderId", u._id))
+					.collect();
+
+				const claimed = await ctx.db
+					.query("vouchers")
+					.filter((q) => q.eq(q.field("claimerId"), u._id))
+					.collect();
+
+				return {
+					_id: u._id,
+					telegramChatId: u.telegramChatId,
+					username: u.username,
+					firstName: u.firstName,
+					coins: u.coins,
+					isBanned: u.isBanned,
+					createdAt: u.createdAt,
+					uploadCount: uploaded.length,
+					claimCount: claimed.length,
+				};
+			}),
+		);
+
+		return { users: usersWithStats };
+	},
+});
