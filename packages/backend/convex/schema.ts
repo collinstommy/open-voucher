@@ -35,7 +35,10 @@ export default defineSchema({
 		// Unix timestamp when user first messaged bot
 		createdAt: v.number(),
 		// Unix timestamp of last interaction
+		// Unix timestamp of last interaction
 		lastActiveAt: v.number(),
+		// Unix timestamp when user was banned (if banned)
+		bannedAt: v.optional(v.number()),
 	}).index("by_chat_id", ["telegramChatId"]),
 
 	// Messages table - stores incoming Telegram messages

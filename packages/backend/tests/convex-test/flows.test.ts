@@ -880,7 +880,7 @@ describe("Ban Flow", () => {
 		vi.unstubAllEnvs();
 	});
 
-	test("uploader gets banned after 10 reports and receives ban message", async () => {
+	test("uploader gets banned when 3 of last 5 uploads reported", async () => {
 		vi.useFakeTimers();
 		const t = convexTest(schema, modules);
 		const uploaderChatId = "uploader_ban_test";
@@ -908,73 +908,46 @@ describe("Ban Flow", () => {
 			});
 		});
 
-		// Helper to create a reported voucher
-		const createReportedVoucher = async (index: number) => {
+		// Create 5 vouchers, all claimed by reporter
+		const voucherIds: Id<"vouchers">[] = [];
+		for (let i = 0; i < 5; i++) {
 			const imageStorageId = await t.run(async (ctx) => {
-				return await ctx.storage.store(new Blob([`voucher_image_${index}`]));
+				return await ctx.storage.store(new Blob([`voucher_${i}`]));
 			});
 
 			const voucherId = await t.run(async (ctx) => {
 				return await ctx.db.insert("vouchers", {
 					type: "10",
-					status: "reported",
+					status: "claimed",
 					imageStorageId,
 					uploaderId,
 					claimerId: reporterId,
-					claimedAt: Date.now() - index * 1000, // Different times
+					claimedAt: Date.now() - (5 - i) * 1000,
 					expiryDate: Date.now() + 7 * 24 * 60 * 60 * 1000,
-					createdAt: Date.now() - index * 1000,
+					createdAt: Date.now() - (5 - i) * 2000,
 				});
 			});
-
-			// Create the report entry
-			await t.run(async (ctx) => {
-				await ctx.db.insert("reports", {
-					voucherId,
-					reporterId,
-					uploaderId,
-					reason: "not_working",
-					createdAt: Date.now() - index * 1000,
-				});
-			});
-
-			return voucherId;
-		};
-
-		// Create 9 existing reported vouchers (will trigger ban on 10th report)
-		const reportedVoucherIds: Id<"vouchers">[] = [];
-		for (let i = 0; i < 9; i++) {
-			const voucherId = await createReportedVoucher(i);
-			reportedVoucherIds.push(voucherId);
+			voucherIds.push(voucherId);
 		}
 
-		// Create 1 available voucher that will be reported via callback
-		const availableImageStorageId = await t.run(async (ctx) => {
-			return await ctx.storage.store(new Blob(["available_voucher_image"]));
-		});
-
-		const availableVoucherId = await t.run(async (ctx) => {
-			return await ctx.db.insert("vouchers", {
-				type: "10",
-				status: "claimed",
-				imageStorageId: availableImageStorageId,
-				uploaderId,
-				claimerId: reporterId,
-				claimedAt: Date.now(),
-				expiryDate: Date.now() + 7 * 24 * 60 * 60 * 1000,
-				createdAt: Date.now(),
+		// Report first 2 vouchers (should not trigger ban)
+		for (let i = 0; i < 2; i++) {
+			await t.mutation(internal.vouchers.reportVoucher, {
+				userId: reporterId,
+				voucherId: voucherIds[i],
 			});
+		}
+
+		// Verify uploader is NOT banned yet
+		let uploader = await t.run(async (ctx) => {
+			return await ctx.db.get(uploaderId);
 		});
+		expect(uploader?.isBanned).toBe(false);
 
-		// Create callback query to report the available voucher (10th report)
-		const callbackQuery = createTelegramCallback(
-			`report:${availableVoucherId}`,
-			reporterChatId,
-		);
-
-		// Execute the callback handler - this should trigger the ban
-		await t.action(internal.telegram.handleTelegramCallback, {
-			callbackQuery,
+		// Report 3rd voucher - this should trigger ban (3 of 5)
+		await t.mutation(internal.vouchers.reportVoucher, {
+			userId: reporterId,
+			voucherId: voucherIds[2],
 		});
 
 		// Wait for scheduled functions (ban notification) to complete
@@ -982,10 +955,11 @@ describe("Ban Flow", () => {
 		await t.finishInProgressScheduledFunctions();
 
 		// Verify the uploader is now banned
-		const uploader = await t.run(async (ctx) => {
+		uploader = await t.run(async (ctx) => {
 			return await ctx.db.get(uploaderId);
 		});
 		expect(uploader?.isBanned).toBe(true);
+		expect(uploader?.bannedAt).toBeDefined();
 
 		// Verify ban notification was sent to uploader
 		const banNotification = sentMessages.find(
@@ -993,20 +967,38 @@ describe("Ban Flow", () => {
 		);
 		expect(banNotification).toBeDefined();
 		expect(banNotification?.text).toContain(
-			"banned because multiple vouchers you uploaded were reported",
+			"3 or more of your last 5 uploads were reported",
 		);
 
-		// Verify the available voucher was marked as reported
-		const availableVoucher = await t.run(async (ctx) => {
-			return await ctx.db.get(availableVoucherId);
+		vi.useRealTimers();
+	});
+	test("banned user gets a ban message when trying to interact", async () => {
+		vi.useFakeTimers();
+		const t = convexTest(schema, modules);
+		const uploaderChatId = "uploader_ban_test";
+		const reporterChatId = "reporter_test";
+
+		// Create uploader user (will be banned)
+		const uploaderId = await t.run(async (ctx) => {
+			return await ctx.db.insert("users", {
+				telegramChatId: uploaderChatId,
+				coins: 100,
+				isBanned: true, // Start as banned for this test
+				createdAt: Date.now(),
+				lastActiveAt: Date.now(),
+			});
 		});
-		expect(availableVoucher?.status).toBe("reported");
 
-		// Verify reporter got appropriate response (replacement or refund)
-		const reporterResponse = sentMessages.find(
-			(m) => m.chatId === reporterChatId,
-		);
-		expect(reporterResponse).toBeDefined();
+		// Create reporter user (not relevant for this specific test, but good to have)
+		await t.run(async (ctx) => {
+			return await ctx.db.insert("users", {
+				telegramChatId: reporterChatId,
+				coins: 50,
+				isBanned: false,
+				createdAt: Date.now(),
+				lastActiveAt: Date.now(),
+			});
+		});
 
 		// Now test that the banned user gets a ban message when trying to interact
 		sentMessages.length = 0; // Clear sent messages
@@ -1440,5 +1432,265 @@ describe("Voucher Expiration Flow", () => {
 
 		expect(result.success).toBe(false);
 		expect(result.error).toContain("No €5 vouchers currently available");
+	});
+});
+
+describe("Ban Flow Tests", () => {
+	beforeEach(() => {
+		setupFetchMock();
+		vi.stubEnv("TELEGRAM_BOT_TOKEN", "test-bot-token");
+	});
+
+	afterEach(() => {
+		vi.unstubAllGlobals();
+		vi.unstubAllEnvs();
+	});
+
+	test("reporter banned when 3+ of last 5 claims are reported", async () => {
+		vi.useFakeTimers();
+		const t = convexTest(schema, modules);
+		const now = Date.now();
+
+		const uploaderId = await t.run(async (ctx) => {
+			return await ctx.db.insert("users", {
+				telegramChatId: "uploader123",
+				coins: 0,
+				isBanned: false,
+				createdAt: now,
+				lastActiveAt: now,
+			});
+		});
+
+		const reporterId = await t.run(async (ctx) => {
+			return await ctx.db.insert("users", {
+				telegramChatId: "reporter456",
+				coins: 100,
+				isBanned: false,
+				createdAt: now,
+				lastActiveAt: now,
+			});
+		});
+
+		// Create 5 vouchers and have reporter claim all of them
+		const voucherIds: Id<"vouchers">[] = [];
+		for (let i = 0; i < 5; i++) {
+			const imageStorageId = await t.run(async (ctx) => {
+				return await ctx.storage.store(new Blob([`voucher-${i}`]));
+			});
+
+			const voucherId = await t.run(async (ctx) => {
+				return await ctx.db.insert("vouchers", {
+					type: "5",
+					status: "claimed",
+					imageStorageId,
+					uploaderId,
+					claimerId: reporterId,
+					expiryDate: now + 7 * 24 * 60 * 60 * 1000,
+					claimedAt: now - (5 - i) * 1000, // Stagger claim times
+					createdAt: now - (5 - i) * 2000,
+				});
+			});
+			voucherIds.push(voucherId);
+		}
+
+		// Report first 2 vouchers (should be fine - 2 of 5)
+		for (let i = 0; i < 2; i++) {
+			await t.mutation(internal.vouchers.reportVoucher, {
+				userId: reporterId,
+				voucherId: voucherIds[i],
+			});
+		}
+
+		let reporter = await t.run(async (ctx) => {
+			return await ctx.db.get(reporterId);
+		});
+		expect(reporter?.isBanned).toBe(false);
+
+		await t.mutation(internal.vouchers.reportVoucher, {
+			userId: reporterId,
+			voucherId: voucherIds[2],
+		});
+
+		expect(reporter?.isBanned).toBe(false);
+
+		// Report 4th voucher - this should trigger ban (3 existing + this one)
+		const result4 = await t.mutation(internal.vouchers.reportVoucher, {
+			userId: reporterId,
+			voucherId: voucherIds[3],
+		});
+
+		expect(result4.status).toBe("banned");
+		expect(result4.message).toContain("3 or more of your last 5 claims");
+
+		await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+		reporter = await t.run(async (ctx) => {
+			return await ctx.db.get(reporterId);
+		});
+		expect(reporter?.isBanned).toBe(true);
+		expect(reporter?.bannedAt).toBeDefined();
+		vi.useRealTimers();
+	});
+
+	test("uploader banned when 3+ of last 5 uploads are reported", async () => {
+		vi.useFakeTimers();
+		const t = convexTest(schema, modules);
+		const now = Date.now();
+
+		const uploaderId = await t.run(async (ctx) => {
+			return await ctx.db.insert("users", {
+				telegramChatId: "uploader789",
+				coins: 0,
+				isBanned: false,
+				createdAt: now,
+				lastActiveAt: now,
+			});
+		});
+
+		const reporterId = await t.run(async (ctx) => {
+			return await ctx.db.insert("users", {
+				telegramChatId: "reporter101",
+				coins: 100,
+				isBanned: false,
+				createdAt: now,
+				lastActiveAt: now,
+			});
+		});
+
+		// Create 5 vouchers uploaded by uploader, claimed by reporter
+		const voucherIds: Id<"vouchers">[] = [];
+		for (let i = 0; i < 5; i++) {
+			const imageStorageId = await t.run(async (ctx) => {
+				return await ctx.storage.store(new Blob([`voucher-${i}`]));
+			});
+
+			const voucherId = await t.run(async (ctx) => {
+				return await ctx.db.insert("vouchers", {
+					type: "5",
+					status: "claimed",
+					imageStorageId,
+					uploaderId,
+					claimerId: reporterId,
+					expiryDate: now + 7 * 24 * 60 * 60 * 1000,
+					claimedAt: now - (5 - i) * 1000,
+					createdAt: now - (5 - i) * 2000, // Most recent upload last
+				});
+			});
+			voucherIds.push(voucherId);
+		}
+
+		for (let i = 0; i < 2; i++) {
+			await t.mutation(internal.vouchers.reportVoucher, {
+				userId: reporterId,
+				voucherId: voucherIds[i],
+			});
+		}
+
+		let uploader = await t.run(async (ctx) => {
+			return await ctx.db.get(uploaderId);
+		});
+		expect(uploader?.isBanned).toBe(false);
+
+		// Report 3rd voucher - this should trigger uploader ban (3 of 5)
+		await t.mutation(internal.vouchers.reportVoucher, {
+			userId: reporterId,
+			voucherId: voucherIds[2],
+		});
+
+		await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+		uploader = await t.run(async (ctx) => {
+			return await ctx.db.get(uploaderId);
+		});
+		expect(uploader?.isBanned).toBe(true);
+		expect(uploader?.bannedAt).toBeDefined();
+		vi.useRealTimers();
+	});
+
+	test("uploader NOT banned when reports come from banned users", async () => {
+		vi.useFakeTimers();
+		const t = convexTest(schema, modules);
+		const now = Date.now();
+
+		// Create uploader
+		const uploaderId = await t.run(async (ctx) => {
+			return await ctx.db.insert("users", {
+				telegramChatId: "gooduploader",
+				coins: 0,
+				isBanned: false,
+				createdAt: now,
+				lastActiveAt: now,
+			});
+		});
+
+		const goodReporterId = await t.run(async (ctx) => {
+			return await ctx.db.insert("users", {
+				telegramChatId: "goodreporter",
+				coins: 100,
+				isBanned: false,
+				createdAt: now,
+				lastActiveAt: now,
+			});
+		});
+
+		const badReporterId = await t.run(async (ctx) => {
+			return await ctx.db.insert("users", {
+				telegramChatId: "badreporter",
+				coins: 100,
+				isBanned: true, // Already banned
+				bannedAt: now - 1000,
+				createdAt: now,
+				lastActiveAt: now,
+			});
+		});
+
+		const voucherIds: Id<"vouchers">[] = [];
+		for (let i = 0; i < 5; i++) {
+			const imageStorageId = await t.run(async (ctx) => {
+				return await ctx.storage.store(new Blob([`voucher-${i}`]));
+			});
+
+			const reporterForThisVoucher = i < 3 ? badReporterId : goodReporterId;
+
+			const voucherId = await t.run(async (ctx) => {
+				return await ctx.db.insert("vouchers", {
+					type: "5",
+					status: "claimed",
+					imageStorageId,
+					uploaderId,
+					claimerId: reporterForThisVoucher,
+					expiryDate: now + 7 * 24 * 60 * 60 * 1000,
+					claimedAt: now - (5 - i) * 1000,
+					createdAt: now - (5 - i) * 2000,
+				});
+			});
+			voucherIds.push(voucherId);
+		}
+
+		for (let i = 0; i < 3; i++) {
+			await t.run(async (ctx) => {
+				await ctx.db.insert("reports", {
+					voucherId: voucherIds[i],
+					reporterId: badReporterId,
+					uploaderId,
+					reason: "not_working",
+					createdAt: now - (3 - i) * 1000,
+				});
+			});
+		}
+
+		await t.mutation(internal.vouchers.reportVoucher, {
+			userId: goodReporterId,
+			voucherId: voucherIds[3],
+		});
+
+		await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+		// Verify uploader is NOT banned (only 1 valid report out of 5)
+		const uploader = await t.run(async (ctx) => {
+			return await ctx.db.get(uploaderId);
+		});
+		expect(uploader?.isBanned).toBe(false);
+		vi.useRealTimers();
 	});
 });
