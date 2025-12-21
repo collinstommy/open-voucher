@@ -169,6 +169,17 @@ chmod +x pacakges/backend/createInviteCode.sh
 🔗 Share: https://t.me/your_bot?start=REDDIT50
 ```
 
+## Admin Authentication
+
+Session-based authentication for admin endpoints.
+
+**Setup:**
+```bash
+bunx convex env set ADMIN_PASSWORD "your-secure-password-here"
+```
+
+For usage documentation, see `packages/backend/convex/ADMIN_AUTH.md`.
+
 ## ToDo
 - [ ] unify the validation, we do this in two places right now
 - [ ] return vouchers that are expires soonest

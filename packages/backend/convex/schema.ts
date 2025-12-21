@@ -148,4 +148,14 @@ export default defineSchema({
 		createdAt: v.number(),
 		status: v.string(), // "new", "read", "archived"
 	}).index("by_status", ["status"]),
+
+	// Admin sessions table - for admin authentication
+	adminSessions: defineTable({
+		// Session token (UUID)
+		token: v.string(),
+		// Unix timestamp when session was created
+		createdAt: v.number(),
+		// Unix timestamp when session expires
+		expiresAt: v.number(),
+	}).index("by_token", ["token"]),
 });
