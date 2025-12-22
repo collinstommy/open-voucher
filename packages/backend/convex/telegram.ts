@@ -113,6 +113,30 @@ You've been started with <b>${newUser.coins} coins</b> to get you going! 🚀
 			return;
 		}
 
+		const lowerText = text.toLowerCase().trim();
+
+
+		if (lowerText.startsWith("support ")) {
+			const supportText = text.slice(8).trim();
+			if (supportText.length > 0) {
+				await ctx.runMutation(internal.users.submitFeedback, {
+					userId: user._id,
+					text: supportText,
+					type: "support",
+				});
+				await sendTelegramMessage(
+					chatId,
+					"✅ Your support request has been received. We'll review your case and get back to you.",
+				);
+			} else {
+				await sendTelegramMessage(
+					chatId,
+					"⚠️ Please include your message, e.g., 'support I believe this ban is a mistake because...'",
+				);
+			}
+			return;
+		}
+
 		if (user.isBanned) {
 			await sendTelegramMessage(
 				chatId,
@@ -159,7 +183,6 @@ You've been started with <b>${newUser.coins} coins</b> to get you going! 🚀
 		}
 
 		// 5. Handle Commands
-		const lowerText = text.toLowerCase().trim();
 
 		if (lowerText === "/balance" || lowerText === "balance") {
 			await sendTelegramMessage(chatId, `💰 You have ${user.coins} coins.`);
@@ -185,25 +208,6 @@ You've been started with <b>${newUser.coins} coins</b> to get you going! 🚀
 				await sendTelegramMessage(
 					chatId,
 					"⚠️ Please include a message, e.g., 'feedback fix this bug!'",
-				);
-			}
-			return;
-		} else if (lowerText.startsWith("support ")) {
-			const supportText = text.slice(8).trim();
-			if (supportText.length > 0) {
-				await ctx.runMutation(internal.users.submitFeedback, {
-					userId: user._id,
-					text: supportText,
-					type: "support",
-				});
-				await sendTelegramMessage(
-					chatId,
-					"✅ Your support request has been received. We'll review your case and get back to you.",
-				);
-			} else {
-				await sendTelegramMessage(
-					chatId,
-					"⚠️ Please include your message, e.g., 'support I believe this ban is a mistake because...'",
 				);
 			}
 			return;
