@@ -26,6 +26,7 @@ export default defineSchema({
 		claimCount: v.optional(v.number()),
 		uploadReportCount: v.optional(v.number()),
 		claimReportCount: v.optional(v.number()),
+		lastReportAt: v.optional(v.number()),
 	}).index("by_chat_id", ["telegramChatId"]),
 
 	messages: defineTable({

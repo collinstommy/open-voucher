@@ -25,7 +25,8 @@ type SortField =
 	| "uploadCount"
 	| "claimCount"
 	| "uploadReportCount"
-	| "claimReportCount";
+	| "claimReportCount"
+	| "uploadReportRatio";
 type SortDirection = "asc" | "desc";
 
 function UsersPage() {
@@ -79,12 +80,22 @@ function UsersPage() {
 		return <div className="text-red-500">Error loading users</div>;
 	}
 
-	const users = (data?.users ?? []).sort((a, b) => {
-		const aValue = a[sortField];
-		const bValue = b[sortField];
-		const multiplier = sortDirection === "asc" ? 1 : -1;
-		return (aValue - bValue) * multiplier;
-	});
+	const users = (data?.users ?? [])
+		.map((user) => ({
+			...user,
+			uploadReportRatio:
+				user.uploadCount > 0
+					? user.uploadReportCount / user.uploadCount
+					: user.uploadReportCount > 0
+						? Number.POSITIVE_INFINITY
+						: 0,
+		}))
+		.sort((a, b) => {
+			const aValue = a[sortField];
+			const bValue = b[sortField];
+			const multiplier = sortDirection === "asc" ? 1 : -1;
+			return (aValue - bValue) * multiplier;
+		});
 
 	return (
 		<div>
@@ -202,6 +213,23 @@ function UsersPage() {
 									)}
 								</button>
 							</th>
+							<th className="pb-3 pr-4 font-medium">
+								<button
+									onClick={() => handleSort("uploadReportRatio")}
+									className="flex items-center gap-1 hover:text-foreground"
+								>
+									Upload Report Ratio
+									{sortField === "uploadReportRatio" ? (
+										sortDirection === "asc" ? (
+											<span>↑</span>
+										) : (
+											<span>↓</span>
+										)
+									) : (
+										<span className="opacity-30">⇅</span>
+									)}
+								</button>
+							</th>
 							<th className="pb-3 font-medium">Actions</th>
 						</tr>
 					</thead>
@@ -243,6 +271,23 @@ function UsersPage() {
 										}
 									>
 										{user.claimReportCount}
+									</span>
+								</td>
+								<td className="py-3 pr-4">
+									<span
+										className={
+											user.uploadReportRatio > 1.5
+												? "text-red-600 font-bold"
+												: user.uploadReportRatio > 1.0
+													? "text-orange-500 font-medium"
+													: user.uploadReportRatio === Number.POSITIVE_INFINITY
+														? "text-red-600 font-bold"
+														: ""
+										}
+									>
+										{user.uploadReportRatio === Number.POSITIVE_INFINITY
+											? "∞"
+											: user.uploadReportRatio.toFixed(2)}
 									</span>
 								</td>
 								<td className="py-3">

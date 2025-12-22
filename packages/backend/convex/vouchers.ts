@@ -365,20 +365,27 @@ export const reportVoucher = internalMutation({
 		voucherId: v.id("vouchers"),
 	},
 	handler: async (ctx, { userId, voucherId }) => {
-		// 1. Get User
 		const user = await ctx.db.get(userId);
 		if (!user) throw new Error("User not found");
 
-		// 2. Get Voucher
+		const now = Date.now();
+		const startOfDay = dayjs(now).startOf("day").valueOf();
+
+		if (user.lastReportAt && user.lastReportAt >= startOfDay) {
+			return {
+				status: "rate_limited",
+				message:
+					"You can only report 1 voucher per day. Please try again tomorrow.",
+			};
+		}
+
 		const voucher = await ctx.db.get(voucherId);
 		if (!voucher) throw new Error("Voucher not found");
 
-		// Verify this user actually claimed this voucher
 		if (voucher.claimerId !== user._id) {
 			throw new Error("You did not claim this voucher");
 		}
 
-		// Check if this user already reported this specific voucher
 		const existingReport = await ctx.db
 			.query("reports")
 			.withIndex("by_voucher", (q) => q.eq("voucherId", voucherId))
@@ -454,6 +461,7 @@ export const reportVoucher = internalMutation({
 
 			await ctx.db.patch(user._id, {
 				claimReportCount: (user.claimReportCount || 0) + 1,
+				lastReportAt: now,
 			});
 
 			const uploader = await ctx.db.get(voucher.uploaderId);

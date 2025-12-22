@@ -115,7 +115,6 @@ You've been started with <b>${newUser.coins} coins</b> to get you going! 🚀
 
 		const lowerText = text.toLowerCase().trim();
 
-
 		if (lowerText.startsWith("support ")) {
 			const supportText = text.slice(8).trim();
 			if (supportText.length > 0) {
@@ -372,7 +371,9 @@ export const handleTelegramCallback = internalAction({
 				voucherId: voucherId as Id<"vouchers">,
 			});
 
-			if (result.status === "already_reported") {
+			if (result.status === "rate_limited") {
+				await sendTelegramMessage(chatId, `⏰ ${result.message}`);
+			} else if (result.status === "already_reported") {
 				await sendTelegramMessage(chatId, `⚠️ ${result.message}`);
 			} else if (result.status === "replaced" && result.voucher) {
 				await sendTelegramPhoto(
