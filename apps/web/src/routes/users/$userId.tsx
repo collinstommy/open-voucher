@@ -53,6 +53,8 @@ function UserDetailPage() {
 
 	const user = data?.user;
 	const stats = data?.stats;
+	const uploadedVouchers = data?.uploadedVouchers ?? [];
+	const claimedVouchers = data?.claimedVouchers ?? [];
 	const reportsFiledByUser = data?.reportsFiledByUser ?? [];
 	const reportsAgainstUploads = data?.reportsAgainstUploads ?? [];
 
@@ -130,6 +132,135 @@ function UserDetailPage() {
 						</div>
 					</div>
 				</div>
+			</div>
+
+			<div>
+				<h2 className="mb-4 text-xl font-semibold">
+					Uploaded Vouchers ({uploadedVouchers.length})
+				</h2>
+
+				{uploadedVouchers.length === 0 ? (
+					<div className="text-muted-foreground rounded-lg border p-12 text-center">
+						No uploaded vouchers
+					</div>
+				) : (
+					<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+						{uploadedVouchers.map((voucher) => (
+							<div key={voucher._id} className="rounded-lg border p-4">
+								{voucher.imageUrl ? (
+									<img
+										src={voucher.imageUrl}
+										alt="Voucher"
+										className="mb-3 h-96 w-full rounded border object-contain bg-muted"
+									/>
+								) : (
+									<div className="bg-muted mb-3 flex h-96 w-full items-center justify-center rounded">
+										<span className="text-muted-foreground text-xs">
+											No image
+										</span>
+									</div>
+								)}
+								<div className="mb-3">
+									<div className="mb-2 font-medium">
+										€{voucher.type} Voucher
+									</div>
+									<div className="text-muted-foreground mb-1 text-xs">
+										ID: {voucher._id}
+									</div>
+									<div className="text-muted-foreground mb-1 text-sm">
+										Status:{" "}
+										<span
+											className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+												voucher.status === "available"
+													? "bg-green-100 text-green-800"
+													: voucher.status === "claimed"
+														? "bg-blue-100 text-blue-800"
+														: voucher.status === "reported"
+															? "bg-red-100 text-red-800"
+															: voucher.status === "expired"
+																? "bg-gray-100 text-gray-800"
+																: "bg-yellow-100 text-yellow-800"
+											}`}
+										>
+											{voucher.status}
+										</span>
+									</div>
+									<div className="text-muted-foreground mb-1 text-sm">
+										Expires {new Date(voucher.expiryDate).toLocaleDateString()}
+									</div>
+									<div className="text-muted-foreground text-sm">
+										Uploaded {new Date(voucher.createdAt).toLocaleString()}
+									</div>
+								</div>
+							</div>
+						))}
+					</div>
+				)}
+			</div>
+
+			<div>
+				<h2 className="mb-4 text-xl font-semibold">
+					Claimed Vouchers ({claimedVouchers.length})
+				</h2>
+
+				{claimedVouchers.length === 0 ? (
+					<div className="text-muted-foreground rounded-lg border p-12 text-center">
+						No claimed vouchers
+					</div>
+				) : (
+					<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+						{claimedVouchers.map((voucher) => (
+							<div key={voucher._id} className="rounded-lg border p-4">
+								{voucher.imageUrl ? (
+									<img
+										src={voucher.imageUrl}
+										alt="Voucher"
+										className="mb-3 h-96 w-full rounded border object-contain bg-muted"
+									/>
+								) : (
+									<div className="bg-muted mb-3 flex h-96 w-full items-center justify-center rounded">
+										<span className="text-muted-foreground text-xs">
+											No image
+										</span>
+									</div>
+								)}
+								<div className="mb-3">
+									<div className="mb-2 font-medium">
+										€{voucher.type} Voucher
+									</div>
+									<div className="text-muted-foreground mb-1 text-xs">
+										ID: {voucher._id}
+									</div>
+									<div className="text-muted-foreground mb-1 text-sm">
+										Status:{" "}
+										<span
+											className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+												voucher.status === "claimed"
+													? "bg-green-100 text-green-800"
+													: voucher.status === "reported"
+														? "bg-red-100 text-red-800"
+														: "bg-gray-100 text-gray-800"
+											}`}
+										>
+											{voucher.status}
+										</span>
+									</div>
+									{voucher.expiryDate && (
+										<div className="text-muted-foreground mb-1 text-sm">
+											Expires{" "}
+											{new Date(voucher.expiryDate).toLocaleDateString()}
+										</div>
+									)}
+									{voucher.claimedAt && (
+										<div className="text-muted-foreground text-sm">
+											Claimed {new Date(voucher.claimedAt).toLocaleString()}
+										</div>
+									)}
+								</div>
+							</div>
+						))}
+					</div>
+				)}
 			</div>
 
 			<div>

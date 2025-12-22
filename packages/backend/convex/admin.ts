@@ -298,6 +298,37 @@ export const getUserDetails = adminQuery({
 			.filter((q) => q.eq(q.field("claimerId"), userId))
 			.collect();
 
+		// Get voucher details with images for uploaded vouchers
+		const uploadedVouchersWithDetails = await Promise.all(
+			uploadedVouchers.map(async (voucher) => {
+				const imageUrl = await ctx.storage.getUrl(voucher.imageStorageId);
+				return {
+					_id: voucher._id,
+					type: voucher.type,
+					status: voucher.status,
+					imageUrl,
+					expiryDate: voucher.expiryDate,
+					createdAt: voucher.createdAt,
+				};
+			}),
+		);
+
+		// Get voucher details with images for claimed vouchers
+		// Only include successfully claimed vouchers (not reported)
+		const claimedVouchersWithDetails = await Promise.all(
+			claimedVouchers.map(async (voucher) => {
+				const imageUrl = await ctx.storage.getUrl(voucher.imageStorageId);
+				return {
+					_id: voucher._id,
+					type: voucher.type,
+					status: voucher.status,
+					imageUrl,
+					expiryDate: voucher.expiryDate,
+					claimedAt: voucher.claimedAt,
+				};
+			}),
+		);
+
 		const reportsAgainstUploads = await ctx.db
 			.query("reports")
 			.withIndex("by_uploader", (q) => q.eq("uploaderId", userId))
@@ -382,11 +413,13 @@ export const getUserDetails = adminQuery({
 				lastActiveAt: user.lastActiveAt,
 			},
 			stats: {
-				uploadedCount: uploadedVouchers.length,
-				claimedCount: claimedVouchers.length,
-				reportsAgainstUploadsCount: reportsAgainstUploads.length,
-				reportsFiledCount: reportsFiledByUser.length,
+				uploadedCount: user.uploadCount || 0,
+				claimedCount: user.claimCount || 0,
+				reportsAgainstUploadsCount: user.uploadReportCount || 0,
+				reportsFiledCount: user.claimReportCount || 0,
 			},
+			uploadedVouchers: uploadedVouchersWithDetails,
+			claimedVouchers: claimedVouchersWithDetails,
 			reportsFiledByUser,
 			reportsAgainstUploads: reportsAgainstUserUploads,
 		};
