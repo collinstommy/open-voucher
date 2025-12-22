@@ -46,8 +46,6 @@ function UsersPage() {
 		window.location.reload();
 	};
 
-	console.log(token);
-
 	const { data, isLoading, error } = useQuery(
 		convexQuery(api.admin.getUsersWithStats, token ? { token } : "skip"),
 	);

@@ -220,43 +220,19 @@ export const getUsersWithStats = adminQuery({
 	handler: async (ctx) => {
 		const users = await ctx.db.query("users").collect();
 
-		const usersWithStats = await Promise.all(
-			users.map(async (u) => {
-				const uploaded = await ctx.db
-					.query("vouchers")
-					.withIndex("by_uploader", (q) => q.eq("uploaderId", u._id))
-					.collect();
-
-				const claimed = await ctx.db
-					.query("vouchers")
-					.filter((q) => q.eq(q.field("claimerId"), u._id))
-					.collect();
-
-				const uploadReports = await ctx.db
-					.query("reports")
-					.withIndex("by_uploader", (q) => q.eq("uploaderId", u._id))
-					.collect();
-
-				const claimReports = await ctx.db
-					.query("reports")
-					.withIndex("by_reporterId", (q) => q.eq("reporterId", u._id))
-					.collect();
-
-				return {
-					_id: u._id,
-					telegramChatId: u.telegramChatId,
-					username: u.username,
-					firstName: u.firstName,
-					coins: u.coins,
-					isBanned: u.isBanned,
-					createdAt: u.createdAt,
-					uploadCount: uploaded.length,
-					claimCount: claimed.length,
-					uploadReportCount: uploadReports.length,
-					claimReportCount: claimReports.length,
-				};
-			}),
-		);
+		const usersWithStats = users.map((u) => ({
+			_id: u._id,
+			telegramChatId: u.telegramChatId,
+			username: u.username,
+			firstName: u.firstName,
+			coins: u.coins,
+			isBanned: u.isBanned,
+			createdAt: u.createdAt,
+			uploadCount: u.uploadCount || 0,
+			claimCount: u.claimCount || 0,
+			uploadReportCount: u.uploadReportCount || 0,
+			claimReportCount: u.claimReportCount || 0,
+		}));
 
 		return { users: usersWithStats };
 	},
@@ -435,5 +411,93 @@ export const getBannedUsers = adminQuery({
 				firstName: user.firstName,
 				bannedAt: user.bannedAt,
 			}));
+	},
+});
+
+export const backfillUserStats = internalMutation({
+	args: {},
+	handler: async (ctx) => {
+		let processed = 0;
+		let total = 0;
+
+		// Get total count first
+		const allUsers = await ctx.db.query("users").collect();
+		total = allUsers.length;
+
+		// Pre-aggregate all data in one pass
+		console.log("Aggregating voucher data...");
+		const allVouchers = await ctx.db.query("vouchers").collect();
+		console.log(`Found ${allVouchers.length} vouchers`);
+
+		console.log("Aggregating report data...");
+		const allReports = await ctx.db.query("reports").collect();
+		console.log(`Found ${allReports.length} reports`);
+
+		// Create counters for each user
+		const userStats = new Map();
+
+		// Initialize counters for all users
+		for (const user of allUsers) {
+			userStats.set(user._id.toString(), {
+				uploadCount: 0,
+				claimCount: 0,
+				uploadReportCount: 0,
+				claimReportCount: 0,
+			});
+		}
+
+		// Count vouchers
+		for (const voucher of allVouchers) {
+			const uploaderId = voucher.uploaderId.toString();
+			const uploaderStats = userStats.get(uploaderId);
+			if (uploaderStats) {
+				uploaderStats.uploadCount++;
+			}
+
+			if (voucher.claimerId) {
+				const claimerId = voucher.claimerId.toString();
+				const claimerStats = userStats.get(claimerId);
+				if (claimerStats) {
+					claimerStats.claimCount++;
+				}
+			}
+		}
+
+		// Count reports
+		for (const report of allReports) {
+			const uploaderId = report.uploaderId.toString();
+			const reporterId = report.reporterId.toString();
+
+			const uploaderStats = userStats.get(uploaderId);
+			if (uploaderStats) {
+				uploaderStats.uploadReportCount++;
+			}
+
+			const reporterStats = userStats.get(reporterId);
+			if (reporterStats) {
+				reporterStats.claimReportCount++;
+			}
+		}
+
+		// Update users with their stats
+		console.log("Updating user documents...");
+		for (const user of allUsers) {
+			const stats = userStats.get(user._id.toString());
+			if (stats) {
+				await ctx.db.patch(user._id, {
+					uploadCount: stats.uploadCount,
+					claimCount: stats.claimCount,
+					uploadReportCount: stats.uploadReportCount,
+					claimReportCount: stats.claimReportCount,
+				});
+				processed++;
+			}
+		}
+
+		return {
+			total,
+			processed,
+			completed: processed === total,
+		};
 	},
 });

@@ -127,6 +127,11 @@ export const uploadVoucher = internalMutation({
 			createdAt: now,
 		});
 
+		// Increment upload counter
+		await ctx.db.patch(userId, {
+			uploadCount: (user.uploadCount || 0) + 1,
+		});
+
 		// Schedule OCR processing (runs immediately)
 		await ctx.scheduler.runAfter(0, internal.ocr.processVoucherImage, {
 			voucherId,
@@ -198,9 +203,12 @@ export const requestVoucher = internalMutation({
 		// Sort by expiry date ascending (soonest first)
 		const voucher = vouchers.sort((a, b) => a.expiryDate - b.expiryDate)[0];
 
-		// Deduct coins
+		// Deduct coins and increment claim counter
 		const newCoins = user.coins - cost;
-		await ctx.db.patch(userId, { coins: newCoins });
+		await ctx.db.patch(userId, {
+			coins: newCoins,
+			claimCount: (user.claimCount || 0) + 1,
+		});
 
 		// Mark voucher as claimed
 
@@ -443,6 +451,17 @@ export const reportVoucher = internalMutation({
 				reason: "not_working",
 				createdAt: Date.now(),
 			});
+
+			await ctx.db.patch(user._id, {
+				claimReportCount: (user.claimReportCount || 0) + 1,
+			});
+
+			const uploader = await ctx.db.get(voucher.uploaderId);
+			if (uploader) {
+				await ctx.db.patch(voucher.uploaderId, {
+					uploadReportCount: (uploader.uploadReportCount || 0) + 1,
+				});
+			}
 		}
 
 		// 5. Check Uploader Ban Conditions
@@ -534,6 +553,10 @@ export const reportVoucher = internalMutation({
 				status: "claimed",
 				claimerId: user._id,
 				claimedAt: Date.now(),
+			});
+
+			await ctx.db.patch(user._id, {
+				claimCount: (user.claimCount || 0) + 1,
 			});
 
 			// Link replacement to report

@@ -22,6 +22,10 @@ export default defineSchema({
 		createdAt: v.number(),
 		lastActiveAt: v.number(),
 		bannedAt: v.optional(v.number()),
+		uploadCount: v.optional(v.number()),
+		claimCount: v.optional(v.number()),
+		uploadReportCount: v.optional(v.number()),
+		claimReportCount: v.optional(v.number()),
 	}).index("by_chat_id", ["telegramChatId"]),
 
 	messages: defineTable({
