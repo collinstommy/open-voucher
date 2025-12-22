@@ -1,14 +1,22 @@
 import { Button } from "@/components/ui/button";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuRadioGroup,
+	DropdownMenuRadioItem,
+	DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
 import { convexQuery } from "@convex-dev/react-query";
 import { api } from "@open-router/backend/convex/_generated/api";
 import type { Id } from "@open-router/backend/convex/_generated/dataModel";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
+import { ChevronDownIcon } from "lucide-react";
 import { useConvex } from "convex/react";
 import { useState } from "react";
 
-export const Route = createFileRoute("/admin/feedback")({
+export const Route = createFileRoute("/feedback")({
 	component: FeedbackPage,
 });
 
@@ -16,6 +24,18 @@ function FeedbackPage() {
 	const { token } = useAdminAuth();
 	const convex = useConvex();
 	const queryClient = useQueryClient();
+	const [deployment, setDeployment] = useState<"dev" | "prod">(() => {
+		if (typeof window === "undefined") return "prod";
+		return (
+			(localStorage.getItem("convex-deployment") as "dev" | "prod") || "prod"
+		);
+	});
+
+	const handleDeploymentChange = (value: string) => {
+		localStorage.setItem("convex-deployment", value);
+		window.location.reload();
+	};
+
 	const [typeFilter, setTypeFilter] = useState<"all" | "feedback" | "support">(
 		"all",
 	);
@@ -73,28 +93,51 @@ function FeedbackPage() {
 						</span>
 					)}
 				</h1>
-				<div className="flex gap-2">
-					<Button
-						variant={typeFilter === "all" ? "default" : "outline"}
-						size="sm"
-						onClick={() => setTypeFilter("all")}
-					>
-						All
-					</Button>
-					<Button
-						variant={typeFilter === "feedback" ? "default" : "outline"}
-						size="sm"
-						onClick={() => setTypeFilter("feedback")}
-					>
-						Feedback
-					</Button>
-					<Button
-						variant={typeFilter === "support" ? "default" : "outline"}
-						size="sm"
-						onClick={() => setTypeFilter("support")}
-					>
-						Support
-					</Button>
+				<div className="flex items-center gap-4">
+					<div className="flex gap-2">
+						<Button
+							variant={typeFilter === "all" ? "default" : "outline"}
+							size="sm"
+							onClick={() => setTypeFilter("all")}
+						>
+							All
+						</Button>
+						<Button
+							variant={typeFilter === "feedback" ? "default" : "outline"}
+							size="sm"
+							onClick={() => setTypeFilter("feedback")}
+						>
+							Feedback
+						</Button>
+						<Button
+							variant={typeFilter === "support" ? "default" : "outline"}
+							size="sm"
+							onClick={() => setTypeFilter("support")}
+						>
+							Support
+						</Button>
+					</div>
+					<DropdownMenu>
+						<DropdownMenuTrigger asChild>
+							<Button variant="outline" size="sm">
+								{deployment === "dev" ? "Development" : "Production"}
+								<ChevronDownIcon />
+							</Button>
+						</DropdownMenuTrigger>
+						<DropdownMenuContent align="end">
+							<DropdownMenuRadioGroup
+								value={deployment}
+								onValueChange={handleDeploymentChange}
+							>
+								<DropdownMenuRadioItem value="dev">
+									Development
+								</DropdownMenuRadioItem>
+								<DropdownMenuRadioItem value="prod">
+									Production
+								</DropdownMenuRadioItem>
+							</DropdownMenuRadioGroup>
+						</DropdownMenuContent>
+					</DropdownMenu>
 				</div>
 			</div>
 

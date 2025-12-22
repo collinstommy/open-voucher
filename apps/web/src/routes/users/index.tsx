@@ -1,18 +1,31 @@
 import { Button } from "@/components/ui/button";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuRadioGroup,
+	DropdownMenuRadioItem,
+	DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
 import { convexQuery } from "@convex-dev/react-query";
 import { api } from "@open-router/backend/convex/_generated/api";
 import type { Id } from "@open-router/backend/convex/_generated/dataModel";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { ChevronDownIcon } from "lucide-react";
 import { useConvex } from "convex/react";
 import { useState } from "react";
 
-export const Route = createFileRoute("/admin/users/")({
+export const Route = createFileRoute("/users/")({
 	component: UsersPage,
 });
 
-type SortField = "coins" | "uploadCount" | "claimCount" | "uploadReportCount" | "claimReportCount";
+type SortField =
+	| "coins"
+	| "uploadCount"
+	| "claimCount"
+	| "uploadReportCount"
+	| "claimReportCount";
 type SortDirection = "asc" | "desc";
 
 function UsersPage() {
@@ -21,22 +34,35 @@ function UsersPage() {
 	const queryClient = useQueryClient();
 	const [sortField, setSortField] = useState<SortField>("uploadCount");
 	const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+	const [deployment, setDeployment] = useState<"dev" | "prod">(() => {
+		if (typeof window === "undefined") return "prod";
+		return (
+			(localStorage.getItem("convex-deployment") as "dev" | "prod") || "prod"
+		);
+	});
+
+	const handleDeploymentChange = (value: string) => {
+		localStorage.setItem("convex-deployment", value);
+		window.location.reload();
+	};
+
+	console.log(token);
 
 	const { data, isLoading, error } = useQuery(
 		convexQuery(api.admin.getUsersWithStats, token ? { token } : "skip"),
-	)
+	);
 
 	const banMutation = useMutation({
 		mutationFn: (userId: Id<"users">) =>
 			convex.mutation(api.admin.banUser, { token: token!, userId }),
 		onSuccess: () => queryClient.invalidateQueries(),
-	})
+	});
 
 	const unbanMutation = useMutation({
 		mutationFn: (userId: Id<"users">) =>
 			convex.mutation(api.admin.unbanUser, { token: token!, userId }),
 		onSuccess: () => queryClient.invalidateQueries(),
-	})
+	});
 
 	const handleSort = (field: SortField) => {
 		if (sortField === field) {
@@ -45,7 +71,7 @@ function UsersPage() {
 			setSortField(field);
 			setSortDirection("desc");
 		}
-	}
+	};
 
 	if (isLoading) {
 		return <div className="text-muted-foreground">Loading users...</div>;
@@ -60,11 +86,34 @@ function UsersPage() {
 		const bValue = b[sortField];
 		const multiplier = sortDirection === "asc" ? 1 : -1;
 		return (aValue - bValue) * multiplier;
-	})
+	});
 
 	return (
 		<div>
-			<h1 className="mb-6 text-xl font-semibold">Users ({users.length})</h1>
+			<div className="mb-6 flex items-center justify-between">
+				<h1 className="text-xl font-semibold">Users ({users.length})</h1>
+				<DropdownMenu>
+					<DropdownMenuTrigger asChild>
+						<Button variant="outline" size="sm">
+							{deployment === "dev" ? "Development" : "Production"}
+							<ChevronDownIcon />
+						</Button>
+					</DropdownMenuTrigger>
+					<DropdownMenuContent align="end">
+						<DropdownMenuRadioGroup
+							value={deployment}
+							onValueChange={handleDeploymentChange}
+						>
+							<DropdownMenuRadioItem value="dev">
+								Development
+							</DropdownMenuRadioItem>
+							<DropdownMenuRadioItem value="prod">
+								Production
+							</DropdownMenuRadioItem>
+						</DropdownMenuRadioGroup>
+					</DropdownMenuContent>
+				</DropdownMenu>
+			</div>
 			<div className="overflow-x-auto">
 				<table className="w-full border-collapse">
 					<thead>
@@ -162,7 +211,7 @@ function UsersPage() {
 						{users.map((user) => (
 							<tr key={user._id} className="border-b">
 								<td className="py-3 pr-4">
-									<Link to="/admin/users/$userId" params={{ userId: user._id }}>
+									<Link to="/users/$userId" params={{ userId: user._id }}>
 										<div className="cursor-pointer hover:underline">
 											<div className="font-medium">
 												{user.username || user.firstName || "Unknown"}
@@ -179,7 +228,9 @@ function UsersPage() {
 								<td className="py-3 pr-4">
 									<span
 										className={
-											user.uploadReportCount > 0 ? "text-red-500 font-medium" : ""
+											user.uploadReportCount > 0
+												? "text-red-500 font-medium"
+												: ""
 										}
 									>
 										{user.uploadReportCount}
@@ -188,7 +239,9 @@ function UsersPage() {
 								<td className="py-3 pr-4">
 									<span
 										className={
-											user.claimReportCount > 0 ? "text-orange-500 font-medium" : ""
+											user.claimReportCount > 0
+												? "text-orange-500 font-medium"
+												: ""
 										}
 									>
 										{user.claimReportCount}
@@ -221,5 +274,5 @@ function UsersPage() {
 				</table>
 			</div>
 		</div>
-	)
+	);
 }

@@ -8,7 +8,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useConvex } from "convex/react";
 import { ArrowLeft } from "lucide-react";
 
-export const Route = createFileRoute("/admin/users/$userId")({
+export const Route = createFileRoute("/users/$userId")({
 	component: UserDetailPage,
 });
 
@@ -63,7 +63,7 @@ function UserDetailPage() {
 	return (
 		<div className="space-y-6">
 			<div className="flex items-center gap-4">
-				<Link to="/admin/users">
+				<Link to="/users">
 					<Button variant="ghost" size="sm">
 						<ArrowLeft className="mr-2 h-4 w-4" />
 						Back

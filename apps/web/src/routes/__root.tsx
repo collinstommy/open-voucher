@@ -1,4 +1,6 @@
 import { Toaster } from "@/components/ui/sonner";
+import { NavigationLayout } from "@/components/NavigationLayout";
+import { AdminApp } from "@/components/AdminApp";
 
 import {
 	HeadContent,
@@ -7,7 +9,6 @@ import {
 	createRootRouteWithContext,
 } from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
-import Header from "../components/header";
 import appCss from "../index.css?url";
 import type { QueryClient } from "@tanstack/react-query";
 import type { ConvexQueryClient } from "@convex-dev/react-query";
@@ -51,10 +52,12 @@ function RootDocument() {
 				<HeadContent />
 			</head>
 			<body>
-				<div className="grid h-svh grid-rows-[auto_1fr]">
-					<Header />
-					<Outlet />
-				</div>
+				<AdminApp>
+					<div className="container mx-auto max-w-3xl px-4 py-2">
+						<NavigationLayout />
+						<Outlet />
+					</div>
+				</AdminApp>
 				<Toaster richColors />
 				<TanStackRouterDevtools position="bottom-left" />
 				<Scripts />

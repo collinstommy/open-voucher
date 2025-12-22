@@ -9,24 +9,26 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as TodosRouteImport } from './routes/todos'
-import { Route as AdminRouteImport } from './routes/admin'
+import { Route as VouchersRouteImport } from './routes/vouchers'
+import { Route as FeedbackRouteImport } from './routes/feedback'
+import { Route as BannedRouteImport } from './routes/banned'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as AdminIndexRouteImport } from './routes/admin/index'
-import { Route as AdminVouchersRouteImport } from './routes/admin/vouchers'
-import { Route as AdminFeedbackRouteImport } from './routes/admin/feedback'
-import { Route as AdminBannedRouteImport } from './routes/admin/banned'
-import { Route as AdminUsersIndexRouteImport } from './routes/admin/users/index'
-import { Route as AdminUsersUserIdRouteImport } from './routes/admin/users/$userId'
+import { Route as UsersIndexRouteImport } from './routes/users/index'
+import { Route as UsersUserIdRouteImport } from './routes/users/$userId'
 
-const TodosRoute = TodosRouteImport.update({
-  id: '/todos',
-  path: '/todos',
+const VouchersRoute = VouchersRouteImport.update({
+  id: '/vouchers',
+  path: '/vouchers',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AdminRoute = AdminRouteImport.update({
-  id: '/admin',
-  path: '/admin',
+const FeedbackRoute = FeedbackRouteImport.update({
+  id: '/feedback',
+  path: '/feedback',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BannedRoute = BannedRouteImport.update({
+  id: '/banned',
+  path: '/banned',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -34,125 +36,93 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AdminIndexRoute = AdminIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminVouchersRoute = AdminVouchersRouteImport.update({
-  id: '/vouchers',
-  path: '/vouchers',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminFeedbackRoute = AdminFeedbackRouteImport.update({
-  id: '/feedback',
-  path: '/feedback',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminBannedRoute = AdminBannedRouteImport.update({
-  id: '/banned',
-  path: '/banned',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminUsersIndexRoute = AdminUsersIndexRouteImport.update({
+const UsersIndexRoute = UsersIndexRouteImport.update({
   id: '/users/',
   path: '/users/',
-  getParentRoute: () => AdminRoute,
+  getParentRoute: () => rootRouteImport,
 } as any)
-const AdminUsersUserIdRoute = AdminUsersUserIdRouteImport.update({
+const UsersUserIdRoute = UsersUserIdRouteImport.update({
   id: '/users/$userId',
   path: '/users/$userId',
-  getParentRoute: () => AdminRoute,
+  getParentRoute: () => rootRouteImport,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/admin': typeof AdminRouteWithChildren
-  '/todos': typeof TodosRoute
-  '/admin/banned': typeof AdminBannedRoute
-  '/admin/feedback': typeof AdminFeedbackRoute
-  '/admin/vouchers': typeof AdminVouchersRoute
-  '/admin/': typeof AdminIndexRoute
-  '/admin/users/$userId': typeof AdminUsersUserIdRoute
-  '/admin/users': typeof AdminUsersIndexRoute
+  '/banned': typeof BannedRoute
+  '/feedback': typeof FeedbackRoute
+  '/vouchers': typeof VouchersRoute
+  '/users/$userId': typeof UsersUserIdRoute
+  '/users': typeof UsersIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/todos': typeof TodosRoute
-  '/admin/banned': typeof AdminBannedRoute
-  '/admin/feedback': typeof AdminFeedbackRoute
-  '/admin/vouchers': typeof AdminVouchersRoute
-  '/admin': typeof AdminIndexRoute
-  '/admin/users/$userId': typeof AdminUsersUserIdRoute
-  '/admin/users': typeof AdminUsersIndexRoute
+  '/banned': typeof BannedRoute
+  '/feedback': typeof FeedbackRoute
+  '/vouchers': typeof VouchersRoute
+  '/users/$userId': typeof UsersUserIdRoute
+  '/users': typeof UsersIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/admin': typeof AdminRouteWithChildren
-  '/todos': typeof TodosRoute
-  '/admin/banned': typeof AdminBannedRoute
-  '/admin/feedback': typeof AdminFeedbackRoute
-  '/admin/vouchers': typeof AdminVouchersRoute
-  '/admin/': typeof AdminIndexRoute
-  '/admin/users/$userId': typeof AdminUsersUserIdRoute
-  '/admin/users/': typeof AdminUsersIndexRoute
+  '/banned': typeof BannedRoute
+  '/feedback': typeof FeedbackRoute
+  '/vouchers': typeof VouchersRoute
+  '/users/$userId': typeof UsersUserIdRoute
+  '/users/': typeof UsersIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/admin'
-    | '/todos'
-    | '/admin/banned'
-    | '/admin/feedback'
-    | '/admin/vouchers'
-    | '/admin/'
-    | '/admin/users/$userId'
-    | '/admin/users'
+    | '/banned'
+    | '/feedback'
+    | '/vouchers'
+    | '/users/$userId'
+    | '/users'
   fileRoutesByTo: FileRoutesByTo
-  to:
-    | '/'
-    | '/todos'
-    | '/admin/banned'
-    | '/admin/feedback'
-    | '/admin/vouchers'
-    | '/admin'
-    | '/admin/users/$userId'
-    | '/admin/users'
+  to: '/' | '/banned' | '/feedback' | '/vouchers' | '/users/$userId' | '/users'
   id:
     | '__root__'
     | '/'
-    | '/admin'
-    | '/todos'
-    | '/admin/banned'
-    | '/admin/feedback'
-    | '/admin/vouchers'
-    | '/admin/'
-    | '/admin/users/$userId'
-    | '/admin/users/'
+    | '/banned'
+    | '/feedback'
+    | '/vouchers'
+    | '/users/$userId'
+    | '/users/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  AdminRoute: typeof AdminRouteWithChildren
-  TodosRoute: typeof TodosRoute
+  BannedRoute: typeof BannedRoute
+  FeedbackRoute: typeof FeedbackRoute
+  VouchersRoute: typeof VouchersRoute
+  UsersUserIdRoute: typeof UsersUserIdRoute
+  UsersIndexRoute: typeof UsersIndexRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/todos': {
-      id: '/todos'
-      path: '/todos'
-      fullPath: '/todos'
-      preLoaderRoute: typeof TodosRouteImport
+    '/vouchers': {
+      id: '/vouchers'
+      path: '/vouchers'
+      fullPath: '/vouchers'
+      preLoaderRoute: typeof VouchersRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/admin': {
-      id: '/admin'
-      path: '/admin'
-      fullPath: '/admin'
-      preLoaderRoute: typeof AdminRouteImport
+    '/feedback': {
+      id: '/feedback'
+      path: '/feedback'
+      fullPath: '/feedback'
+      preLoaderRoute: typeof FeedbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/banned': {
+      id: '/banned'
+      path: '/banned'
+      fullPath: '/banned'
+      preLoaderRoute: typeof BannedRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -162,75 +132,30 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/admin/': {
-      id: '/admin/'
-      path: '/'
-      fullPath: '/admin/'
-      preLoaderRoute: typeof AdminIndexRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/vouchers': {
-      id: '/admin/vouchers'
-      path: '/vouchers'
-      fullPath: '/admin/vouchers'
-      preLoaderRoute: typeof AdminVouchersRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/feedback': {
-      id: '/admin/feedback'
-      path: '/feedback'
-      fullPath: '/admin/feedback'
-      preLoaderRoute: typeof AdminFeedbackRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/banned': {
-      id: '/admin/banned'
-      path: '/banned'
-      fullPath: '/admin/banned'
-      preLoaderRoute: typeof AdminBannedRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/users/': {
-      id: '/admin/users/'
+    '/users/': {
+      id: '/users/'
       path: '/users'
-      fullPath: '/admin/users'
-      preLoaderRoute: typeof AdminUsersIndexRouteImport
-      parentRoute: typeof AdminRoute
+      fullPath: '/users'
+      preLoaderRoute: typeof UsersIndexRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/admin/users/$userId': {
-      id: '/admin/users/$userId'
+    '/users/$userId': {
+      id: '/users/$userId'
       path: '/users/$userId'
-      fullPath: '/admin/users/$userId'
-      preLoaderRoute: typeof AdminUsersUserIdRouteImport
-      parentRoute: typeof AdminRoute
+      fullPath: '/users/$userId'
+      preLoaderRoute: typeof UsersUserIdRouteImport
+      parentRoute: typeof rootRouteImport
     }
   }
 }
 
-interface AdminRouteChildren {
-  AdminBannedRoute: typeof AdminBannedRoute
-  AdminFeedbackRoute: typeof AdminFeedbackRoute
-  AdminVouchersRoute: typeof AdminVouchersRoute
-  AdminIndexRoute: typeof AdminIndexRoute
-  AdminUsersUserIdRoute: typeof AdminUsersUserIdRoute
-  AdminUsersIndexRoute: typeof AdminUsersIndexRoute
-}
-
-const AdminRouteChildren: AdminRouteChildren = {
-  AdminBannedRoute: AdminBannedRoute,
-  AdminFeedbackRoute: AdminFeedbackRoute,
-  AdminVouchersRoute: AdminVouchersRoute,
-  AdminIndexRoute: AdminIndexRoute,
-  AdminUsersUserIdRoute: AdminUsersUserIdRoute,
-  AdminUsersIndexRoute: AdminUsersIndexRoute,
-}
-
-const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
-
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  AdminRoute: AdminRouteWithChildren,
-  TodosRoute: TodosRoute,
+  BannedRoute: BannedRoute,
+  FeedbackRoute: FeedbackRoute,
+  VouchersRoute: VouchersRoute,
+  UsersUserIdRoute: UsersUserIdRoute,
+  UsersIndexRoute: UsersIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
