@@ -185,14 +185,14 @@ bunx convex env set ADMIN_PASSWORD "your-secure-password-here" --prod
 ```
 
 ## ToDo
+- [ ] fix users query
 - [ ] unify the validation, we do this in two places right now
-- [ ] return vouchers that are expires soonest
-- [ ] restrict uploads for expiring today to before 9pm
+- [x] return vouchers that are expires soonest
+- [x] restrict uploads for expiring today to before 9pm
 - [ ] if voucher are not Available right now, send message once Available
 - [ ] update landing page with faq
 - [ ] ban messages should be clearer - review this flow
 - [ ] refactor help to be a series of buttons. use buttons for everything
 - [ ] define rules of the system in docs
-- [ ] fix users query
 - [ ] allow banners users to message the bot
 - [ ] send message to single telegram user from bot
