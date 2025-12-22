@@ -930,13 +930,18 @@ describe("Ban Flow", () => {
 			voucherIds.push(voucherId);
 		}
 
-		// Report first 2 vouchers (should not trigger ban)
-		for (let i = 0; i < 2; i++) {
-			await t.mutation(internal.vouchers.reportVoucher, {
-				userId: reporterId,
-				voucherId: voucherIds[i],
-			});
-		}
+		// Report first voucher on Day 1
+		await t.mutation(internal.vouchers.reportVoucher, {
+			userId: reporterId,
+			voucherId: voucherIds[0],
+		});
+
+		// Advance to Day 2 and report second voucher
+		vi.advanceTimersByTime(24 * 60 * 60 * 1000); // 1 day
+		await t.mutation(internal.vouchers.reportVoucher, {
+			userId: reporterId,
+			voucherId: voucherIds[1],
+		});
 
 		// Verify uploader is NOT banned yet
 		let uploader = await t.run(async (ctx) => {
@@ -944,7 +949,8 @@ describe("Ban Flow", () => {
 		});
 		expect(uploader?.isBanned).toBe(false);
 
-		// Report 3rd voucher - this should trigger ban (3 of 5)
+		// Advance to Day 3 and report third voucher - this should trigger ban (3 of 5)
+		vi.advanceTimersByTime(24 * 60 * 60 * 1000); // 1 day
 		await t.mutation(internal.vouchers.reportVoucher, {
 			userId: reporterId,
 			voucherId: voucherIds[2],
@@ -1493,27 +1499,38 @@ describe("Ban Flow Tests", () => {
 			voucherIds.push(voucherId);
 		}
 
-		// Report first 2 vouchers (should be fine - 2 of 5)
-		for (let i = 0; i < 2; i++) {
-			await t.mutation(internal.vouchers.reportVoucher, {
-				userId: reporterId,
-				voucherId: voucherIds[i],
-			});
-		}
+		// Report first voucher on Day 1
+		await t.mutation(internal.vouchers.reportVoucher, {
+			userId: reporterId,
+			voucherId: voucherIds[0],
+		});
+
+		// Advance to Day 2 and report second voucher
+		vi.advanceTimersByTime(24 * 60 * 60 * 1000); // 1 day
+		await t.mutation(internal.vouchers.reportVoucher, {
+			userId: reporterId,
+			voucherId: voucherIds[1],
+		});
 
 		let reporter = await t.run(async (ctx) => {
 			return await ctx.db.get(reporterId);
 		});
 		expect(reporter?.isBanned).toBe(false);
 
+		// Advance to Day 3 and report third voucher
+		vi.advanceTimersByTime(24 * 60 * 60 * 1000); // 1 day
 		await t.mutation(internal.vouchers.reportVoucher, {
 			userId: reporterId,
 			voucherId: voucherIds[2],
 		});
 
+		reporter = await t.run(async (ctx) => {
+			return await ctx.db.get(reporterId);
+		});
 		expect(reporter?.isBanned).toBe(false);
 
-		// Report 4th voucher - this should trigger ban (3 existing + this one)
+		// Advance to Day 4 and report fourth voucher - this should trigger ban (3 existing + this one)
+		vi.advanceTimersByTime(24 * 60 * 60 * 1000); // 1 day
 		const result4 = await t.mutation(internal.vouchers.reportVoucher, {
 			userId: reporterId,
 			voucherId: voucherIds[3],
@@ -1579,19 +1596,26 @@ describe("Ban Flow Tests", () => {
 			voucherIds.push(voucherId);
 		}
 
-		for (let i = 0; i < 2; i++) {
-			await t.mutation(internal.vouchers.reportVoucher, {
-				userId: reporterId,
-				voucherId: voucherIds[i],
-			});
-		}
+		// Report first voucher on Day 1
+		await t.mutation(internal.vouchers.reportVoucher, {
+			userId: reporterId,
+			voucherId: voucherIds[0],
+		});
+
+		// Advance to Day 2 and report second voucher
+		vi.advanceTimersByTime(24 * 60 * 60 * 1000); // 1 day
+		await t.mutation(internal.vouchers.reportVoucher, {
+			userId: reporterId,
+			voucherId: voucherIds[1],
+		});
 
 		let uploader = await t.run(async (ctx) => {
 			return await ctx.db.get(uploaderId);
 		});
 		expect(uploader?.isBanned).toBe(false);
 
-		// Report 3rd voucher - this should trigger uploader ban (3 of 5)
+		// Advance to Day 3 and report third voucher - this should trigger uploader ban (3 of 5)
+		vi.advanceTimersByTime(24 * 60 * 60 * 1000); // 1 day
 		await t.mutation(internal.vouchers.reportVoucher, {
 			userId: reporterId,
 			voucherId: voucherIds[2],
