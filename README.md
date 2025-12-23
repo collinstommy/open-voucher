@@ -196,3 +196,6 @@ bunx convex env set ADMIN_PASSWORD "your-secure-password-here" --prod
 - [ ] define rules of the system in docs
 - [ ] allow banners users to message the bot
 - [ ] send message to single telegram user from bot
+
+### Tests
+-[ ] message from admin to user

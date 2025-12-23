@@ -7,6 +7,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useConvex } from "convex/react";
 import { ArrowLeft } from "lucide-react";
+import { useState } from "react";
 
 export const Route = createFileRoute("/users/$userId")({
 	component: UserDetailPage,
@@ -17,6 +18,7 @@ function UserDetailPage() {
 	const { token } = useAdminAuth();
 	const convex = useConvex();
 	const queryClient = useQueryClient();
+	const [messageText, setMessageText] = useState("");
 
 	const { data, isLoading, error } = useQuery(
 		convexQuery(
@@ -43,6 +45,19 @@ function UserDetailPage() {
 		onSuccess: () => queryClient.invalidateQueries(),
 	});
 
+	const sendMessageMutation = useMutation({
+		mutationFn: (text: string) =>
+			convex.mutation(api.admin.sendMessageToUser, {
+				token: token!,
+				userId: userId as Id<"users">,
+				messageText: text,
+			}),
+		onSuccess: () => {
+			setMessageText("");
+			queryClient.invalidateQueries();
+		},
+	});
+
 	if (isLoading) {
 		return <div className="text-muted-foreground">Loading user details...</div>;
 	}
@@ -58,6 +73,7 @@ function UserDetailPage() {
 	const reportsFiledByUser = data?.reportsFiledByUser ?? [];
 	const reportsAgainstUploads = data?.reportsAgainstUploads ?? [];
 	const feedbackAndSupport = data?.feedbackAndSupport ?? [];
+	const adminMessages = data?.adminMessages ?? [];
 
 	if (!user) {
 		return <div className="text-red-500">User not found</div>;
@@ -431,6 +447,55 @@ function UserDetailPage() {
 						))}
 					</div>
 				)}
+			</div>
+
+			<div>
+				<h2 className="mb-4 text-xl font-semibold">Admin Messages</h2>
+
+				{/* Message History */}
+				<div className="space-y-4 mb-6 max-h-96 overflow-y-auto bg-gray-50 rounded-lg p-4">
+					{adminMessages.length === 0 ? (
+						<div className="text-muted-foreground text-center py-8">
+							No admin messages sent to this user
+						</div>
+					) : (
+						adminMessages.map((message: any) => (
+							<div key={message._id} className="flex justify-end mb-3">
+								<div className="bg-blue-500 text-white rounded-lg p-3 max-w-xs shadow-sm">
+									<p className="text-sm whitespace-pre-wrap">{message.text}</p>
+									<p className="text-xs opacity-75 mt-1">
+										{new Date(message.createdAt).toLocaleString()}
+									</p>
+								</div>
+							</div>
+						))
+					)}
+				</div>
+
+				{/* Message Composer */}
+				<div className="flex gap-2">
+					<input
+						type="text"
+						value={messageText}
+						onChange={(e) => setMessageText(e.target.value)}
+						onKeyPress={(e) =>
+							e.key === "Enter" &&
+							messageText.trim() &&
+							sendMessageMutation.mutate(messageText)
+						}
+						placeholder="Type a message..."
+						className="flex-1 border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+						disabled={sendMessageMutation.isPending}
+					/>
+					<Button
+						onClick={() =>
+							messageText.trim() && sendMessageMutation.mutate(messageText)
+						}
+						disabled={sendMessageMutation.isPending || !messageText.trim()}
+					>
+						{sendMessageMutation.isPending ? "Sending..." : "Send"}
+					</Button>
+				</div>
 			</div>
 		</div>
 	);

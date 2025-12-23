@@ -178,6 +178,7 @@ export const storeMessage = internalMutation({
 	handler: async (ctx, args) => {
 		return await ctx.db.insert("messages", {
 			...args,
+			isAdminMessage: false, // User messages are not admin messages
 			createdAt: Date.now(),
 		});
 	},

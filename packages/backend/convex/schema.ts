@@ -37,10 +37,12 @@ export default defineSchema({
 		text: v.optional(v.string()),
 		mediaGroupId: v.optional(v.string()),
 		imageStorageId: v.optional(v.id("_storage")),
+		isAdminMessage: v.optional(v.boolean()),
 		createdAt: v.number(),
 	})
 		.index("by_chat_id", ["telegramChatId"])
-		.index("by_message_id", ["telegramChatId", "telegramMessageId"]),
+		.index("by_message_id", ["telegramChatId", "telegramMessageId"])
+		.index("by_admin_message", ["isAdminMessage", "telegramChatId"]),
 
 	vouchers: defineTable({
 		type: v.union(

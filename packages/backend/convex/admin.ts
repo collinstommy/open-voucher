@@ -9,6 +9,7 @@ import {
 	query,
 	QueryCtx,
 } from "./_generated/server";
+import { internal } from "./_generated/api";
 
 const SESSION_DURATION_MS = 24 * 60 * 60 * 1000;
 
@@ -409,6 +410,15 @@ export const getUserDetails = adminQuery({
 			.order("desc")
 			.collect();
 
+		// Get admin messages sent to this user
+		const adminMessages = await ctx.db
+			.query("messages")
+			.withIndex("by_admin_message", (q) =>
+				q.eq("isAdminMessage", true).eq("telegramChatId", user.telegramChatId),
+			)
+			.order("desc")
+			.collect();
+
 		return {
 			user: {
 				_id: user._id,
@@ -431,6 +441,7 @@ export const getUserDetails = adminQuery({
 			reportsFiledByUser,
 			reportsAgainstUploads: reportsAgainstUserUploads,
 			feedbackAndSupport,
+			adminMessages,
 		};
 	},
 });
@@ -453,6 +464,39 @@ export const getBannedUsers = adminQuery({
 				firstName: user.firstName,
 				bannedAt: user.bannedAt,
 			}));
+	},
+});
+
+export const sendMessageToUser = adminMutation({
+	args: {
+		userId: v.id("users"),
+		messageText: v.string(),
+	},
+	handler: async (ctx, { userId, messageText }) => {
+		// Get user details
+		const user = await ctx.db.get(userId);
+		if (!user) {
+			throw new Error("User not found");
+		}
+
+		// Create outbound message in messages table
+		await ctx.db.insert("messages", {
+			telegramMessageId: 0, // Placeholder for admin messages
+			telegramChatId: user.telegramChatId,
+			direction: "outbound",
+			messageType: "text",
+			text: messageText,
+			isAdminMessage: true,
+			createdAt: Date.now(),
+		});
+
+		// Send message via Telegram
+		await ctx.scheduler.runAfter(0, internal.telegram.sendMessageAction, {
+			chatId: user.telegramChatId,
+			text: messageText,
+		});
+
+		return { success: true };
 	},
 });
 

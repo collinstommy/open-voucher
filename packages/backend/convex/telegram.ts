@@ -251,9 +251,6 @@ You've been started with <b>${newUser.coins} coins</b> to get you going! 🚀
 	},
 });
 
-/**
- * Send a message via Telegram (Internal Action for scheduling).
- */
 export const sendMessageAction = internalAction({
 	args: {
 		chatId: v.string(),
