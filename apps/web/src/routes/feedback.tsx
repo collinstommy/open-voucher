@@ -11,7 +11,7 @@ import { convexQuery } from "@convex-dev/react-query";
 import { api } from "@open-router/backend/convex/_generated/api";
 import type { Id } from "@open-router/backend/convex/_generated/dataModel";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { ChevronDownIcon } from "lucide-react";
 import { useConvex } from "convex/react";
 import { useState } from "react";
@@ -165,11 +165,23 @@ function FeedbackPage() {
 							<div className="mb-3 flex items-start justify-between">
 								<div>
 									<div className="flex items-center gap-2">
-										<span className="font-medium">
-											{item.user?.username ||
-												item.user?.firstName ||
-												"Unknown User"}
-										</span>
+										{item.user?.id ? (
+											<Link
+												to="/users/$userId"
+												params={{ userId: item.user.id }}
+												className="font-medium hover:text-blue-600 hover:underline"
+											>
+												{item.user?.username ||
+													item.user?.firstName ||
+													"Unknown User"}
+											</Link>
+										) : (
+											<span className="font-medium">
+												{item.user?.username ||
+													item.user?.firstName ||
+													"Unknown User"}
+											</span>
+										)}
 										{item.type === "support" && (
 											<span className="rounded bg-amber-500 px-2 py-1 text-xs text-white">
 												Support

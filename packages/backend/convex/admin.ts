@@ -26,7 +26,6 @@ export const login = mutation({
 		}
 
 		if (password !== adminPassword) {
-			await new Promise((resolve) => setTimeout(resolve, 1000));
 			throw new Error("Invalid password");
 		}
 
@@ -257,6 +256,8 @@ export const getAllFeedback = adminQuery({
 								telegramChatId: user.telegramChatId,
 								username: user.username,
 								firstName: user.firstName,
+								isBanned: user.isBanned,
+								id: user._id,
 							}
 						: null,
 				};
@@ -401,6 +402,13 @@ export const getUserDetails = adminQuery({
 			}),
 		);
 
+		// Get feedback and support messages from this user
+		const feedbackAndSupport = await ctx.db
+			.query("feedback")
+			.filter((q) => q.eq(q.field("userId"), userId))
+			.order("desc")
+			.collect();
+
 		return {
 			user: {
 				_id: user._id,
@@ -422,6 +430,7 @@ export const getUserDetails = adminQuery({
 			claimedVouchers: claimedVouchersWithDetails,
 			reportsFiledByUser,
 			reportsAgainstUploads: reportsAgainstUserUploads,
+			feedbackAndSupport,
 		};
 	},
 });

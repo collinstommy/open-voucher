@@ -57,6 +57,7 @@ function UserDetailPage() {
 	const claimedVouchers = data?.claimedVouchers ?? [];
 	const reportsFiledByUser = data?.reportsFiledByUser ?? [];
 	const reportsAgainstUploads = data?.reportsAgainstUploads ?? [];
+	const feedbackAndSupport = data?.feedbackAndSupport ?? [];
 
 	if (!user) {
 		return <div className="text-red-500">User not found</div>;
@@ -367,6 +368,65 @@ function UserDetailPage() {
 										{report.reason}
 									</div>
 								</div>
+							</div>
+						))}
+					</div>
+				)}
+			</div>
+
+			<div>
+				<h2 className="mb-4 text-xl font-semibold">
+					Feedback & Support Messages ({feedbackAndSupport.length})
+				</h2>
+
+				{feedbackAndSupport.length === 0 ? (
+					<div className="text-muted-foreground rounded-lg border p-12 text-center">
+						No feedback or support messages
+					</div>
+				) : (
+					<div className="space-y-4">
+						{feedbackAndSupport.map((item: any) => (
+							<div
+								key={item._id}
+								className={`rounded-lg border p-4 ${
+									item.status === "new"
+										? "border-blue-500 bg-blue-50 dark:bg-blue-950"
+										: ""
+								} ${
+									item.type === "support"
+										? "border-amber-200 bg-amber-50 dark:bg-amber-950/30"
+										: ""
+								}`}
+							>
+								<div className="mb-3 flex items-start justify-between">
+									<div>
+										<div className="flex items-center gap-2">
+											<span className="font-medium">
+												{item.type === "feedback" ? "Feedback" : "Support"}
+											</span>
+											{item.type === "support" && (
+												<span className="rounded bg-amber-500 px-2 py-1 text-xs text-white">
+													Support
+												</span>
+											)}
+										</div>
+										<div className="text-muted-foreground text-xs">
+											{new Date(item.createdAt).toLocaleString()}
+										</div>
+									</div>
+									<span
+										className={`px-2 py-1 text-xs font-medium rounded-full ${
+											item.status === "new"
+												? "bg-blue-100 text-blue-800"
+												: item.status === "read"
+													? "bg-green-100 text-green-800"
+													: "bg-gray-100 text-gray-800"
+										}`}
+									>
+										{item.status}
+									</span>
+								</div>
+								<p className="whitespace-pre-wrap">{item.text}</p>
 							</div>
 						))}
 					</div>

@@ -6,7 +6,7 @@ import {
 	DropdownMenuRadioItem,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { convexQuery } from "@convex-dev/react-query";
 import { api } from "@open-router/backend/convex/_generated/api";
@@ -24,17 +24,17 @@ function BannedUsers() {
 		if (typeof window === "undefined") return "prod";
 		return (
 			(localStorage.getItem("convex-deployment") as "dev" | "prod") || "prod"
-		)
-	})
+		);
+	});
 
 	const handleDeploymentChange = (value: string) => {
 		localStorage.setItem("convex-deployment", value);
 		window.location.reload();
-	}
+	};
 
 	const { data: bannedUsers, isLoading } = useQuery(
 		convexQuery(api.admin.getBannedUsers, token ? { token } : "skip"),
-	)
+	);
 
 	if (isLoading) {
 		return <div>Loading...</div>;
@@ -87,12 +87,18 @@ function BannedUsers() {
 							<div className="flex items-start justify-between">
 								<div>
 									<h3 className="font-medium">
-										{user.firstName || user.username || "Unknown User"}
-										{user.username && (
-											<span className="text-muted-foreground ml-2">
-												@{user.username}
-											</span>
-										)}
+										<Link
+											to="/users/$userId"
+											params={{ userId: user._id }}
+											className="hover:text-blue-600 hover:underline"
+										>
+											{user.firstName || user.username || "Unknown User"}
+											{user.username && (
+												<span className="text-muted-foreground ml-2">
+													@{user.username}
+												</span>
+											)}
+										</Link>
 									</h3>
 									<p className="text-sm text-muted-foreground">
 										Chat ID: {user.telegramChatId}
@@ -109,5 +115,5 @@ function BannedUsers() {
 				)}
 			</div>
 		</div>
-	)
+	);
 }
