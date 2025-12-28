@@ -163,17 +163,13 @@ You've been started with <b>${newUser.coins} coins</b> to get you going! 🚀
 					});
 				}
 
-				const voucherId = await ctx.runMutation(
-					internal.vouchers.uploadVoucher,
-					{
-						userId: user._id,
-						imageStorageId: storageId,
-					},
-				);
+				// Schedule OCR processing directly (no voucher created yet)
+				await ctx.scheduler.runAfter(0, internal.ocr.processVoucherImage, {
+					userId: user._id,
+					imageStorageId: storageId,
+				});
 
-				if (voucherId) {
-					await sendTelegramMessage(chatId, "📸 Processing your voucher...");
-				}
+				await sendTelegramMessage(chatId, "📸 Processing your voucher...");
 			} catch (e) {
 				console.error(e);
 				await sendTelegramMessage(chatId, "❌ Failed to process image.");
