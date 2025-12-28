@@ -949,9 +949,9 @@ describe("Ban Flow", () => {
 		});
 		expect(uploader?.isBanned).toBe(false);
 
-		// Advance to Day 3 and report third voucher - this should trigger ban (3 of 5)
+		// Advance to Day 3 and report third voucher - this should trigger ban (3 of first 3 / 3 of last 5)
 		vi.advanceTimersByTime(24 * 60 * 60 * 1000); // 1 day
-		await t.mutation(internal.vouchers.reportVoucher, {
+		const result3 = await t.mutation(internal.vouchers.reportVoucher, {
 			userId: reporterId,
 			voucherId: voucherIds[2],
 		});
@@ -959,6 +959,12 @@ describe("Ban Flow", () => {
 		// Wait for scheduled functions (ban notification) to complete
 		vi.runAllTimers();
 		await t.finishInProgressScheduledFunctions();
+
+		const reporter = await t.run(async (ctx) => {
+			return await ctx.db.get(reporterId);
+		});
+		expect(reporter?.isBanned).toBe(true);
+		expect(result3.status).toBe("banned");
 
 		// Verify the uploader is now banned
 		uploader = await t.run(async (ctx) => {
@@ -1517,27 +1523,15 @@ describe("Ban Flow Tests", () => {
 		});
 		expect(reporter?.isBanned).toBe(false);
 
-		// Advance to Day 3 and report third voucher
+		// Advance to Day 3 and report third voucher - this should trigger ban (3 of first 3)
 		vi.advanceTimersByTime(24 * 60 * 60 * 1000); // 1 day
-		await t.mutation(internal.vouchers.reportVoucher, {
+		const result3 = await t.mutation(internal.vouchers.reportVoucher, {
 			userId: reporterId,
 			voucherId: voucherIds[2],
 		});
 
-		reporter = await t.run(async (ctx) => {
-			return await ctx.db.get(reporterId);
-		});
-		expect(reporter?.isBanned).toBe(false);
-
-		// Advance to Day 4 and report fourth voucher - this should trigger ban (3 existing + this one)
-		vi.advanceTimersByTime(24 * 60 * 60 * 1000); // 1 day
-		const result4 = await t.mutation(internal.vouchers.reportVoucher, {
-			userId: reporterId,
-			voucherId: voucherIds[3],
-		});
-
-		expect(result4.status).toBe("banned");
-		expect(result4.message).toContain("3 or more of your last 5 claims");
+		expect(result3.status).toBe("banned");
+		expect(result3.message).toContain("3 of your first 3 claims");
 
 		await t.finishAllScheduledFunctions(vi.runAllTimers);
 
@@ -1546,6 +1540,12 @@ describe("Ban Flow Tests", () => {
 		});
 		expect(reporter?.isBanned).toBe(true);
 		expect(reporter?.bannedAt).toBeDefined();
+
+		// For completeness, verify uploader is also banned (it uploaded 3 bad vouchers)
+		const uploader = await t.run(async (ctx) => {
+			return await ctx.db.get(uploaderId);
+		});
+		expect(uploader?.isBanned).toBe(true);
 		vi.useRealTimers();
 	});
 

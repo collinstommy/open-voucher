@@ -399,6 +399,10 @@ export const reportVoucher = internalMutation({
 			};
 		}
 
+		// Store uploader's ban status before any bans in this function
+		const uploaderAtStart = await ctx.db.get(voucher.uploaderId);
+		const uploaderWasBannedBeforeThisCall = uploaderAtStart?.isBanned || false;
+
 		// 3. Check Reporter Ban Conditions
 		// Get last 5 claims by this reporter
 		const last5Claims = await ctx.db
@@ -414,17 +418,37 @@ export const reportVoucher = internalMutation({
 			.order("desc")
 			.collect();
 
+		// Filter out reports against uploaders who were banned before this function call
+		const validReportsForBanCheck = [];
+		for (const report of reporterReports) {
+			const uploader = await ctx.db.get(report.uploaderId);
+			// Exclude if: uploader was banned before this call AND banned before the report was made
+			if (uploader) {
+				const shouldExclude =
+					uploader.isBanned &&
+					uploader.bannedAt &&
+					uploader.bannedAt < now;
+				if (!shouldExclude) {
+					validReportsForBanCheck.push(report);
+				}
+			}
+		}
+
 		// Check if 3+ of last 5 claims were reported
-		if (last5Claims.length >= 5) {
+		if (last5Claims.length >= 3) {
 			const last5ClaimIds = last5Claims.map((v) => v._id);
-			const last5Reported = reporterReports.filter((r) =>
+			const last5Reported = validReportsForBanCheck.filter((r) =>
 				last5ClaimIds.includes(r.voucherId),
 			);
-			if (last5Reported.length >= 3) {
+
+			// Count current report being made if it's in the last 5 claims
+			const reportCountIncludingCurrent = last5ClaimIds.includes(voucherId)
+				? last5Reported.length + 1
+				: last5Reported.length;
+
+			if (reportCountIncludingCurrent >= 3) {
 				console.log(
-					`🚫 REPORTER BAN: User ${user._id} (${user.telegramChatId}) banned for excessive reporting. ` +
-						`Reported ${last5Reported.length} of last 5 claims. ` +
-						`Total claims: ${last5Claims.length}, Total reports: ${reporterReports.length}`,
+					`🚫 REPORTER BAN: User ${user._id} (${user.telegramChatId}) banned for excessive reporting. Reported ${reportCountIncludingCurrent} of last ${last5Claims.length} claims (excluding reports against banned users). Total claims: ${last5Claims.length}, Total reports: ${reporterReports.length}, Valid reports: ${validReportsForBanCheck.length}`,
 				);
 				console.log(
 					"Last 5 claims:",
@@ -442,7 +466,9 @@ export const reportVoucher = internalMutation({
 				return {
 					status: "banned",
 					message:
-						"You have been banned for reporting 3 or more of your last 5 claims.",
+						last5Claims.length === 3
+							? "You have been banned for reporting 3 of your first 3 claims."
+							: "You have been banned for reporting 3 or more of your last 5 claims.",
 				};
 			}
 		}
@@ -489,12 +515,24 @@ export const reportVoucher = internalMutation({
 				.withIndex("by_uploader", (q) => q.eq("uploaderId", voucher.uploaderId))
 				.collect();
 
-			// Filter out reports from banned users
+			// Filter out reports from users who were banned before this function call
+			// EXCEPT: don't filter the current reporter's reports (even if they got banned during this call)
 			const validReports = [];
 			for (const report of uploaderReports) {
-				const reporter = await ctx.db.get(report.reporterId);
-				if (reporter && !reporter.isBanned) {
+				// Always include reports from the current reporter
+				if (report.reporterId === user._id) {
 					validReports.push(report);
+					continue;
+				}
+
+				// For other reporters, exclude if they were banned before this call
+				const reporter = await ctx.db.get(report.reporterId);
+				if (reporter) {
+					const shouldExclude =
+						reporter.isBanned && reporter.bannedAt && reporter.bannedAt < now;
+					if (!shouldExclude) {
+						validReports.push(report);
+					}
 				}
 			}
 
@@ -504,10 +542,12 @@ export const reportVoucher = internalMutation({
 				last5UploadIds.includes(r.voucherId),
 			);
 
+			// Note: Current report was already inserted before this check,
+			// so we don't need to add 1 like we do for reporter ban check
 			if (last5Reported.length >= 3) {
 				console.log(
 					`🚫 UPLOADER BAN: User ${voucher.uploaderId} banned for bad uploads. ` +
-						`${last5Reported.length} of last 5 uploads reported. ` +
+						`${last5Reported.length} of last ${last5Uploads.length} uploads reported. ` +
 						`Total uploads: ${last5Uploads.length}, Valid reports (non-banned): ${validReports.length}`,
 				);
 				console.log(
