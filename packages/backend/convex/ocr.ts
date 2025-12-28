@@ -8,6 +8,7 @@ type VoucherOcrFailureReason =
 	| "COULD_NOT_READ_AMOUNT"
 	| "COULD_NOT_READ_BARCODE"
 	| "COULD_NOT_READ_EXPIRY_DATE"
+	| "COULD_NOT_READ_VALID_FROM"
 	| "INVALID_TYPE"
 	| "DUPLICATE_BARCODE"
 	| "UNKNOWN_ERROR";
@@ -70,14 +71,16 @@ Where year is not specified, assume it is the current year.
 
 Extract:
 1. **Type**: The discount amount (5, 10, or 20). If it is NOT one of these specific amounts, return "0".
-2. **Expiry**: YYYY-MM-DD.
-3. **Barcode**: The number below the barcode.
+2. **ValidFrom**: The start date of validity period in YYYY-MM-DD format (e.g., in "Valid 23 Nov - 29 Nov", extract 23 Nov).
+3. **Expiry**: The end date of validity period in YYYY-MM-DD format (e.g., in "Valid 23 Nov - 29 Nov", extract 29 Nov).
+4. **Barcode**: The number below the barcode.
 
 Return ONLY JSON:
-{"type": "5", "expiryDate": "2024-12-31", "barcode": "1234567890"}
+{"type": "5", "validFrom": "2026-12-23", "expiryDate": "2026-12-31", "barcode": "1234567890"}
 
 If barcode is missing: null.
 If type is unknown or invalid: "0".
+If validFrom is unknown: null.
 If expiry is unknown: null.`;
 
 			const response = await fetch(
@@ -143,6 +146,32 @@ If expiry is unknown: null.`;
 				throw new VoucherValidationError(
 					"INVALID_TYPE",
 					"Invalid voucher type detected",
+				);
+			}
+
+			// Parse validFrom date
+			let validFrom: number | undefined;
+
+			if (extracted.validFrom) {
+				const dayjsValidFrom = dayjs(extracted.validFrom);
+
+				// Parse YYYY-MM-DD
+				if (
+					dayjsValidFrom.isValid() &&
+					dayjsValidFrom.valueOf() > Date.now() - 365 * 24 * 60 * 60 * 1000
+				) {
+					// Set to start of the day (00:00:00.000)
+					validFrom = dayjsValidFrom.startOf("day").valueOf();
+				} else {
+					throw new VoucherValidationError(
+						"COULD_NOT_READ_VALID_FROM",
+						"Invalid validFrom date",
+					);
+				}
+			} else {
+				throw new VoucherValidationError(
+					"COULD_NOT_READ_VALID_FROM",
+					"Could not determine valid from date",
 				);
 			}
 
@@ -218,12 +247,13 @@ If expiry is unknown: null.`;
 				voucherId,
 				type: voucherType,
 				expiryDate,
+				validFrom,
 				barcodeNumber,
 				ocrRawResponse: rawResponse,
 			});
 
 			console.log(
-				`OCR completed for voucher ${voucherId}: type=${voucherType}, expiry=${new Date(expiryDate).toISOString()}, barcode=${barcodeNumber}`,
+				`OCR completed for voucher ${voucherId}: type=${voucherType}, validFrom=${validFrom ? new Date(validFrom).toISOString() : 'none'}, expiry=${new Date(expiryDate).toISOString()}, barcode=${barcodeNumber}`,
 			);
 		} catch (error: any) {
 			console.error(`OCR failed for voucher ${voucherId}:`, error);

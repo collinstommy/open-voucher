@@ -7,7 +7,12 @@ export const getStats = query({
 			ctx.db.query("users").collect(),
 		]);
 
-		const availableVouchers = vouchers.filter((v) => v.status === "available");
+		const now = Date.now();
+		const availableVouchers = vouchers.filter(
+			(v) =>
+				v.status === "available" &&
+				(!v.validFrom || v.validFrom <= now),
+		);
 
 		const vouchersByType = {
 			"5": availableVouchers.filter((v) => v.type === "5").length,
@@ -31,6 +36,7 @@ export const getStats = query({
 export const getExpiringVouchers = internalQuery({
 	handler: async (ctx) => {
 		const now = new Date();
+		const nowTimestamp = now.getTime();
 		const startOfToday = new Date(
 			now.getFullYear(),
 			now.getMonth(),
@@ -49,7 +55,8 @@ export const getExpiringVouchers = internalQuery({
 				(v) =>
 					v.expiryDate >= startOfToday &&
 					v.expiryDate < endOfTomorrow &&
-					v.status === "available",
+					v.status === "available" &&
+					(!v.validFrom || v.validFrom <= nowTimestamp),
 			)
 			.map((v) => ({
 				id: v._id,

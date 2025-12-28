@@ -61,6 +61,7 @@ export default defineSchema({
 		imageStorageId: v.id("_storage"),
 		barcodeNumber: v.optional(v.string()),
 		expiryDate: v.number(),
+		validFrom: v.optional(v.number()),
 		uploaderId: v.id("users"),
 		claimerId: v.optional(v.id("users")),
 		claimedAt: v.optional(v.number()),

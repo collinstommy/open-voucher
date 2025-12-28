@@ -12,14 +12,19 @@ import { Id } from "../../convex/_generated/dataModel";
 import schema from "../../convex/schema";
 import { modules } from "../test.setup";
 
-function mockGeminiResponse(type: string, expiryDate: string, barcode: string) {
+function mockGeminiResponse(
+	type: string,
+	validFrom: string,
+	expiryDate: string,
+	barcode: string,
+) {
 	return {
 		candidates: [
 			{
 				content: {
 					parts: [
 						{
-							text: JSON.stringify({ type, expiryDate, barcode }),
+							text: JSON.stringify({ type, validFrom, expiryDate, barcode }),
 						},
 					],
 				},
@@ -99,6 +104,10 @@ function setupFetchMock(
 	futureDate.setDate(futureDate.getDate() + 14);
 	const futureDateStr = futureDate.toISOString().split("T")[0];
 
+	const validFromDate = new Date();
+	validFromDate.setDate(validFromDate.getDate() - 1); // Started yesterday
+	const validFromStr = validFromDate.toISOString().split("T")[0];
+
 	const pastDate = new Date();
 	pastDate.setDate(pastDate.getDate() - 7);
 	const pastDateStr = pastDate.toISOString().split("T")[0];
@@ -106,13 +115,14 @@ function setupFetchMock(
 	const scenarios = {
 		valid_5: mockGeminiResponse(
 			"5",
+			validFromStr,
 			customExpiryDate || futureDateStr,
 			"1234567890001",
 		),
-		valid_10: mockGeminiResponse("10", futureDateStr, "1234567890002"),
-		valid_20: mockGeminiResponse("20", futureDateStr, "1234567890003"),
-		expired: mockGeminiResponse("10", pastDateStr, "1234567890004"),
-		invalid_type: mockGeminiResponse("0", futureDateStr, "1234567890005"),
+		valid_10: mockGeminiResponse("10", validFromStr, futureDateStr, "1234567890002"),
+		valid_20: mockGeminiResponse("20", validFromStr, futureDateStr, "1234567890003"),
+		expired: mockGeminiResponse("10", validFromStr, pastDateStr, "1234567890004"),
+		invalid_type: mockGeminiResponse("0", validFromStr, futureDateStr, "1234567890005"),
 	};
 
 	vi.stubGlobal(
@@ -427,6 +437,7 @@ describe("Voucher Claim Flow", () => {
 				imageStorageId,
 				uploaderId: uploaderId,
 				expiryDate: Date.now() + 7 * 24 * 60 * 60 * 1000,
+				validFrom: Date.now() - 24 * 60 * 60 * 1000,
 				createdAt: Date.now(),
 			});
 		});
@@ -488,6 +499,7 @@ describe("Voucher Claim Flow", () => {
 				imageStorageId,
 				uploaderId: uploaderId,
 				expiryDate: Date.now() + 7 * 24 * 60 * 60 * 1000,
+				validFrom: Date.now() - 24 * 60 * 60 * 1000,
 				createdAt: Date.now(),
 			});
 		});
@@ -580,6 +592,7 @@ describe("OCR Flow with Mocked Gemini", () => {
 			voucherId,
 			type: "10",
 			expiryDate: Date.now() + 14 * 24 * 60 * 60 * 1000,
+			validFrom: Date.now() - 24 * 60 * 60 * 1000,
 			barcodeNumber: "1234567890",
 			ocrRawResponse: "{}",
 		});
@@ -754,6 +767,7 @@ describe("OCR Flow with Mocked Gemini", () => {
 				imageStorageId: imageStorageId1,
 				uploaderId: userId,
 				expiryDate: Date.now() + 14 * 24 * 60 * 60 * 1000,
+				validFrom: Date.now() - 24 * 60 * 60 * 1000,
 				barcodeNumber: duplicateBarcode,
 				createdAt: Date.now(),
 			});
@@ -849,6 +863,7 @@ describe("Report Flow", () => {
 				claimerId,
 				claimedAt: Date.now(),
 				expiryDate: Date.now() + 7 * 24 * 60 * 60 * 1000,
+				validFrom: Date.now() - 24 * 60 * 60 * 1000,
 				createdAt: Date.now(),
 			});
 		});
@@ -924,6 +939,7 @@ describe("Ban Flow", () => {
 					claimerId: reporterId,
 					claimedAt: Date.now() - (5 - i) * 1000,
 					expiryDate: Date.now() + 7 * 24 * 60 * 60 * 1000,
+					validFrom: Date.now() - 24 * 60 * 60 * 1000,
 					createdAt: Date.now() - (5 - i) * 2000,
 				});
 			});
@@ -1283,6 +1299,7 @@ describe("Rate Limiting Flow", () => {
 					claimerId,
 					claimedAt: Date.now() - 1000, // Just now
 					expiryDate: Date.now() + 86400000,
+					validFrom: Date.now() - 24 * 60 * 60 * 1000,
 					createdAt: Date.now() - 10000,
 				});
 			});
@@ -1296,6 +1313,7 @@ describe("Rate Limiting Flow", () => {
 				imageStorageId,
 				uploaderId,
 				expiryDate: Date.now() + 86400000,
+				validFrom: Date.now() - 24 * 60 * 60 * 1000,
 				createdAt: Date.now(),
 			});
 		});
@@ -1359,6 +1377,7 @@ describe("Voucher Expiration Flow", () => {
 				uploaderId,
 				imageStorageId,
 				expiryDate: now + 86400000, // Tomorrow
+				validFrom: now - 86400000,
 				createdAt: now,
 			});
 		});
@@ -1370,6 +1389,7 @@ describe("Voucher Expiration Flow", () => {
 				uploaderId,
 				imageStorageId,
 				expiryDate: now - 86400000, // Yesterday
+				validFrom: now - 172800000,
 				createdAt: now - 172800000,
 			});
 		});
@@ -1427,6 +1447,7 @@ describe("Voucher Expiration Flow", () => {
 				uploaderId,
 				imageStorageId,
 				expiryDate: now - 86400000, // Expired yesterday
+				validFrom: now - 172800000,
 				createdAt: now - 172800000,
 			});
 		});

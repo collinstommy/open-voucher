@@ -27,6 +27,7 @@ async function failVoucherHelper(
 		| "COULD_NOT_READ_AMOUNT"
 		| "COULD_NOT_READ_BARCODE"
 		| "COULD_NOT_READ_EXPIRY_DATE"
+		| "COULD_NOT_READ_VALID_FROM"
 		| "INVALID_TYPE"
 		| "DUPLICATE_BARCODE"
 		| "UNKNOWN_ERROR",
@@ -52,6 +53,8 @@ async function failVoucherHelper(
 				userMessage += `We couldn't determine the voucher amount (e.g., €5, €10, €20). Please make sure the value is clear in the photo.`;
 			} else if (reason === "COULD_NOT_READ_EXPIRY_DATE") {
 				userMessage += `We couldn't determine the expiry date. Please make sure it's clear in the photo.`;
+			} else if (reason === "COULD_NOT_READ_VALID_FROM") {
+				userMessage += `We couldn't determine the valid from date. Please make sure the validity dates are clear in the photo.`;
 			} else if (reason === "COULD_NOT_READ_BARCODE") {
 				userMessage += `We couldn't read the barcode. Please ensure it's fully visible and clear.`;
 			} else if (reason === "EXPIRED") {
@@ -190,7 +193,15 @@ export const requestVoucher = internalMutation({
 			.withIndex("by_status_type", (q) =>
 				q.eq("status", "available").eq("type", type),
 			)
-			.filter((q) => q.gt(q.field("expiryDate"), now))
+			.filter((q) =>
+				q.and(
+					q.gt(q.field("expiryDate"), now),
+					q.or(
+						q.eq(q.field("validFrom"), undefined),
+						q.lte(q.field("validFrom"), now),
+					),
+				),
+			)
 			.collect();
 
 		if (vouchers.length === 0) {
@@ -265,12 +276,13 @@ export const updateVoucherFromOcr = internalMutation({
 		voucherId: v.id("vouchers"),
 		type: v.union(v.literal("5"), v.literal("10"), v.literal("20")),
 		expiryDate: v.number(),
+		validFrom: v.optional(v.number()),
 		barcodeNumber: v.optional(v.string()),
 		ocrRawResponse: v.string(),
 	},
 	handler: async (
 		ctx,
-		{ voucherId, type, expiryDate, barcodeNumber, ocrRawResponse },
+		{ voucherId, type, expiryDate, validFrom, barcodeNumber, ocrRawResponse },
 	) => {
 		const voucher = await ctx.db.get(voucherId);
 		if (!voucher) {
@@ -302,6 +314,7 @@ export const updateVoucherFromOcr = internalMutation({
 		await ctx.db.patch(voucherId, {
 			type,
 			expiryDate,
+			validFrom,
 			barcodeNumber,
 			ocrRawResponse,
 			status,
@@ -344,6 +357,7 @@ export const markVoucherOcrFailed = internalMutation({
 			v.literal("COULD_NOT_READ_AMOUNT"),
 			v.literal("COULD_NOT_READ_BARCODE"),
 			v.literal("COULD_NOT_READ_EXPIRY_DATE"),
+			v.literal("COULD_NOT_READ_VALID_FROM"),
 			v.literal("INVALID_TYPE"),
 			v.literal("DUPLICATE_BARCODE"),
 			v.literal("UNKNOWN_ERROR"),
@@ -541,6 +555,12 @@ export const reportVoucher = internalMutation({
 			.query("vouchers")
 			.withIndex("by_status_type", (q) =>
 				q.eq("status", "available").eq("type", voucher.type),
+			)
+			.filter((q) =>
+				q.or(
+					q.eq(q.field("validFrom"), undefined),
+					q.lte(q.field("validFrom"), now),
+				),
 			)
 			.first();
 
