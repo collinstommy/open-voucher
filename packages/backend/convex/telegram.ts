@@ -351,10 +351,8 @@ export const handleTelegramCallback = internalAction({
 		if (data.startsWith("report:")) {
 			const voucherId = data.split(":")[1];
 
-			// Acknowledge the callback immediately
 			await answerTelegramCallback(callbackQuery.id, "Checking...");
 
-			// Look up the user by their Telegram chat ID
 			const user = await ctx.runQuery(internal.users.getUserByTelegramChatId, {
 				telegramChatId: telegramUserId,
 			});
@@ -363,10 +361,22 @@ export const handleTelegramCallback = internalAction({
 				return;
 			}
 
+			if (user.isBanned) {
+				await sendTelegramMessage(
+					chatId,
+					"🚫 Your account has been banned from this service.\n\nIf you believe this is a mistake, you can dispute this ban by sending: 'support YOUR_MESSAGE'",
+				);
+				return;
+			}
+
 			const result = await ctx.runMutation(internal.vouchers.reportVoucher, {
 				userId: user._id,
 				voucherId: voucherId as Id<"vouchers">,
 			});
+
+			if (!result) {
+				return;
+			}
 
 			if (result.status === "rate_limited") {
 				await sendTelegramMessage(chatId, `⏰ ${result.message}`);
