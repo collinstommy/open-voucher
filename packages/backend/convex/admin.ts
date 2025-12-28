@@ -500,6 +500,34 @@ export const sendMessageToUser = adminMutation({
 	},
 });
 
+export const clearReportAndUpdateVoucher = adminMutation({
+	args: {
+		reportId: v.id("reports"),
+		newVoucherStatus: v.union(v.literal("expired"), v.literal("available")),
+	},
+	handler: async (ctx, { reportId, newVoucherStatus }) => {
+		const report = await ctx.db.get(reportId);
+		if (!report) {
+			throw new Error("Report not found");
+		}
+
+		const voucher = await ctx.db.get(report.voucherId);
+		if (!voucher) {
+			throw new Error("Voucher not found");
+		}
+
+		await ctx.db.patch(report.voucherId, { status: newVoucherStatus });
+
+		await ctx.db.delete(reportId);
+
+		return {
+			success: true,
+			voucherId: report.voucherId,
+			newStatus: newVoucherStatus,
+		};
+	},
+});
+
 export const backfillUserStats = internalMutation({
 	args: {},
 	handler: async (ctx) => {

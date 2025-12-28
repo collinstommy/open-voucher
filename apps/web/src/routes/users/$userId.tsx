@@ -58,6 +58,22 @@ function UserDetailPage() {
 		},
 	});
 
+	const clearReportMutation = useMutation({
+		mutationFn: ({
+			reportId,
+			newStatus,
+		}: {
+			reportId: Id<"reports">;
+			newStatus: "expired" | "available";
+		}) =>
+			convex.mutation(api.admin.clearReportAndUpdateVoucher, {
+				token: token!,
+				reportId,
+				newVoucherStatus: newStatus,
+			}),
+		onSuccess: () => queryClient.invalidateQueries(),
+	});
+
 	if (isLoading) {
 		return <div className="text-muted-foreground">Loading user details...</div>;
 	}
@@ -310,6 +326,12 @@ function UserDetailPage() {
 									<div className="mb-2 font-medium">
 										€{report.voucher?.type} Voucher
 									</div>
+									<div className="text-muted-foreground mb-1 text-xs">
+										Voucher ID: {report.voucherId}
+									</div>
+									<div className="text-muted-foreground mb-1 text-xs">
+										Report ID: {report._id}
+									</div>
 									<div className="text-muted-foreground mb-1 text-sm">
 										Reported on {new Date(report.createdAt).toLocaleString()}
 									</div>
@@ -328,6 +350,34 @@ function UserDetailPage() {
 									<div className="whitespace-pre-wrap text-sm">
 										{report.reason}
 									</div>
+								</div>
+								<div className="flex gap-2 mt-3 flex-col">
+									<Button
+										size="sm"
+										variant="outline"
+										onClick={() =>
+											clearReportMutation.mutate({
+												reportId: report._id,
+												newStatus: "expired",
+											})
+										}
+										disabled={clearReportMutation.isPending}
+									>
+										Expire & Clear
+									</Button>
+									<Button
+										size="sm"
+										variant="outline"
+										onClick={() =>
+											clearReportMutation.mutate({
+												reportId: report._id,
+												newStatus: "available",
+											})
+										}
+										disabled={clearReportMutation.isPending}
+									>
+										Available & Clear
+									</Button>
 								</div>
 							</div>
 						))}
@@ -365,6 +415,12 @@ function UserDetailPage() {
 									<div className="mb-2 font-medium">
 										€{report.voucher?.type} Voucher
 									</div>
+									<div className="text-muted-foreground mb-1 text-xs">
+										Voucher ID: {report.voucherId}
+									</div>
+									<div className="text-muted-foreground mb-1 text-xs">
+										Report ID: {report._id}
+									</div>
 									<div className="text-muted-foreground mb-1 text-sm">
 										Reported on {new Date(report.createdAt).toLocaleString()}
 									</div>
@@ -383,6 +439,34 @@ function UserDetailPage() {
 									<div className="whitespace-pre-wrap text-sm">
 										{report.reason}
 									</div>
+								</div>
+								<div className="flex gap-2 mt-3 flex-col">
+									<Button
+										size="sm"
+										variant="outline"
+										onClick={() =>
+											clearReportMutation.mutate({
+												reportId: report._id,
+												newStatus: "expired",
+											})
+										}
+										disabled={clearReportMutation.isPending}
+									>
+										Expire & Clear
+									</Button>
+									<Button
+										size="sm"
+										variant="outline"
+										onClick={() =>
+											clearReportMutation.mutate({
+												reportId: report._id,
+												newStatus: "available",
+											})
+										}
+										disabled={clearReportMutation.isPending}
+									>
+										Available & Clear
+									</Button>
 								</div>
 							</div>
 						))}

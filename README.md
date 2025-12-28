@@ -185,7 +185,8 @@ bunx convex env set ADMIN_PASSWORD "your-secure-password-here" --prod
 ```
 
 ## ToDo
-- [ ] fix users query
+- [x] fix users query
+- [ ] start date for vouchers
 - [ ] unify the validation, we do this in two places right now
 - [x] return vouchers that are expires soonest
 - [x] restrict uploads for expiring today to before 9pm
