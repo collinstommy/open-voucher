@@ -117,4 +117,11 @@ export default defineSchema({
 		createdAt: v.number(),
 		expiresAt: v.number(),
 	}).index("by_token", ["token"]),
+
+	failedUploads: defineTable({
+		userId: v.id("users"),
+		imageStorageId: v.id("_storage"),
+		errorReason: v.string(),
+		createdAt: v.number(),
+	}).index("by_created", ["createdAt"]),
 });

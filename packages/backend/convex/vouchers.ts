@@ -1,11 +1,16 @@
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
-import { internalMutation, internalQuery } from "./_generated/server";
+import {
+	internalMutation,
+	internalQuery,
+	internalAction,
+} from "./_generated/server";
 import { CLAIM_COSTS, MAX_COINS, UPLOAD_REWARDS } from "./constants";
 
 import dayjs from "dayjs";
 import { Id } from "./_generated/dataModel";
 import { MutationCtx } from "./_generated/server";
+import { OCR_ERROR, type OcrError } from "./ocr";
 
 export const getVoucherByBarcode = internalQuery({
 	args: { barcodeNumber: v.string() },
@@ -17,83 +22,187 @@ export const getVoucherByBarcode = internalQuery({
 	},
 });
 
-// Shared helper to mark voucher as failed/rejected
-async function failVoucherHelper(
-	ctx: MutationCtx,
-	voucherId: Id<"vouchers">,
-	error: string,
-	reason:
-		| "EXPIRED"
-		| "COULD_NOT_READ_AMOUNT"
-		| "COULD_NOT_READ_BARCODE"
-		| "COULD_NOT_READ_EXPIRY_DATE"
-		| "COULD_NOT_READ_VALID_FROM"
-		| "INVALID_TYPE"
-		| "DUPLICATE_BARCODE"
-		| "UNKNOWN_ERROR",
-	detectedExpiryDate?: number,
-) {
-	const voucher = await ctx.db.get(voucherId);
-	if (voucher) {
-		// If we have a specific expiry date detected (even if expired), update the record
-		// This ensures the DB reflects the reality of what was scanned
-		if (detectedExpiryDate !== undefined) {
-			await ctx.db.patch(voucherId, { expiryDate: detectedExpiryDate });
+export const getTelegramChatId = internalQuery({
+	args: { userId: v.id("users") },
+	handler: async (ctx, { userId }) => {
+		const user = await ctx.db.get(userId);
+		return user?.telegramChatId ?? null;
+	},
+});
+
+export const createFailedUpload = internalMutation({
+	args: {
+		userId: v.id("users"),
+		imageStorageId: v.id("_storage"),
+		errorReason: v.string(),
+		createdAt: v.number(),
+	},
+	handler: async (ctx, { userId, imageStorageId, errorReason, createdAt }) => {
+		await ctx.db.insert("failedUploads", {
+			userId,
+			imageStorageId,
+			errorReason,
+			createdAt,
+		});
+	},
+});
+
+export const sendErrorMessageAction = internalMutation({
+	args: {
+		telegramChatId: v.string(),
+		errorReason: v.string(),
+		detectedExpiryDate: v.optional(v.number()),
+	},
+	handler: async (ctx, { telegramChatId, errorReason, detectedExpiryDate }) => {
+		let userMessage = "❌ <b>Voucher Processing Failed</b>\n\n";
+
+		if (errorReason === OCR_ERROR.COULD_NOT_READ_AMOUNT) {
+			userMessage += "We couldn't determine the voucher amount (e.g., €5, €10, €20). Please make sure the value is clear in the photo.";
+		} else if (errorReason === OCR_ERROR.COULD_NOT_READ_EXPIRY_DATE) {
+			userMessage += "We couldn't determine the expiry date. Please make sure it's clear in the photo.";
+		} else if (errorReason === OCR_ERROR.COULD_NOT_READ_VALID_FROM) {
+			userMessage += "We couldn't determine the valid from date. Please make sure the validity dates are clear in the photo.";
+		} else if (errorReason === OCR_ERROR.COULD_NOT_READ_BARCODE) {
+			userMessage += "We couldn't read the barcode. Please ensure it's fully visible and clear.";
+		} else if (errorReason === OCR_ERROR.EXPIRED) {
+			const dateToUse = detectedExpiryDate ?? Date.now();
+			userMessage += "This voucher expired on " + dayjs(dateToUse).format("DD-MM-YYYY") + ".";
+		} else if (errorReason === OCR_ERROR.INVALID_TYPE) {
+			userMessage += "This voucher does not appear to be a valid €5, €10, or €20 Dunnes voucher. We only accept these specific general spend vouchers.";
+		} else if (errorReason === OCR_ERROR.DUPLICATE_BARCODE) {
+			userMessage += "This voucher has already been uploaded by someone. Each voucher can only be uploaded once.";
+		} else {
+			userMessage += "We encountered an unknown error while processing your voucher. Please try again or contact support.";
 		}
 
-		await ctx.db.patch(voucherId, {
-			status: "expired",
-			ocrRawResponse: JSON.stringify({ error, reason }),
+		await ctx.scheduler.runAfter(0, internal.telegram.sendMessageAction, {
+			chatId: telegramChatId,
+			text: userMessage,
+		});
+	},
+});
+
+export const sendSuccessMessageAction = internalMutation({
+	args: {
+		telegramChatId: v.string(),
+		voucherType: v.union(v.literal("5"), v.literal("10"), v.literal("20")),
+		reward: v.number(),
+		newCoins: v.number(),
+	},
+	handler: async (ctx, { telegramChatId, voucherType, reward, newCoins }) => {
+		await ctx.scheduler.runAfter(0, internal.telegram.sendMessageAction, {
+			chatId: telegramChatId,
+			text: "✅ <b>Voucher Accepted!</b>\n\nThanks for sharing a €" + voucherType + " voucher.\nCoins earned: +" + reward + "\nNew balance: " + newCoins,
+		});
+	},
+});
+
+export const createVoucherFromOcr = internalMutation({
+	args: {
+		userId: v.id("users"),
+		imageStorageId: v.id("_storage"),
+		voucherType: v.union(v.literal("5"), v.literal("10"), v.literal("20")),
+		expiryDate: v.number(),
+		validFrom: v.number(),
+		barcodeNumber: v.string(),
+		ocrRawResponse: v.string(),
+		createdAt: v.number(),
+	},
+	handler: async (
+		ctx,
+		{ userId, imageStorageId, voucherType, expiryDate, validFrom, barcodeNumber, ocrRawResponse, createdAt },
+	) => {
+		const user = await ctx.db.get(userId);
+		if (!user) {
+			return { success: false };
+		}
+
+		const voucherId = await ctx.db.insert("vouchers", {
+			type: voucherType,
+			status: "available",
+			imageStorageId,
+			barcodeNumber,
+			expiryDate,
+			validFrom,
+			uploaderId: userId,
+			createdAt,
+			ocrRawResponse,
 		});
 
-		const uploader = await ctx.db.get(voucher.uploaderId);
-		if (uploader) {
-			let userMessage = `❌ <b>Voucher Processing Failed</b>\n\n`;
-			if (reason === "COULD_NOT_READ_AMOUNT") {
-				userMessage += `We couldn't determine the voucher amount (e.g., €5, €10, €20). Please make sure the value is clear in the photo.`;
-			} else if (reason === "COULD_NOT_READ_EXPIRY_DATE") {
-				userMessage += `We couldn't determine the expiry date. Please make sure it's clear in the photo.`;
-			} else if (reason === "COULD_NOT_READ_VALID_FROM") {
-				userMessage += `We couldn't determine the valid from date. Please make sure the validity dates are clear in the photo.`;
-			} else if (reason === "COULD_NOT_READ_BARCODE") {
-				userMessage += `We couldn't read the barcode. Please ensure it's fully visible and clear.`;
-			} else if (reason === "EXPIRED") {
-				// Use detected date if available, otherwise DB date (which might be 0/1970 if not set)
-				const dateToUse =
-					detectedExpiryDate !== undefined
-						? detectedExpiryDate
-						: voucher.expiryDate;
-				userMessage += `This voucher expired on ${dayjs(dateToUse).format("DD-MM-YYYY")}.`;
-			} else if (reason === "INVALID_TYPE") {
-				userMessage += `This voucher does not appear to be a valid €5, €10, or €20 Dunnes voucher. We only accept these specific general spend vouchers.`;
-			} else if (reason === "DUPLICATE_BARCODE") {
-				userMessage += `This voucher has already been uploaded by someone. Each voucher can only be uploaded once.`;
-			} else {
-				userMessage += `We encountered an unknown error while processing your voucher. Please try again or contact support.`;
-			}
+		const reward = UPLOAD_REWARDS[voucherType];
+		const newCoins = Math.min(MAX_COINS, user.coins + reward);
+		await ctx.db.patch(userId, { coins: newCoins });
 
-			console.error("Error details:", error);
+		await ctx.db.insert("transactions", {
+			userId,
+			type: "upload_reward",
+			amount: reward,
+			voucherId,
+			createdAt,
+		});
 
-			await ctx.scheduler.runAfter(0, internal.telegram.sendMessageAction, {
-				chatId: uploader.telegramChatId,
-				text: userMessage,
-			});
-		}
+		return { success: true, reward, newCoins };
+	},
+});
+
+function parseExpiryDate(expiryDate: string | null): number | OcrError {
+	if (!expiryDate) {
+		return OCR_ERROR.COULD_NOT_READ_EXPIRY_DATE;
 	}
+
+	const dayjsDate = dayjs(expiryDate);
+	const now = dayjs();
+
+	if (!dayjsDate.isValid() || dayjsDate.valueOf() < Date.now() - 365 * 24 * 60 * 60 * 1000) {
+		return OCR_ERROR.EXPIRED;
+	}
+
+	const expiryTimestamp = dayjsDate.endOf("day").valueOf();
+
+	if (dayjsDate.isBefore(now, "day")) {
+		return OCR_ERROR.EXPIRED;
+	}
+
+	if (dayjsDate.isSame(now, "day") && now.hour() >= 21) {
+		return OCR_ERROR.EXPIRED;
+	}
+
+	return expiryTimestamp;
 }
 
-/**
- * Upload a new voucher image.
- * Creates voucher in "processing" status and triggers OCR.
- * Internal mutation - only called from actions.
- */
+function parseValidFrom(validFrom: string | null): number | OcrError {
+	if (!validFrom) {
+		return OCR_ERROR.COULD_NOT_READ_VALID_FROM;
+	}
+
+	const dayjsValidFrom = dayjs(validFrom);
+
+	if (!dayjsValidFrom.isValid() || dayjsValidFrom.valueOf() < Date.now() - 365 * 24 * 60 * 60 * 1000) {
+		return OCR_ERROR.COULD_NOT_READ_VALID_FROM;
+	}
+
+	return dayjsValidFrom.startOf("day").valueOf();
+}
+
+function parseVoucherType(type: string | number): "5" | "10" | "20" | OcrError {
+	if (type === "10" || type === 10) {
+		return "10";
+	}
+	if (type === "20" || type === 20) {
+		return "20";
+	}
+	if (type === "5" || type === 5) {
+		return "5";
+	}
+	return OCR_ERROR.INVALID_TYPE;
+}
+
 export const uploadVoucher = internalMutation({
 	args: {
 		userId: v.id("users"),
 		imageStorageId: v.id("_storage"),
 	},
 	handler: async (ctx, { userId, imageStorageId }) => {
-		// Check user exists and is not banned
 		const user = await ctx.db.get(userId);
 		if (!user) {
 			throw new Error("User not found");
@@ -105,7 +214,6 @@ export const uploadVoucher = internalMutation({
 		const now = Date.now();
 		const oneDayAgo = now - 24 * 60 * 60 * 1000;
 
-		// Check upload limit (10 per 24h)
 		const recentUploads = await ctx.db
 			.query("vouchers")
 			.withIndex("by_uploader_created", (q) =>
@@ -121,34 +229,214 @@ export const uploadVoucher = internalMutation({
 			return null;
 		}
 
-		const voucherId = await ctx.db.insert("vouchers", {
-			type: "0",
-			status: "processing",
-			imageStorageId,
-			uploaderId: userId,
-			expiryDate: 0,
-			createdAt: now,
-		});
-
-		// Increment upload counter
-		await ctx.db.patch(userId, {
-			uploadCount: (user.uploadCount || 0) + 1,
-		});
-
-		// Schedule OCR processing (runs immediately)
-		await ctx.scheduler.runAfter(0, internal.ocr.processVoucherImage, {
-			voucherId,
+		await ctx.scheduler.runAfter(0, internal.vouchers.processAndValidateVoucher, {
+			userId,
 			imageStorageId,
 		});
 
-		return voucherId;
+		return null;
 	},
 });
 
-/**
- * Request a voucher.
- * Checks balance, finds available voucher, claims it, and records transaction.
- */
+export const processAndValidateVoucher = internalAction({
+	args: {
+		userId: v.id("users"),
+		imageStorageId: v.id("_storage"),
+	},
+	handler: async (ctx, { userId, imageStorageId }) => {
+		const now = Date.now();
+
+		const ocrResult = await ctx.runAction(internal.ocr.extractVoucherData, {
+			imageStorageId,
+		});
+
+		if (!ocrResult.success) {
+			await ctx.runMutation(internal.vouchers.createFailedUpload, {
+				userId,
+				imageStorageId,
+				errorReason: ocrResult.error,
+				createdAt: now,
+			});
+
+			const telegramChatId = await ctx.runQuery(
+				internal.vouchers.getTelegramChatId,
+				{ userId },
+			);
+			if (telegramChatId) {
+				await ctx.runMutation(internal.vouchers.sendErrorMessageAction, {
+					telegramChatId,
+					errorReason: ocrResult.error,
+				});
+			}
+			return;
+		}
+
+		const { data: extracted } = ocrResult;
+
+		const voucherType = parseVoucherType(extracted.type);
+		if (typeof voucherType === "string" && voucherType.startsWith("O")) {
+			await ctx.runMutation(internal.vouchers.createFailedUpload, {
+				userId,
+				imageStorageId,
+				errorReason: voucherType,
+				createdAt: now,
+			});
+
+			const telegramChatId = await ctx.runQuery(
+				internal.vouchers.getTelegramChatId,
+				{ userId },
+			);
+			if (telegramChatId) {
+				await ctx.runMutation(internal.vouchers.sendErrorMessageAction, {
+					telegramChatId,
+					errorReason: voucherType,
+				});
+			}
+			return;
+		}
+
+		const validFrom = parseValidFrom(extracted.validFrom);
+		if (typeof validFrom === "string" && validFrom.startsWith("O")) {
+			await ctx.runMutation(internal.vouchers.createFailedUpload, {
+				userId,
+				imageStorageId,
+				errorReason: validFrom,
+				createdAt: now,
+			});
+
+			const telegramChatId = await ctx.runQuery(
+				internal.vouchers.getTelegramChatId,
+				{ userId },
+			);
+			if (telegramChatId) {
+				await ctx.runMutation(internal.vouchers.sendErrorMessageAction, {
+					telegramChatId,
+					errorReason: validFrom,
+				});
+			}
+			return;
+		}
+
+		const expiryDate = parseExpiryDate(extracted.expiryDate);
+		if (typeof expiryDate === "string" && expiryDate.startsWith("O")) {
+			const detectedExpiryDate =
+				typeof expiryDate === "number" ? expiryDate : undefined;
+			await ctx.runMutation(internal.vouchers.createFailedUpload, {
+				userId,
+				imageStorageId,
+				errorReason: expiryDate,
+				createdAt: now,
+			});
+
+			const telegramChatId = await ctx.runQuery(
+				internal.vouchers.getTelegramChatId,
+				{ userId },
+			);
+			if (telegramChatId) {
+				await ctx.runMutation(internal.vouchers.sendErrorMessageAction, {
+					telegramChatId,
+					errorReason: expiryDate,
+					detectedExpiryDate,
+				});
+			}
+			return;
+		}
+
+		if (!extracted.barcode) {
+			await ctx.runMutation(internal.vouchers.createFailedUpload, {
+				userId,
+				imageStorageId,
+				errorReason: OCR_ERROR.COULD_NOT_READ_BARCODE,
+				createdAt: now,
+			});
+
+			const telegramChatId = await ctx.runQuery(
+				internal.vouchers.getTelegramChatId,
+				{ userId },
+			);
+			if (telegramChatId) {
+				await ctx.runMutation(internal.vouchers.sendErrorMessageAction, {
+					telegramChatId,
+					errorReason: OCR_ERROR.COULD_NOT_READ_BARCODE,
+				});
+			}
+			return;
+		}
+
+		const existingVoucher = await ctx.runQuery(internal.vouchers.getVoucherByBarcode, {
+			barcodeNumber: extracted.barcode,
+		});
+		if (existingVoucher) {
+			await ctx.runMutation(internal.vouchers.createFailedUpload, {
+				userId,
+				imageStorageId,
+				errorReason: OCR_ERROR.DUPLICATE_BARCODE,
+				createdAt: now,
+			});
+
+			const telegramChatId = await ctx.runQuery(
+				internal.vouchers.getTelegramChatId,
+				{ userId },
+			);
+			if (telegramChatId) {
+				await ctx.runMutation(internal.vouchers.sendErrorMessageAction, {
+					telegramChatId,
+					errorReason: OCR_ERROR.DUPLICATE_BARCODE,
+				});
+			}
+			return;
+		}
+
+		const result = await ctx.runMutation(internal.vouchers.createVoucherFromOcr, {
+			userId,
+			imageStorageId,
+			voucherType,
+			expiryDate,
+			validFrom,
+			barcodeNumber: extracted.barcode,
+			ocrRawResponse: ocrResult.rawResponse,
+			createdAt: now,
+		});
+
+		const telegramChatId = await ctx.runQuery(internal.vouchers.getTelegramChatId, {
+			userId,
+		});
+		if (telegramChatId && result.success) {
+			await ctx.runMutation(internal.vouchers.sendSuccessMessageAction, {
+				telegramChatId,
+				voucherType,
+				reward: result.reward,
+				newCoins: result.newCoins,
+			});
+		}
+	},
+});
+
+export const cleanupFailedUploads = internalMutation({
+	args: {},
+	handler: async (ctx) => {
+		const now = Date.now();
+		const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
+
+		const oldFailedUploads = await ctx.db
+			.query("failedUploads")
+			.withIndex("by_created", (q) => q.lt("createdAt", sevenDaysAgo))
+			.collect();
+
+		let deletedCount = 0;
+		for (const failedUpload of oldFailedUploads) {
+			await ctx.storage.delete(failedUpload.imageStorageId);
+			await ctx.db.delete(failedUpload._id);
+			deletedCount++;
+		}
+
+		if (deletedCount > 0) {
+			console.log("Cleaned up " + deletedCount + " failed uploads.");
+		}
+
+		return deletedCount;
+	},
+});
 export const requestVoucher = internalMutation({
 	args: {
 		userId: v.id("users"),
@@ -238,59 +526,6 @@ export const requestVoucher = internalMutation({
 				success: false,
 				error:
 					"Failed to retrieve voucher image. No coins used. Please try again.",
-			};
-		}
-
-		await ctx.db.patch(voucher._id, {
-			status: "claimed",
-			claimerId: userId,
-			claimedAt: now,
-		});
-
-		// Record transaction
-		await ctx.db.insert("transactions", {
-			userId,
-			type: "claim_spend",
-			amount: -cost,
-			voucherId: voucher._id,
-			createdAt: now,
-		});
-
-		return {
-			success: true,
-			voucherId: voucher._id,
-			imageUrl, // Return the actual image URL
-			remainingCoins: newCoins,
-			expiryDate: voucher.expiryDate,
-		};
-	},
-});
-
-/**
- * Update voucher with OCR results.
- * Called internally by the OCR action after processing.
- * Awards coins to uploader.
- */
-export const updateVoucherFromOcr = internalMutation({
-	args: {
-		voucherId: v.id("vouchers"),
-		type: v.union(v.literal("5"), v.literal("10"), v.literal("20")),
-		expiryDate: v.number(),
-		validFrom: v.optional(v.number()),
-		barcodeNumber: v.optional(v.string()),
-		ocrRawResponse: v.string(),
-	},
-	handler: async (
-		ctx,
-		{ voucherId, type, expiryDate, validFrom, barcodeNumber, ocrRawResponse },
-	) => {
-		const voucher = await ctx.db.get(voucherId);
-		if (!voucher) {
-			throw new Error("Voucher not found");
-		}
-
-		const uploader = await ctx.db.get(voucher.uploaderId);
-		if (!uploader) {
 			return;
 		}
 
@@ -588,7 +823,6 @@ export const reportVoucher = internalMutation({
 			});
 
 			// Link replacement to report
-			if (reportId) {
 				await ctx.db.patch(reportId, { replacementVoucherId: replacement._id });
 			}
 
@@ -612,29 +846,3 @@ export const reportVoucher = internalMutation({
 });
 
 export const expireOldVouchers = internalMutation({
-	args: {},
-	handler: async (ctx) => {
-		const now = Date.now();
-
-		const availableVouchers = await ctx.db
-			.query("vouchers")
-			.withIndex("by_status_created", (q) => q.eq("status", "available"))
-			.collect();
-
-		let expiredCount = 0;
-
-		for (const voucher of availableVouchers) {
-			if (voucher.expiryDate < now) {
-				await ctx.db.patch(voucher._id, { status: "expired" });
-				console.log(`Expired voucher: ${voucher._id}`);
-				expiredCount++;
-			}
-		}
-
-		if (expiredCount > 0) {
-			console.log(`Expired ${expiredCount} old vouchers.`);
-		}
-
-		return expiredCount;
-	},
-});

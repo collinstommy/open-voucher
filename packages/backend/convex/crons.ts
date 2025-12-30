@@ -27,4 +27,12 @@ crons.daily(
 	internal.admin.cleanupExpiredSessions,
 );
 
+// Run at 3am UTC
+// Cleans up failed uploads older than 7 days
+crons.daily(
+	"cleanup failed uploads",
+	{ hourUTC: 3, minuteUTC: 0 },
+	internal.vouchers.cleanupFailedUploads,
+);
+
 export default crons;
