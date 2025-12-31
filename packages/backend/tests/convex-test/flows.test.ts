@@ -588,24 +588,28 @@ describe("OCR Flow with Mocked Gemini", () => {
 		});
 
 		// Simulate OCR completing with valid result
-		await t.mutation(internal.vouchers.updateVoucherFromOcr, {
-			voucherId,
-			type: "10",
-			expiryDate: Date.now() + 14 * 24 * 60 * 60 * 1000,
-			validFrom: Date.now() - 24 * 60 * 60 * 1000,
-			barcodeNumber: "1234567890",
-			ocrRawResponse: "{}",
+		await t.mutation(internal.ocr.store.storeVoucherFromOcr, {
+			userId,
+			imageStorageId,
+			type: 10,
+			expiryDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+			validFrom: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+			barcode: "1234567890",
+			rawResponse: "{}",
 		});
 
 		// Wait for scheduled functions (Telegram notifications)
 		await t.finishAllScheduledFunctions(vi.runAllTimers);
 
-		// Check voucher is now available
-		const voucher = await t.run(async (ctx) => {
-			return await ctx.db.get(voucherId);
+		// Check new voucher was created with status available
+		const vouchers = await t.run(async (ctx) => {
+			return await ctx.db.query("vouchers").collect();
 		});
-		expect(voucher?.status).toBe("available");
-		expect(voucher?.type).toBe("10");
+		// Should have 2 vouchers: original processing + new available one
+		expect(vouchers.length).toBe(2);
+		const availableVoucher = vouchers.find((v) => v.status === "available");
+		expect(availableVoucher).toBeDefined();
+		expect(availableVoucher?.type).toBe("10");
 
 		// Check user got coins (10 for €10 voucher)
 		const user = await t.run(async (ctx) => {
@@ -646,23 +650,26 @@ describe("OCR Flow with Mocked Gemini", () => {
 		});
 
 		// Simulate OCR with expired date
-		const pastDate = Date.now() - 7 * 24 * 60 * 60 * 1000;
-		await t.mutation(internal.vouchers.updateVoucherFromOcr, {
-			voucherId,
-			type: "10",
+		const pastDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+		await t.mutation(internal.ocr.store.storeVoucherFromOcr, {
+			userId,
+			imageStorageId,
+			type: 10,
 			expiryDate: pastDate,
-			barcodeNumber: "1234567890",
-			ocrRawResponse: "{}",
+			barcode: "1234567890",
+			rawResponse: "{}",
 		});
 
 		// Wait for scheduled functions (Telegram notifications)
 		await t.finishAllScheduledFunctions(vi.runAllTimers);
 
-		// Check voucher is expired
-		const voucher = await t.run(async (ctx) => {
-			return await ctx.db.get(voucherId);
+		// Check voucher was rejected (no new voucher created, original processing voucher remains)
+		const vouchers = await t.run(async (ctx) => {
+			return await ctx.db.query("vouchers").collect();
 		});
-		expect(voucher?.status).toBe("expired");
+		// Only the original processing voucher exists, no new voucher was created
+		expect(vouchers.length).toBe(1);
+		expect(vouchers[0].status).toBe("processing");
 
 		// Check user did NOT get coins
 		const user = await t.run(async (ctx) => {
@@ -698,8 +705,6 @@ describe("OCR Flow with Mocked Gemini", () => {
 
 		await t.action(internal.telegram.handleTelegramMessage, { message });
 
-		// Verify user received the rejection message
-
 		await t.finishAllScheduledFunctions(vi.runAllTimers);
 
 		const user = await t.query(internal.users.getUserByTelegramChatId, {
@@ -715,16 +720,10 @@ describe("OCR Flow with Mocked Gemini", () => {
 				.collect();
 		});
 
-		expect(vouchers.length).toBe(1);
+		// No voucher should be created - rejected due to 9 PM cutoff
+		expect(vouchers.length).toBe(0);
 
-		const voucher = vouchers[0];
-
-		expect(voucher.status).toBe("expired");
-
-		expect(voucher.ocrRawResponse).toContain(
-			"Voucher expires today and it's too late to use",
-		);
-
+		// Verify Telegram error message was sent
 		const failureMessage = sentMessages.find(
 			(m) =>
 				m.chatId === chatId &&
@@ -789,12 +788,12 @@ describe("OCR Flow with Mocked Gemini", () => {
 
 		await t.finishAllScheduledFunctions(vi.runAllTimers);
 
-		// Find the second voucher (the duplicate one)
+		// Only the original voucher should exist - no duplicate is created
 		const vouchers = await t.run(async (ctx) => {
 			return await ctx.db.query("vouchers").collect();
 		});
-		const duplicateVoucher = vouchers.find((v) => v.status === "expired");
-		expect(duplicateVoucher).toBeDefined();
+		expect(vouchers.length).toBe(1);
+		expect(vouchers[0].barcodeNumber).toBe(duplicateBarcode);
 
 		const user = await t.run(async (ctx) => {
 			return await ctx.db.get(userId);

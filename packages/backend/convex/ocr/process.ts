@@ -16,12 +16,12 @@ export const processVoucherImage = internalAction({
 
 		try {
 			// Step 1: Extract OCR data from image
-			const extracted = await ctx.runAction(internal.ocr.extractFromImage, {
+			const extracted = await ctx.runAction(internal.ocr.extract.extractFromImage, {
 				imageStorageId,
 			});
 
 			// Step 2: Validate and store voucher if valid
-			const result = await ctx.runMutation(internal.ocr.storeVoucherFromOcr, {
+			const result = await ctx.runMutation(internal.ocr.store.storeVoucherFromOcr, {
 				userId,
 				imageStorageId,
 				type: extracted.type,
@@ -41,7 +41,7 @@ export const processVoucherImage = internalAction({
 			console.error("OCR processing failed:", error);
 
 			// Send generic error message to user
-			const user = await ctx.db.get(userId);
+			const user = await ctx.runQuery(internal.users.getUserById, { userId });
 			if (user) {
 				await ctx.scheduler.runAfter(0, internal.telegram.sendMessageAction, {
 					chatId: user.telegramChatId,

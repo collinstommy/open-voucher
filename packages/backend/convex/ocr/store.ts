@@ -35,7 +35,7 @@ export const storeVoucherFromOcr = internalMutation({
 	args: {
 		userId: v.id("users"),
 		imageStorageId: v.id("_storage"),
-		type: v.number(),
+		type: v.union(v.number(), v.string()),
 		validFrom: v.optional(v.string()),
 		expiryDate: v.optional(v.string()),
 		barcode: v.optional(v.string()),
@@ -51,11 +51,12 @@ export const storeVoucherFromOcr = internalMutation({
 
 		// Validate type
 		let voucherType: "5" | "10" | "20";
-		if (type === 10 || type === "10") {
+		const typeNum = typeof type === "string" ? parseInt(type, 10) : type;
+		if (typeNum === 10) {
 			voucherType = "10";
-		} else if (type === 20 || type === "20") {
+		} else if (typeNum === 20) {
 			voucherType = "20";
-		} else if (type === 5 || type === "5") {
+		} else if (typeNum === 5) {
 			voucherType = "5";
 		} else {
 			await sendErrorMessage(ctx, user.telegramChatId, "INVALID_TYPE");
@@ -109,7 +110,7 @@ export const storeVoucherFromOcr = internalMutation({
 		}
 
 		// Check for duplicate barcode
-		const existing = await ctx.runQuery(internal.ocr.checkBarcodeExists, { barcodeNumber: barcode });
+		const existing = await ctx.runQuery(internal.ocr.store.checkBarcodeExists, { barcodeNumber: barcode });
 		if (existing) {
 			await sendErrorMessage(ctx, user.telegramChatId, "DUPLICATE_BARCODE");
 			return { success: false, reason: "DUPLICATE_BARCODE" };
@@ -157,7 +158,7 @@ export const storeVoucherFromOcr = internalMutation({
 
 async function sendErrorMessage(
 	ctx: any,
-	chatId: number,
+	chatId: string | number,
 	reason: VoucherOcrFailureReason,
 	expiryDate?: number,
 ) {

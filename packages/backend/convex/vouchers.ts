@@ -1,4 +1,5 @@
 import { v } from "convex/values";
+import { Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
 import { internalMutation, internalQuery } from "./_generated/server";
 import { CLAIM_COSTS } from "./constants";
@@ -60,7 +61,7 @@ export const uploadVoucher = internalMutation({
 
 		// Schedule OCR processing (runs immediately)
 		// The OCR action will extract data, validate, and create voucher if valid
-		await ctx.scheduler.runAfter(0, internal.ocr.processVoucherImage, {
+		await ctx.scheduler.runAfter(0, internal.ocr.process.processVoucherImage, {
 			userId,
 			imageStorageId,
 		});
