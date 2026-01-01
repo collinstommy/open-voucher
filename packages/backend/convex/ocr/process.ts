@@ -2,10 +2,6 @@ import { v } from "convex/values";
 import { internal } from "../_generated/api";
 import { internalAction } from "../_generated/server";
 
-/**
- * Process a voucher image through OCR and store if valid.
- * Orchestrates: extract data → validate → create voucher (or send error).
- */
 export const processVoucherImage = internalAction({
 	args: {
 		userId: v.id("users"),
@@ -15,16 +11,14 @@ export const processVoucherImage = internalAction({
 		const { userId, imageStorageId } = args;
 
 		try {
-			// Step 1: Extract OCR data from image
 			const extracted = await ctx.runAction(internal.ocr.extract.extractFromImage, {
 				imageStorageId,
 			});
 
-			// Step 2: Validate and store voucher if valid
 			const result = await ctx.runMutation(internal.ocr.store.storeVoucherFromOcr, {
 				userId,
 				imageStorageId,
-				type: extracted.type,
+				type: String(extracted.type),
 				validFrom: extracted.validFrom,
 				expiryDate: extracted.expiryDate,
 				barcode: extracted.barcode,

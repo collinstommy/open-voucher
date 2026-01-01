@@ -14,9 +14,6 @@ type VoucherOcrFailureReason =
 	| "DUPLICATE_BARCODE"
 	| "UNKNOWN_ERROR";
 
-/**
- * Check if a barcode already exists in the database.
- */
 export const checkBarcodeExists = internalQuery({
 	args: { barcodeNumber: v.string() },
 	handler: async (ctx, { barcodeNumber }) => {
@@ -27,15 +24,11 @@ export const checkBarcodeExists = internalQuery({
 	},
 });
 
-/**
- * Validate extracted OCR data and create voucher if valid.
- * Sends appropriate telegram message to user based on result.
- */
 export const storeVoucherFromOcr = internalMutation({
 	args: {
 		userId: v.id("users"),
 		imageStorageId: v.id("_storage"),
-		type: v.union(v.number(), v.string()),
+		type: v.string(),
 		validFrom: v.optional(v.string()),
 		expiryDate: v.optional(v.string()),
 		barcode: v.optional(v.string()),
@@ -49,93 +42,80 @@ export const storeVoucherFromOcr = internalMutation({
 			throw new Error("User not found");
 		}
 
-		// Validate type
-		let voucherType: "5" | "10" | "20";
-		const typeNum = typeof type === "string" ? parseInt(type, 10) : type;
-		if (typeNum === 10) {
-			voucherType = "10";
-		} else if (typeNum === 20) {
-			voucherType = "20";
-		} else if (typeNum === 5) {
-			voucherType = "5";
-		} else {
+		const oneYearAgo = Date.now() - 365 * 24 * 60 * 60 * 1000;
+		const now = dayjs();
+
+		// Parse and validate type
+		const isValidType = type === "5" || type === "10" || type === "20";
+
+		// Parse and validate expiry date
+		const dayjsExpiry = dayjs(expiryDate!);
+		const isExpiryDateValid = expiryDate && dayjsExpiry.isValid() && dayjsExpiry.valueOf() > oneYearAgo;
+		const isAlreadyExpired = dayjsExpiry.isBefore(now, "day");
+		const isTooLateToday = dayjsExpiry.isSame(now, "day") && now.hour() >= 21;
+		const expiryDateMs = dayjsExpiry.endOf("day").valueOf();
+
+		if (!validFrom) {
+			await sendErrorMessage(ctx, user.telegramChatId, "COULD_NOT_READ_VALID_FROM");
+			return { success: false, reason: "COULD_NOT_READ_VALID_FROM" };
+		}
+
+		const dayjsValidFrom =  dayjs(validFrom);
+		const isValidFromValid = dayjsValidFrom.isValid() && dayjsValidFrom.valueOf() > oneYearAgo;
+
+		if (!isValidType) {
 			await sendErrorMessage(ctx, user.telegramChatId, "INVALID_TYPE");
 			return { success: false, reason: "INVALID_TYPE" };
 		}
 
-		// Validate and parse validFrom
-		let validFromMs: number | undefined;
-		if (validFrom) {
-			const dayjsValidFrom = dayjs(validFrom);
-			if (!dayjsValidFrom.isValid() || dayjsValidFrom.valueOf() < Date.now() - 365 * 24 * 60 * 60 * 1000) {
-				await sendErrorMessage(ctx, user.telegramChatId, "COULD_NOT_READ_VALID_FROM");
-				return { success: false, reason: "COULD_NOT_READ_VALID_FROM" };
-			}
-			validFromMs = dayjsValidFrom.startOf("day").valueOf();
+		if (!isValidFromValid) {
+			await sendErrorMessage(ctx, user.telegramChatId, "COULD_NOT_READ_VALID_FROM");
+			return { success: false, reason: "COULD_NOT_READ_VALID_FROM" };
 		}
 
-		// Validate and parse expiry date
-		let expiryDateMs: number;
-		if (!expiryDate) {
+		if (!isExpiryDateValid) {
 			await sendErrorMessage(ctx, user.telegramChatId, "COULD_NOT_READ_EXPIRY_DATE");
 			return { success: false, reason: "COULD_NOT_READ_EXPIRY_DATE" };
 		}
 
-		const dayjsExpiry = dayjs(expiryDate);
-		const now = dayjs();
-
-		if (!dayjsExpiry.isValid() || dayjsExpiry.valueOf() < Date.now() - 365 * 24 * 60 * 60 * 1000) {
-			await sendErrorMessage(ctx, user.telegramChatId, "EXPIRED");
-			return { success: false, reason: "EXPIRED" };
-		}
-
-		expiryDateMs = dayjsExpiry.endOf("day").valueOf();
-
-		// Check if already expired (yesterday or older)
-		if (dayjsExpiry.isBefore(now, "day")) {
+		if (isAlreadyExpired) {
 			await sendErrorMessage(ctx, user.telegramChatId, "EXPIRED", expiryDateMs);
 			return { success: false, reason: "EXPIRED", expiryDate: expiryDateMs };
 		}
 
-		// Check if expiring today and it's too late (after 9 PM)
-		if (dayjsExpiry.isSame(now, "day") && now.hour() >= 21) {
+		if (isTooLateToday) {
 			await sendErrorMessage(ctx, user.telegramChatId, "EXPIRED", expiryDateMs);
 			return { success: false, reason: "EXPIRED", expiryDate: expiryDateMs };
 		}
 
-		// Validate barcode
 		if (!barcode) {
 			await sendErrorMessage(ctx, user.telegramChatId, "COULD_NOT_READ_BARCODE");
 			return { success: false, reason: "COULD_NOT_READ_BARCODE" };
 		}
 
-		// Check for duplicate barcode
 		const existing = await ctx.runQuery(internal.ocr.store.checkBarcodeExists, { barcodeNumber: barcode });
 		if (existing) {
 			await sendErrorMessage(ctx, user.telegramChatId, "DUPLICATE_BARCODE");
 			return { success: false, reason: "DUPLICATE_BARCODE" };
 		}
 
-		// All validations passed - create voucher
 		const nowMs = Date.now();
 		const voucherId = await ctx.db.insert("vouchers", {
-			type: voucherType,
+			type,
 			status: "available",
 			imageStorageId,
 			uploaderId: userId,
 			expiryDate: expiryDateMs,
-			validFrom: validFromMs,
+			validFrom: dayjsValidFrom?.startOf("day").valueOf(),
 			barcodeNumber: barcode,
 			ocrRawResponse: rawResponse,
 			createdAt: nowMs,
 		});
 
-		// Award coins
-		const reward = UPLOAD_REWARDS[voucherType];
+		const reward = UPLOAD_REWARDS[type];
 		const newCoins = Math.min(MAX_COINS, user.coins + reward);
 		await ctx.db.patch(userId, { coins: newCoins });
 
-		// Record transaction
 		await ctx.db.insert("transactions", {
 			userId,
 			type: "upload_reward",
@@ -144,13 +124,12 @@ export const storeVoucherFromOcr = internalMutation({
 			createdAt: nowMs,
 		});
 
-		// Send success message
 		await ctx.scheduler.runAfter(0, internal.telegram.sendMessageAction, {
 			chatId: user.telegramChatId,
-			text: `✅ <b>Voucher Accepted!</b>\n\nThanks for sharing a €${voucherType} voucher.\nCoins earned: +${reward}\nNew balance: ${newCoins}`,
+			text: `✅ <b>Voucher Accepted!</b>\n\nThanks for sharing a €${type} voucher.\nCoins earned: +${reward}\nNew balance: ${newCoins}`,
 		});
 
-		console.log(`Voucher created: ${voucherId} (type=${voucherType}, barcode=${barcode})`);
+		console.log(`Voucher created: ${voucherId} (type=${type}, barcode=${barcode})`);
 
 		return { success: true, voucherId };
 	},
