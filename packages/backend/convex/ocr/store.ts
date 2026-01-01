@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { internal } from "../_generated/api";
-import { internalMutation, internalQuery } from "../_generated/server";
+import { internalMutation } from "../_generated/server";
 import { UPLOAD_REWARDS, MAX_COINS } from "../constants";
 import dayjs from "dayjs";
 
@@ -13,16 +13,6 @@ type VoucherOcrFailureReason =
 	| "INVALID_TYPE"
 	| "DUPLICATE_BARCODE"
 	| "UNKNOWN_ERROR";
-
-export const checkBarcodeExists = internalQuery({
-	args: { barcodeNumber: v.string() },
-	handler: async (ctx, { barcodeNumber }) => {
-		return await ctx.db
-			.query("vouchers")
-			.withIndex("by_barcode", (q) => q.eq("barcodeNumber", barcodeNumber))
-			.first();
-	},
-});
 
 export const storeVoucherFromOcr = internalMutation({
 	args: {
@@ -93,7 +83,11 @@ export const storeVoucherFromOcr = internalMutation({
 			return { success: false, reason: "COULD_NOT_READ_BARCODE" };
 		}
 
-		const existing = await ctx.runQuery(internal.ocr.store.checkBarcodeExists, { barcodeNumber: barcode });
+		const existing = await ctx.db
+		.query("vouchers")
+		.withIndex("by_barcode", (q) => q.eq("barcodeNumber", barcode))
+		.first();
+
 		if (existing) {
 			await sendErrorMessage(ctx, user.telegramChatId, "DUPLICATE_BARCODE");
 			return { success: false, reason: "DUPLICATE_BARCODE" };

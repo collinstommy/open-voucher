@@ -32,9 +32,8 @@ export const processVoucherImage = internalAction({
 				// Error message is sent by storeVoucherFromOcr
 			}
 		} catch (error: any) {
-			console.error("OCR processing failed:", error);
+			console.error("OCR system error:", { userId, imageStorageId, error });
 
-			// Send generic error message to user
 			const user = await ctx.runQuery(internal.users.getUserById, { userId });
 			if (user) {
 				await ctx.scheduler.runAfter(0, internal.telegram.sendMessageAction, {
