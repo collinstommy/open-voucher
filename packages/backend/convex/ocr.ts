@@ -1,64 +1,57 @@
-import { v } from "convex/values";
+import { Id } from "./_generated/dataModel";
 import dayjs from "dayjs";
-import { internal } from "./_generated/api";
-import { internalAction } from "./_generated/server";
 
-type VoucherOcrFailureReason =
-	| "EXPIRED"
-	| "COULD_NOT_READ_AMOUNT"
-	| "COULD_NOT_READ_BARCODE"
-	| "COULD_NOT_READ_EXPIRY_DATE"
-	| "COULD_NOT_READ_VALID_FROM"
-	| "INVALID_TYPE"
-	| "DUPLICATE_BARCODE"
-	| "UNKNOWN_ERROR";
+type OcrSuccess = {
+	status: "success";
+	type: "5" | "10" | "20";
+	barcodeNumber: string;
+	expiryDate: number;
+	validFrom: number | undefined;
+	rawResponse: string;
+};
 
-class VoucherValidationError extends Error {
-	constructor(
-		public reason: VoucherOcrFailureReason,
-		message?: string,
-		public expiryDate?: number,
-	) {
-		super(message || reason);
-		this.name = "VoucherValidationError";
+type OcrError =
+	| { status: "error"; reason: "INVALID_TYPE" }
+	| { status: "error"; reason: "EXPIRED"; expiryDate: number }
+	| { status: "error"; reason: "MISSING_BARCODE" }
+	| { status: "error"; reason: "MISSING_EXPIRY_DATE" }
+	| { status: "error"; reason: "MISSING_VALID_FROM" }
+	| { status: "error"; reason: "API_ERROR"; details: string };
+
+type OcrResult = OcrSuccess | OcrError;
+
+export async function extractVoucherData(
+	imageStorageId: Id<"_storage">,
+	storage: { getUrl: (id: Id<"_storage">) => Promise<string | null> },
+): Promise<OcrResult> {
+	const imageUrl = await storage.getUrl(imageStorageId);
+	if (!imageUrl) {
+		return {
+			status: "error",
+			reason: "API_ERROR",
+			details: "Could not get image URL",
+		};
 	}
-}
 
-/**
- * Process a voucher image with Gemini OCR.
- * Extracts voucher type, expiry date, and barcode number.
- */
-export const processVoucherImage = internalAction({
-	args: {
-		voucherId: v.id("vouchers"),
-		imageStorageId: v.id("_storage"),
-	},
-	handler: async (ctx, { voucherId, imageStorageId }) => {
-		try {
-			// Get image URL from Convex storage
-			const imageUrl = await ctx.storage.getUrl(imageStorageId);
-			if (!imageUrl) {
-				throw new Error("Could not get image URL");
-			}
+	const imageBase64 = await fetchImageAsBase64(imageUrl);
 
-			// Download image and convert to base64
-			const imageBase64 = await fetchImageAsBase64(imageUrl);
+	const geminiApiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+	if (!geminiApiKey) {
+		return {
+			status: "error",
+			reason: "API_ERROR",
+			details: "Gemini API key not configured",
+		};
+	}
 
-			// Call Gemini API
-			const geminiApiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
-			if (!geminiApiKey) {
-				throw new Error("Gemini API key not configured");
-			}
-
-			const currentYear = new Date().getFullYear();
-			const prompt = `You are analyzing an image of a voucher.
+	const currentYear = new Date().getFullYear();
+	const prompt = `You are analyzing an image of a voucher.
 We are ONLY looking for specific Dunnes Stores vouchers (Ireland) of these exact types:
 - €5 off €25
 - €10 off €40
 - €10 off €50
 - €20 off €80
 - €20 off €100
-
 
 Any other voucher type (e.g. "€1 off", "€3 off", product specific, or from other stores) is INVALID.
 
@@ -83,202 +76,132 @@ If type is unknown or invalid: "0".
 If validFrom is unknown: null.
 If expiry is unknown: null.`;
 
-			const response = await fetch(
-				`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite-preview-02-05:generateContent?key=${geminiApiKey}`,
-				{
-					method: "POST",
-					headers: {
-						"Content-Type": "application/json",
-					},
-					body: JSON.stringify({
-						contents: [
-							{
-								parts: [
-									{ text: prompt },
-									{
-										inlineData: {
-											mimeType: "image/jpeg",
-											data: imageBase64,
-										},
+	try {
+		const response = await fetch(
+			`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite-preview-02-05:generateContent?key=${geminiApiKey}`,
+			{
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify({
+					contents: [
+						{
+							parts: [
+								{ text: prompt },
+								{
+									inlineData: {
+										mimeType: "image/jpeg",
+										data: imageBase64,
 									},
-								],
-							},
-						],
-						generationConfig: {
-							temperature: 0.0, // Reduced temperature for more deterministic output
-							maxOutputTokens: 256,
-							responseMimeType: "application/json",
+								},
+							],
 						},
-					}),
-				},
-			);
+					],
+					generationConfig: {
+						temperature: 0.0,
+						maxOutputTokens: 256,
+						responseMimeType: "application/json",
+					},
+				}),
+			},
+		);
 
-			if (!response.ok) {
-				const error = await response.text();
-				throw new Error(`Gemini API error: ${error}`);
-			}
-
-			const result = await response.json();
-			const rawResponse = JSON.stringify(result);
-
-			// Extract text from response
-			const textContent = result.candidates?.[0]?.content?.parts?.[0]?.text;
-			if (!textContent) {
-				throw new VoucherValidationError(
-					"COULD_NOT_READ_AMOUNT",
-					"No text in Gemini response",
-				);
-			}
-
-			const extracted = JSON.parse(textContent);
-
-			console.log("Extracted:", extracted);
-
-			// Validate and normalize type
-			let voucherType: "5" | "10" | "20";
-			if (extracted.type === "10" || extracted.type === 10) {
-				voucherType = "10";
-			} else if (extracted.type === "20" || extracted.type === 20) {
-				voucherType = "20";
-			} else if (extracted.type === "5" || extracted.type === 5) {
-				voucherType = "5";
-			} else {
-				throw new VoucherValidationError(
-					"INVALID_TYPE",
-					"Invalid voucher type detected",
-				);
-			}
-
-			// Parse validFrom date
-			let validFrom: number | undefined;
-
-			if (extracted.validFrom) {
-				const dayjsValidFrom = dayjs(extracted.validFrom);
-
-				// Parse YYYY-MM-DD
-				if (
-					dayjsValidFrom.isValid() &&
-					dayjsValidFrom.valueOf() > Date.now() - 365 * 24 * 60 * 60 * 1000
-				) {
-					// Set to start of the day (00:00:00.000)
-					validFrom = dayjsValidFrom.startOf("day").valueOf();
-				} else {
-					throw new VoucherValidationError(
-						"COULD_NOT_READ_VALID_FROM",
-						"Invalid validFrom date",
-					);
-				}
-			} else {
-				throw new VoucherValidationError(
-					"COULD_NOT_READ_VALID_FROM",
-					"Could not determine valid from date",
-				);
-			}
-
-			// Parse expiry date
-			let expiryDate: number = 0;
-
-			if (extracted.expiryDate) {
-				const dayjsDate = dayjs(extracted.expiryDate);
-				const now = dayjs();
-
-				// Parse YYYY-MM-DD
-				if (
-					dayjsDate.isValid() &&
-					dayjsDate.valueOf() > Date.now() - 365 * 24 * 60 * 60 * 1000
-				) {
-					// Set to end of the day (23:59:59.999) to be inclusive
-					expiryDate = dayjsDate.endOf("day").valueOf();
-
-					// Check if already expired (yesterday or older)
-					if (dayjsDate.isBefore(now, "day")) {
-						throw new VoucherValidationError(
-							"EXPIRED",
-							"Voucher has already expired",
-							expiryDate,
-						);
-					}
-
-					// Check if expiring today and it's too late (after 9 PM)
-					if (dayjsDate.isSame(now, "day") && now.hour() >= 21) {
-						throw new VoucherValidationError(
-							"EXPIRED",
-							"Voucher expires today and it's too late to use (after 9 PM)",
-							expiryDate,
-						);
-					}
-				} else {
-					throw new VoucherValidationError(
-						"EXPIRED",
-						"Invalid or past expiry date",
-					);
-				}
-			} else {
-				throw new VoucherValidationError(
-					"COULD_NOT_READ_EXPIRY_DATE",
-					"Could not determine expiry date",
-				);
-			}
-
-			const barcodeNumber = extracted.barcode;
-			if (!barcodeNumber) {
-				throw new VoucherValidationError(
-					"COULD_NOT_READ_BARCODE",
-					"Could not read barcode from voucher",
-				);
-			}
-
-			// Check for duplicate barcode before saving
-			const existingVoucher = await ctx.runQuery(
-				internal.vouchers.getVoucherByBarcode,
-				{
-					barcodeNumber,
-				},
-			);
-			if (existingVoucher) {
-				throw new VoucherValidationError(
-					"DUPLICATE_BARCODE",
-					"This voucher has already been uploaded",
-				);
-			}
-
-			// Update voucher with extracted data
-			await ctx.runMutation(internal.vouchers.updateVoucherFromOcr, {
-				voucherId,
-				type: voucherType,
-				expiryDate,
-				validFrom,
-				barcodeNumber,
-				ocrRawResponse: rawResponse,
-			});
-
-			console.log(
-				`OCR completed for voucher ${voucherId}: type=${voucherType}, validFrom=${validFrom ? new Date(validFrom).toISOString() : 'none'}, expiry=${new Date(expiryDate).toISOString()}, barcode=${barcodeNumber}`,
-			);
-		} catch (error: any) {
-			console.error(`OCR failed for voucher ${voucherId}:`, error);
-
-			let reason: VoucherOcrFailureReason = "UNKNOWN_ERROR";
-			let expiryDate: number | undefined;
-
-			if (error instanceof VoucherValidationError) {
-				reason = error.reason;
-				expiryDate = error.expiryDate;
-			}
-
-			// Mark voucher as failed
-			await ctx.runMutation(internal.vouchers.markVoucherOcrFailed, {
-				voucherId,
-				error: error.message || "Unknown error",
-				reason,
-				expiryDate,
-			});
+		if (!response.ok) {
+			const error = await response.text();
+			return {
+				status: "error",
+				reason: "API_ERROR",
+				details: `Gemini API error: ${error}`,
+			};
 		}
-	},
-});
-/**
- * Fetch an image from URL and convert to base64.
- */
+
+		const result = await response.json();
+		const rawResponse = JSON.stringify(result);
+
+		const textContent = result.candidates?.[0]?.content?.parts?.[0]?.text;
+		if (!textContent) {
+			return { status: "error", reason: "MISSING_EXPIRY_DATE" };
+		}
+
+		const extracted = JSON.parse(textContent);
+
+		let voucherType: "5" | "10" | "20";
+		if (extracted.type === "10" || extracted.type === 10) {
+			voucherType = "10";
+		} else if (extracted.type === "20" || extracted.type === 20) {
+			voucherType = "20";
+		} else if (extracted.type === "5" || extracted.type === 5) {
+			voucherType = "5";
+		} else {
+			return { status: "error", reason: "INVALID_TYPE" };
+		}
+
+		let validFrom: number | undefined;
+
+		if (extracted.validFrom) {
+			const dayjsValidFrom = dayjs(extracted.validFrom);
+
+			if (
+				dayjsValidFrom.isValid() &&
+				dayjsValidFrom.valueOf() > Date.now() - 365 * 24 * 60 * 60 * 1000
+			) {
+				validFrom = dayjsValidFrom.startOf("day").valueOf();
+			} else {
+				return { status: "error", reason: "MISSING_VALID_FROM" };
+			}
+		} else {
+			return { status: "error", reason: "MISSING_VALID_FROM" };
+		}
+
+		let expiryDate: number = 0;
+
+		if (extracted.expiryDate) {
+			const dayjsDate = dayjs(extracted.expiryDate);
+			const now = dayjs();
+
+			if (
+				dayjsDate.isValid() &&
+				dayjsDate.valueOf() > Date.now() - 365 * 24 * 60 * 60 * 1000
+			) {
+				expiryDate = dayjsDate.endOf("day").valueOf();
+
+				if (dayjsDate.isBefore(now, "day")) {
+					return { status: "error", reason: "EXPIRED", expiryDate };
+				}
+
+				if (dayjsDate.isSame(now, "day") && now.hour() >= 21) {
+					return { status: "error", reason: "EXPIRED", expiryDate };
+				}
+			} else {
+				return { status: "error", reason: "MISSING_EXPIRY_DATE" };
+			}
+		} else {
+			return { status: "error", reason: "MISSING_EXPIRY_DATE" };
+		}
+
+		const barcodeNumber = extracted.barcode;
+		if (!barcodeNumber) {
+			return { status: "error", reason: "MISSING_BARCODE" };
+		}
+
+		return {
+			status: "success",
+			type: voucherType,
+			barcodeNumber,
+			expiryDate,
+			validFrom,
+			rawResponse,
+		};
+	} catch (error: any) {
+		return {
+			status: "error",
+			reason: "API_ERROR",
+			details: error?.message || "Unknown error",
+		};
+	}
+}
+
 async function fetchImageAsBase64(url: string): Promise<string> {
 	const response = await fetch(url);
 	if (!response.ok) {
@@ -288,7 +211,6 @@ async function fetchImageAsBase64(url: string): Promise<string> {
 	const arrayBuffer = await response.arrayBuffer();
 	const uint8Array = new Uint8Array(arrayBuffer);
 
-	// Convert to base64
 	let binary = "";
 	for (let i = 0; i < uint8Array.length; i++) {
 		binary += String.fromCharCode(uint8Array[i]);

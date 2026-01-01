@@ -119,10 +119,30 @@ function setupFetchMock(
 			customExpiryDate || futureDateStr,
 			"1234567890001",
 		),
-		valid_10: mockGeminiResponse("10", validFromStr, futureDateStr, "1234567890002"),
-		valid_20: mockGeminiResponse("20", validFromStr, futureDateStr, "1234567890003"),
-		expired: mockGeminiResponse("10", validFromStr, pastDateStr, "1234567890004"),
-		invalid_type: mockGeminiResponse("0", validFromStr, futureDateStr, "1234567890005"),
+		valid_10: mockGeminiResponse(
+			"10",
+			validFromStr,
+			futureDateStr,
+			"1234567890002",
+		),
+		valid_20: mockGeminiResponse(
+			"20",
+			validFromStr,
+			futureDateStr,
+			"1234567890003",
+		),
+		expired: mockGeminiResponse(
+			"10",
+			validFromStr,
+			pastDateStr,
+			"1234567890004",
+		),
+		invalid_type: mockGeminiResponse(
+			"0",
+			validFromStr,
+			futureDateStr,
+			"1234567890005",
+		),
 	};
 
 	vi.stubGlobal(
@@ -545,206 +565,25 @@ describe("Voucher Claim Flow", () => {
 	});
 });
 
-describe("OCR Flow with Mocked Gemini", () => {
+describe("OCR Upload Flow", () => {
 	beforeEach(() => {
 		setupFetchMock();
 		vi.useFakeTimers();
+		vi.stubEnv("GOOGLE_GENERATIVE_AI_API_KEY", "test-api-key");
+		vi.stubEnv("TELEGRAM_BOT_TOKEN", "test-bot-token");
 	});
 
 	afterEach(() => {
 		vi.useRealTimers();
 		vi.unstubAllGlobals();
+		vi.unstubAllEnvs();
 	});
 
-	test("valid voucher OCR awards coins to uploader", async () => {
+	test("valid voucher creates voucher and awards coins", async () => {
 		setupFetchMock("valid_10");
 		const t = convexTest(schema, modules);
-
-		// Create user
-		const userId = await t.run(async (ctx) => {
-			return await ctx.db.insert("users", {
-				telegramChatId: "123456",
-				coins: 0,
-				isBanned: false,
-				createdAt: Date.now(),
-				lastActiveAt: Date.now(),
-			});
-		});
-
-		// Create storage and voucher
-		const imageStorageId = await t.run(async (ctx) => {
-			return await ctx.storage.store(new Blob(["fake-image"]));
-		});
-
-		const voucherId = await t.run(async (ctx) => {
-			return await ctx.db.insert("vouchers", {
-				type: "0",
-				status: "processing",
-				imageStorageId,
-				uploaderId: userId,
-				expiryDate: 0,
-				createdAt: Date.now(),
-			});
-		});
-
-		// Simulate OCR completing with valid result
-		await t.mutation(internal.vouchers.updateVoucherFromOcr, {
-			voucherId,
-			type: "10",
-			expiryDate: Date.now() + 14 * 24 * 60 * 60 * 1000,
-			validFrom: Date.now() - 24 * 60 * 60 * 1000,
-			barcodeNumber: "1234567890",
-			ocrRawResponse: "{}",
-		});
-
-		// Wait for scheduled functions (Telegram notifications)
-		await t.finishAllScheduledFunctions(vi.runAllTimers);
-
-		// Check voucher is now available
-		const voucher = await t.run(async (ctx) => {
-			return await ctx.db.get(voucherId);
-		});
-		expect(voucher?.status).toBe("available");
-		expect(voucher?.type).toBe("10");
-
-		// Check user got coins (10 for €10 voucher)
-		const user = await t.run(async (ctx) => {
-			return await ctx.db.get(userId);
-		});
-		expect(user?.coins).toBe(10);
-	});
-
-	test("expired voucher OCR fails and notifies user", async () => {
-		setupFetchMock("expired");
-		const t = convexTest(schema, modules);
-
-		// Create user
-		const userId = await t.run(async (ctx) => {
-			return await ctx.db.insert("users", {
-				telegramChatId: "123456",
-				coins: 0,
-				isBanned: false,
-				createdAt: Date.now(),
-				lastActiveAt: Date.now(),
-			});
-		});
-
-		// Create storage and voucher
-		const imageStorageId = await t.run(async (ctx) => {
-			return await ctx.storage.store(new Blob(["fake-image"]));
-		});
-
-		const voucherId = await t.run(async (ctx) => {
-			return await ctx.db.insert("vouchers", {
-				type: "0",
-				status: "processing",
-				imageStorageId,
-				uploaderId: userId,
-				expiryDate: 0,
-				createdAt: Date.now(),
-			});
-		});
-
-		// Simulate OCR with expired date
-		const pastDate = Date.now() - 7 * 24 * 60 * 60 * 1000;
-		await t.mutation(internal.vouchers.updateVoucherFromOcr, {
-			voucherId,
-			type: "10",
-			expiryDate: pastDate,
-			barcodeNumber: "1234567890",
-			ocrRawResponse: "{}",
-		});
-
-		// Wait for scheduled functions (Telegram notifications)
-		await t.finishAllScheduledFunctions(vi.runAllTimers);
-
-		// Check voucher is expired
-		const voucher = await t.run(async (ctx) => {
-			return await ctx.db.get(voucherId);
-		});
-		expect(voucher?.status).toBe("expired");
-
-		// Check user did NOT get coins
-		const user = await t.run(async (ctx) => {
-			return await ctx.db.get(userId);
-		});
-		expect(user?.coins).toBe(0);
-	});
-
-	test("test vouchers expiring today are rejected after 9 PM", async () => {
-		const t = convexTest(schema, modules);
-		const chatId = "12345";
-
-		// Create user
-		await t.mutation(internal.users.createUserWithInvite, {
-			telegramChatId: chatId,
-			inviteCode: "TEST",
-		});
-
-		// Set fixed date for test: 2025-12-21 21:30:00
-		const todayStr = "2025-12-21";
-		const mockNow = new Date(`${todayStr}T21:30:00`);
-		vi.setSystemTime(mockNow);
-
-		// Mock response with expiration date set to today
-		setupFetchMock("valid_5", todayStr);
-
-		// Stub Gemini API key
-		vi.stubEnv("GOOGLE_GENERATIVE_AI_API_KEY", "test-api-key");
-		vi.stubEnv("TELEGRAM_BOT_TOKEN", "test-bot-token");
-
-		// Send telegram photo message
-		const message = createTelegramPhotoMessage(chatId);
-
-		await t.action(internal.telegram.handleTelegramMessage, { message });
-
-		// Verify user received the rejection message
-
-		await t.finishAllScheduledFunctions(vi.runAllTimers);
-
-		const user = await t.query(internal.users.getUserByTelegramChatId, {
-			telegramChatId: chatId,
-		});
-
-		const vouchers = await t.run((ctx) => {
-			return ctx.db
-				.query("vouchers")
-
-				.withIndex("by_uploader", (q) => q.eq("uploaderId", user!._id))
-
-				.collect();
-		});
-
-		expect(vouchers.length).toBe(1);
-
-		const voucher = vouchers[0];
-
-		expect(voucher.status).toBe("expired");
-
-		expect(voucher.ocrRawResponse).toContain(
-			"Voucher expires today and it's too late to use",
-		);
-
-		const failureMessage = sentMessages.find(
-			(m) =>
-				m.chatId === chatId &&
-				m.text?.includes("Voucher Processing Failed") &&
-				m.text?.includes("This voucher expired on 21-12-2025"),
-		);
-
-		expect(failureMessage).toBeDefined();
-	});
-	test("test duplicate barcode is rejected via Telegram webhook", async () => {
-		// Use a barcode that the mock OCR will return
-		const duplicateBarcode = "1234567890002";
 		const chatId = "123456";
-		setupFetchMock("valid_10");
-		vi.stubEnv("GOOGLE_GENERATIVE_AI_API_KEY", "test-api-key");
-		vi.stubEnv("TELEGRAM_BOT_TOKEN", "test-bot-token");
-		vi.useFakeTimers({ now: Date.now() });
-		const t = convexTest(schema, modules);
 
-		// Create existing user (already signed up)
 		const userId = await t.run(async (ctx) => {
 			return await ctx.db.insert("users", {
 				telegramChatId: chatId,
@@ -755,16 +594,208 @@ describe("OCR Flow with Mocked Gemini", () => {
 			});
 		});
 
-		// Create first voucher with the same barcode that OCR will return
-		const imageStorageId1 = await t.run(async (ctx) => {
-			return await ctx.storage.store(new Blob(["image1"]));
+		const imageStorageId = await t.run(async (ctx) => {
+			return await ctx.storage.store(new Blob(["fake-image"]));
+		});
+
+		const voucherId = await t.mutation(internal.vouchers.uploadVoucher, {
+			userId,
+			imageStorageId,
+		});
+
+		await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+		expect(voucherId).toBeDefined();
+
+		const voucher = await t.run(async (ctx) => {
+			return await ctx.db.get(voucherId!);
+		});
+		expect(voucher?.status).toBe("available");
+		expect(voucher?.type).toBe("10");
+		expect(voucher?.barcodeNumber).toBe("1234567890002");
+
+		const user = await t.run(async (ctx) => {
+			return await ctx.db.get(userId);
+		});
+		expect(user?.coins).toBe(10);
+		expect(user?.uploadCount).toBe(1);
+
+		const successMsg = sentMessages.find(
+			(m) =>
+				m.chatId === chatId &&
+				m.text?.includes("Voucher Accepted") &&
+				m.text?.includes("+10"),
+		);
+		expect(successMsg).toBeDefined();
+	});
+
+	test("expired voucher sends error message and does not create voucher", async () => {
+		setupFetchMock("expired");
+		const t = convexTest(schema, modules);
+		const chatId = "123456";
+
+		const userId = await t.run(async (ctx) => {
+			return await ctx.db.insert("users", {
+				telegramChatId: chatId,
+				coins: 0,
+				isBanned: false,
+				createdAt: Date.now(),
+				lastActiveAt: Date.now(),
+			});
+		});
+
+		const imageStorageId = await t.run(async (ctx) => {
+			return await ctx.storage.store(new Blob(["fake-image"]));
+		});
+
+		const voucherId = await t.mutation(internal.vouchers.uploadVoucher, {
+			userId,
+			imageStorageId,
+		});
+
+		await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+		expect(voucherId).toBeNull();
+
+		const vouchers = await t.run(async (ctx) => {
+			return await ctx.db.query("vouchers").collect();
+		});
+		expect(vouchers.length).toBe(0);
+
+		const user = await t.run(async (ctx) => {
+			return await ctx.db.get(userId);
+		});
+		expect(user?.coins).toBe(0);
+		expect(user?.uploadCount).toBeUndefined();
+
+		const errorMsg = sentMessages.find(
+			(m) =>
+				m.chatId === chatId &&
+				m.text?.includes("Voucher Processing Failed") &&
+				m.text?.includes("expired"),
+		);
+		expect(errorMsg).toBeDefined();
+	});
+
+	test("invalid type sends error message and does not create voucher", async () => {
+		setupFetchMock("invalid_type");
+		const t = convexTest(schema, modules);
+		const chatId = "123456";
+
+		const userId = await t.run(async (ctx) => {
+			return await ctx.db.insert("users", {
+				telegramChatId: chatId,
+				coins: 0,
+				isBanned: false,
+				createdAt: Date.now(),
+				lastActiveAt: Date.now(),
+			});
+		});
+
+		const imageStorageId = await t.run(async (ctx) => {
+			return await ctx.storage.store(new Blob(["fake-image"]));
+		});
+
+		const voucherId = await t.mutation(internal.vouchers.uploadVoucher, {
+			userId,
+			imageStorageId,
+		});
+
+		await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+		expect(voucherId).toBeNull();
+
+		const vouchers = await t.run(async (ctx) => {
+			return await ctx.db.query("vouchers").collect();
+		});
+		expect(vouchers.length).toBe(0);
+
+		const errorMsg = sentMessages.find(
+			(m) =>
+				m.chatId === chatId &&
+				m.text?.includes("Voucher Processing Failed") &&
+				m.text?.includes("not appear to be a valid"),
+		);
+		expect(errorMsg).toBeDefined();
+	});
+
+	test("voucher expiring today after 9 PM is rejected", async () => {
+		const t = convexTest(schema, modules);
+		const chatId = "12345";
+
+		await t.mutation(internal.users.createUserWithInvite, {
+			telegramChatId: chatId,
+			inviteCode: "TEST",
+		});
+
+		const todayStr = "2025-12-21";
+		const mockNow = new Date(`${todayStr}T21:30:00`);
+		vi.setSystemTime(mockNow);
+
+		setupFetchMock("valid_5", todayStr);
+		vi.stubEnv("GOOGLE_GENERATIVE_AI_API_KEY", "test-api-key");
+		vi.stubEnv("TELEGRAM_BOT_TOKEN", "test-bot-token");
+
+		const user = await t.query(internal.users.getUserByTelegramChatId, {
+			telegramChatId: chatId,
+		});
+
+		const imageStorageId = await t.run(async (ctx) => {
+			return await ctx.storage.store(new Blob(["fake-image"]));
+		});
+
+		const voucherId = await t.mutation(internal.vouchers.uploadVoucher, {
+			userId: user!._id,
+			imageStorageId,
+		});
+
+		await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+		expect(voucherId).toBeNull();
+
+		const vouchers = await t.run(async (ctx) => {
+			return ctx.db
+				.query("vouchers")
+				.withIndex("by_uploader", (q) => q.eq("uploaderId", user!._id))
+				.collect();
+		});
+
+		expect(vouchers.length).toBe(0);
+
+		const errorMsg = sentMessages.find(
+			(m) =>
+				m.chatId === chatId &&
+				m.text?.includes("Voucher Processing Failed") &&
+				m.text?.includes("expired"),
+		);
+		expect(errorMsg).toBeDefined();
+	});
+
+	test("duplicate barcode is rejected", async () => {
+		setupFetchMock("valid_10");
+		const t = convexTest(schema, modules);
+		const chatId = "123456";
+		const duplicateBarcode = "1234567890002";
+
+		const userId = await t.run(async (ctx) => {
+			return await ctx.db.insert("users", {
+				telegramChatId: chatId,
+				coins: 0,
+				isBanned: false,
+				createdAt: Date.now(),
+				lastActiveAt: Date.now(),
+			});
+		});
+
+		const existingImageStorageId = await t.run(async (ctx) => {
+			return await ctx.storage.store(new Blob(["existing-image"]));
 		});
 
 		await t.run(async (ctx) => {
 			await ctx.db.insert("vouchers", {
 				type: "10",
 				status: "available",
-				imageStorageId: imageStorageId1,
+				imageStorageId: existingImageStorageId,
 				uploaderId: userId,
 				expiryDate: Date.now() + 14 * 24 * 60 * 60 * 1000,
 				validFrom: Date.now() - 24 * 60 * 60 * 1000,
@@ -773,45 +804,33 @@ describe("OCR Flow with Mocked Gemini", () => {
 			});
 		});
 
-		// Simulate Telegram webhook with a photo message (like a real user uploading)
-		const telegramMessage = {
-			message_id: 12345,
-			chat: { id: Number(chatId) },
-			from: { id: 12345, username: "testuser", first_name: "Test" },
-			photo: [{ file_id: "small_photo_id", width: 100, height: 100 }],
-			date: Math.floor(Date.now() / 1000),
-		};
+		const newImageStorageId = await t.run(async (ctx) => {
+			return await ctx.storage.store(new Blob(["new-image"]));
+		});
 
-		// Call the Telegram message handler directly (simulates webhook)
-		await t.action(internal.telegram.handleTelegramMessage, {
-			message: telegramMessage,
+		const voucherId = await t.mutation(internal.vouchers.uploadVoucher, {
+			userId,
+			imageStorageId: newImageStorageId,
 		});
 
 		await t.finishAllScheduledFunctions(vi.runAllTimers);
 
-		// Find the second voucher (the duplicate one)
+		expect(voucherId).toBeNull();
+
 		const vouchers = await t.run(async (ctx) => {
 			return await ctx.db.query("vouchers").collect();
 		});
-		const duplicateVoucher = vouchers.find((v) => v.status === "expired");
-		expect(duplicateVoucher).toBeDefined();
+		expect(vouchers.length).toBe(1);
 
 		const user = await t.run(async (ctx) => {
 			return await ctx.db.get(userId);
 		});
 		expect(user?.coins).toBe(0);
 
-		// Verify the user received a message about the duplicate
-		const duplicateMessage = sentMessages.find(
-			(msg) =>
-				msg.text?.includes("already been uploaded") ||
-				msg.text?.includes("duplicate"),
+		const errorMsg = sentMessages.find(
+			(m) => m.chatId === chatId && m.text?.includes("already been uploaded"),
 		);
-		expect(duplicateMessage).toBeDefined();
-		expect(duplicateMessage?.chatId).toBe(chatId);
-
-		vi.useRealTimers();
-		vi.unstubAllEnvs();
+		expect(errorMsg).toBeDefined();
 	});
 });
 
