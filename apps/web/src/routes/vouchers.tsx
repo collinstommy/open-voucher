@@ -83,39 +83,60 @@ function VouchersPage() {
 					</DropdownMenuContent>
 				</DropdownMenu>
 			</div>
-			<div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+			<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
 				{vouchers.map((voucher) => (
-					<div
-						key={voucher._id}
-						className="group relative overflow-hidden rounded-lg border"
-					>
+					<div key={voucher._id} className="rounded-lg border p-4">
 						{voucher.imageUrl ? (
 							<img
 								src={voucher.imageUrl}
-								alt={`Voucher ${voucher.type}`}
-								className="aspect-[3/4] w-full object-cover"
+								alt="Voucher"
+								className="mb-3 h-96 w-full rounded border object-contain bg-muted"
 							/>
 						) : (
-							<div className="bg-muted flex aspect-[3/4] items-center justify-center">
-								<span className="text-muted-foreground text-sm">No image</span>
+							<div className="bg-muted mb-3 flex h-96 w-full items-center justify-center rounded">
+								<span className="text-muted-foreground text-xs">
+									No image
+								</span>
 							</div>
 						)}
-						<div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-3">
-							<div className="flex items-center justify-between text-white">
-								<span className="font-medium">${voucher.type}</span>
+						<div className="mb-3">
+							<div className="mb-2 font-medium">
+								€{voucher.type} Voucher
+							</div>
+							<div className="text-muted-foreground mb-1 text-xs font-mono">
+								Voucher ID: {voucher._id}
+							</div>
+							<div className="text-muted-foreground mb-1 text-xs font-mono">
+								Uploader: {voucher.uploaderId}
+							</div>
+							{voucher.claimerId && (
+								<div className="text-muted-foreground mb-1 text-xs font-mono">
+									Claimer: {voucher.claimerId}
+								</div>
+							)}
+							<div className="text-muted-foreground mb-1 text-sm">
+								Status:{" "}
 								<span
-									className={`rounded px-2 py-0.5 text-xs ${
+									className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
 										voucher.status === "available"
-											? "bg-green-500"
+											? "bg-green-100 text-green-800"
 											: voucher.status === "claimed"
-												? "bg-blue-500"
-												: voucher.status === "processing"
-													? "bg-yellow-500"
-													: "bg-gray-500"
+												? "bg-blue-100 text-blue-800"
+												: voucher.status === "reported"
+													? "bg-red-100 text-red-800"
+													: voucher.status === "expired"
+														? "bg-gray-100 text-gray-800"
+														: "bg-yellow-100 text-yellow-800"
 									}`}
 								>
 									{voucher.status}
 								</span>
+							</div>
+							<div className="text-muted-foreground mb-1 text-sm">
+								Expires {new Date(voucher.expiryDate).toLocaleDateString()}
+							</div>
+							<div className="text-muted-foreground text-sm">
+								Uploaded {new Date(voucher.createdAt).toLocaleString()}
 							</div>
 						</div>
 					</div>

@@ -207,6 +207,8 @@ export const getTodaysVouchers = adminQuery({
 				status: v.status,
 				createdAt: v.createdAt,
 				expiryDate: v.expiryDate,
+				uploaderId: v.uploaderId,
+				claimerId: v.claimerId,
 				imageUrl: await ctx.storage.getUrl(v.imageStorageId),
 			})),
 		);
