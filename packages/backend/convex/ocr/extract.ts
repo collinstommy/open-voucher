@@ -54,7 +54,7 @@ Extract:
 4. **Barcode**: The number below the barcode.
 
 Return ONLY JSON:
-{"type": "5", "validFrom": "2026-12-23", "expiryDate": "2026-12-31", "barcode": "1234567890"}
+{"type": "5", "validFrom": "yyyy-mm-dd", "expiryDate": "yyyy-mm-dd", "barcode": "10000000"}
 
 If barcode is missing: null.
 If type is unknown or invalid: "0".
