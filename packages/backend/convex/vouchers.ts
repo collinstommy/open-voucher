@@ -16,17 +16,12 @@ export const getVoucherByBarcode = internalQuery({
 	},
 });
 
-/**
- * Upload a new voucher image.
- * Triggers OCR and creates voucher only if valid.
- */
 export const uploadVoucher = internalMutation({
 	args: {
 		userId: v.id("users"),
 		imageStorageId: v.id("_storage"),
 	},
 	handler: async (ctx, { userId, imageStorageId }) => {
-		// Check user exists and is not banned
 		const user = await ctx.db.get(userId);
 		if (!user) {
 			throw new Error("User not found");
@@ -38,7 +33,7 @@ export const uploadVoucher = internalMutation({
 		const now = Date.now();
 		const oneDayAgo = now - 24 * 60 * 60 * 1000;
 
-		// Check upload limit (10 per 24h)
+		const MAX_DAILY_UPLOADS = 10;
 		const recentUploads = await ctx.db
 			.query("vouchers")
 			.withIndex("by_uploader_created", (q) =>
@@ -46,7 +41,7 @@ export const uploadVoucher = internalMutation({
 			)
 			.collect();
 
-		if (recentUploads.length >= 10) {
+		if (recentUploads.length >= MAX_DAILY_UPLOADS) {
 			await ctx.scheduler.runAfter(0, internal.telegram.sendMessageAction, {
 				chatId: user.telegramChatId,
 				text: "🚫 <b>Daily Upload Limit Reached</b>\n\nYou can only upload 10 vouchers per 24 hours. Please try again later.",
@@ -54,13 +49,10 @@ export const uploadVoucher = internalMutation({
 			return null;
 		}
 
-		// Increment upload counter
 		await ctx.db.patch(userId, {
 			uploadCount: (user.uploadCount || 0) + 1,
 		});
 
-		// Schedule OCR processing (runs immediately)
-		// The OCR action will extract data, validate, and create voucher if valid
 		await ctx.scheduler.runAfter(0, internal.ocr.process.processVoucherImage, {
 			userId,
 			imageStorageId,
@@ -70,10 +62,6 @@ export const uploadVoucher = internalMutation({
 	},
 });
 
-/**
- * Request a voucher.
- * Checks balance, finds available voucher, claims it, and records transaction.
- */
 export const requestVoucher = internalMutation({
 	args: {
 		userId: v.id("users"),
@@ -96,7 +84,7 @@ export const requestVoucher = internalMutation({
 		const now = Date.now();
 		const oneDayAgo = now - 24 * 60 * 60 * 1000;
 
-		// Check claim limit (5 per 24h)
+		const MAX_DAILY_CLAIMS = 5;
 		const recentClaims = await ctx.db
 			.query("vouchers")
 			.withIndex("by_claimer_claimed_at", (q) =>
@@ -104,7 +92,7 @@ export const requestVoucher = internalMutation({
 			)
 			.collect();
 
-		if (recentClaims.length >= 5) {
+		if (recentClaims.length >= MAX_DAILY_CLAIMS) {
 			return {
 				success: false,
 				error:
@@ -136,29 +124,11 @@ export const requestVoucher = internalMutation({
 			};
 		}
 
-		// Sort by expiry date ascending (soonest first)
 		const voucher = vouchers.sort((a, b) => a.expiryDate - b.expiryDate)[0];
-
-		// Deduct coins and increment claim counter
 		const newCoins = user.coins - cost;
-		await ctx.db.patch(userId, {
-			coins: newCoins,
-			claimCount: (user.claimCount || 0) + 1,
-		});
 
-		// Mark voucher as claimed
-
-		// Attempt to get image URL - if this fails, revert and error
 		const imageUrl = await ctx.storage.getUrl(voucher.imageStorageId);
 		if (!imageUrl) {
-			// Revert voucher status
-			await ctx.db.patch(voucher._id, {
-				status: "available",
-				claimerId: undefined,
-				claimedAt: undefined,
-			});
-			// Revert user coins
-			await ctx.db.patch(userId, { coins: user.coins });
 			return {
 				success: false,
 				error:
@@ -166,13 +136,17 @@ export const requestVoucher = internalMutation({
 			};
 		}
 
+		await ctx.db.patch(userId, {
+			coins: newCoins,
+			claimCount: (user.claimCount || 0) + 1,
+		});
+
 		await ctx.db.patch(voucher._id, {
 			status: "claimed",
 			claimerId: userId,
 			claimedAt: now,
 		});
 
-		// Record transaction
 		await ctx.db.insert("transactions", {
 			userId,
 			type: "claim_spend",
@@ -184,17 +158,13 @@ export const requestVoucher = internalMutation({
 		return {
 			success: true,
 			voucherId: voucher._id,
-			imageUrl, // Return the actual image URL
+			imageUrl,
 			remainingCoins: newCoins,
 			expiryDate: voucher.expiryDate,
 		};
 	},
 });
 
-/**
- * Report a voucher as not working
- * Marks as reported, checks ban threshold, and tries to send a replacement.
- */
 export const reportVoucher = internalMutation({
 	args: {
 		userId: v.id("users"),
@@ -216,8 +186,8 @@ export const reportVoucher = internalMutation({
 		}
 
 		const voucher = await ctx.db.get(voucherId);
-		if (!voucher) throw new Error("Voucher not found");
 
+		if (!voucher) throw new Error("Voucher not found");
 		if (voucher.claimerId !== user._id) {
 			throw new Error("You did not claim this voucher");
 		}
@@ -371,7 +341,6 @@ export const reportVoucher = internalMutation({
 			}
 		}
 
-		// 5. Replacement Logic (No charge)
 		// Find replacement of same type
 		const replacement = await ctx.db
 			.query("vouchers")
@@ -424,7 +393,6 @@ export const reportVoucher = internalMutation({
 				},
 			};
 		} else {
-			// Refund coins
 			await ctx.db.patch(user._id, {
 				coins: user.coins + CLAIM_COSTS[voucher.type],
 			});
@@ -444,7 +412,6 @@ export const expireOldVouchers = internalMutation({
 			.collect();
 
 		let expiredCount = 0;
-
 		for (const voucher of availableVouchers) {
 			if (voucher.expiryDate < now) {
 				await ctx.db.patch(voucher._id, { status: "expired" });
