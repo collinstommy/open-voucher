@@ -96,7 +96,7 @@ export const requestVoucher = internalMutation({
 			return {
 				success: false,
 				error:
-					"🚫 <b>Daily Claim Limit Reached</b>\n\nYou can only claim 5 vouchers per 24 hours. Please try again later.",
+					"<b>Daily Claim Limit Reached</b>\n\nYou can only claim 5 vouchers per 24 hours. Please try again later.",
 			};
 		}
 
