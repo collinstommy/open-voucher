@@ -144,8 +144,9 @@ You've been started with <b>${newUser.coins} coins</b> to get you going! 🚀
 			return;
 		}
 
-		// 4. Handle Image (Voucher Upload)
 		if (isImage) {
+			await sendTelegramMessage(chatId, "📸 Processing your voucher...");
+
 			// Telegram sends multiple sizes, take the largest (last one)
 			const photo = message.photo[message.photo.length - 1];
 			const fileId = photo.file_id;
@@ -155,7 +156,6 @@ You've been started with <b>${newUser.coins} coins</b> to get you going! 🚀
 				const imageBlob = await fetch(imageUrl).then((r) => r.blob());
 				const storageId = await ctx.storage.store(imageBlob);
 
-				// Update message with storage ID
 				if (messageDbId) {
 					await ctx.runMutation(internal.users.patchMessageImage, {
 						messageId: messageDbId,
@@ -163,17 +163,13 @@ You've been started with <b>${newUser.coins} coins</b> to get you going! 🚀
 					});
 				}
 
-				const voucherId = await ctx.runMutation(
+				await ctx.runMutation(
 					internal.vouchers.uploadVoucher,
 					{
 						userId: user._id,
 						imageStorageId: storageId,
 					},
 				);
-
-				if (voucherId) {
-					await sendTelegramMessage(chatId, "📸 Processing your voucher...");
-				}
 			} catch (e) {
 				console.error(e);
 				await sendTelegramMessage(chatId, "❌ Failed to process image.");
@@ -182,7 +178,6 @@ You've been started with <b>${newUser.coins} coins</b> to get you going! 🚀
 		}
 
 		// 5. Handle Commands
-
 		if (lowerText === "/balance" || lowerText === "balance") {
 			await sendTelegramMessage(chatId, `💰 You have ${user.coins} coins.`);
 			return;
@@ -213,11 +208,9 @@ You've been started with <b>${newUser.coins} coins</b> to get you going! 🚀
 		}
 
 		// Handle Voucher Requests
-		// Support "5", "10", "20", "claim 5", "get 10", etc.
 		const match = lowerText.match(/\b(5|10|20)\b/);
 		if (match) {
 			const type = match[1] as "5" | "10" | "20";
-			// If the user just typed a number or a simple claim phrase, assume they want that voucher
 			// We do a loose check: if message length is short (< 20 chars) and contains the number
 			if (lowerText.length < 10) {
 				const result = await ctx.runMutation(internal.vouchers.requestVoucher, {
@@ -308,7 +301,6 @@ async function sendTelegramPhoto(
 		}
 		const imageBlob = await imageRes.blob();
 
-		// 2. Construct FormData to upload the image file
 		const formData = new FormData();
 		formData.append("chat_id", chatId);
 		formData.append("photo", imageBlob, "voucher.jpg");
@@ -336,9 +328,6 @@ async function sendTelegramPhoto(
 	}
 }
 
-/**
- * Handle Telegram Callback Query (Button Press)
- */
 export const handleTelegramCallback = internalAction({
 	args: {
 		callbackQuery: v.any(),

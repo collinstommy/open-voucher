@@ -102,6 +102,16 @@ export const getUserByTelegramChatId = internalQuery({
 });
 
 /**
+ * Get user by ID.
+ */
+export const getUserById = internalQuery({
+	args: { userId: v.id("users") },
+	handler: async (ctx, { userId }) => {
+		return await ctx.db.get(userId);
+	},
+});
+
+/**
  * Create a new user with a validated invite code.
  * Internal mutation.
  */
