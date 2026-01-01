@@ -615,3 +615,88 @@ export const backfillUserStats = internalMutation({
 		};
 	},
 });
+
+export const clearUserData = internalMutation({
+	args: {
+		userId: v.id("users"),
+	},
+	handler: async (ctx, { userId }) => {
+		const isDevelopment = process.env.ENVIRONMENT === "development";
+
+		if (!isDevelopment) {
+			throw new Error(
+				"clearUserData is only available in development. This operation is blocked in production.",
+			);
+		}
+
+		const user = await ctx.db.get(userId);
+		if (!user) {
+			throw new Error("User not found");
+		}
+
+		const uploadedVouchers = await ctx.db
+			.query("vouchers")
+			.withIndex("by_uploader", (q) => q.eq("uploaderId", userId))
+			.collect();
+
+		for (const voucher of uploadedVouchers) {
+			await ctx.db.delete(voucher._id);
+		}
+
+		const claimedVouchers = await ctx.db
+			.query("vouchers")
+			.filter((q) => q.eq(q.field("claimerId"), userId))
+			.collect();
+
+		for (const voucher of claimedVouchers) {
+			await ctx.db.delete(voucher._id);
+		}
+
+		const reportsFiled = await ctx.db
+			.query("reports")
+			.withIndex("by_reporterId", (q) => q.eq("reporterId", userId))
+			.collect();
+
+		for (const report of reportsFiled) {
+			await ctx.db.delete(report._id);
+		}
+
+		const reportsAgainstUploads = await ctx.db
+			.query("reports")
+			.withIndex("by_uploader", (q) => q.eq("uploaderId", userId))
+			.collect();
+
+		for (const report of reportsAgainstUploads) {
+			await ctx.db.delete(report._id);
+		}
+
+		const transactions = await ctx.db
+			.query("transactions")
+			.withIndex("by_user", (q) => q.eq("userId", userId))
+			.collect();
+
+		for (const transaction of transactions) {
+			await ctx.db.delete(transaction._id);
+		}
+
+		await ctx.db.patch(userId, {
+			uploadCount: 0,
+			claimCount: 0,
+			uploadReportCount: 0,
+			claimReportCount: 0,
+		});
+
+		console.log(`Cleared all data for user ${userId} (${user.username})`);
+
+		return {
+			success: true,
+			deletedCounts: {
+				uploadedVouchers: uploadedVouchers.length,
+				claimedVouchers: claimedVouchers.length,
+				reportsFiled: reportsFiled.length,
+				reportsAgainstUploads: reportsAgainstUploads.length,
+				transactions: transactions.length,
+			},
+		};
+	},
+});

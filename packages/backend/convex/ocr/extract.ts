@@ -5,7 +5,8 @@ import { internalAction } from "../_generated/server";
 
 type ExtractedData = {
 	type: number;
-	validFrom?: string;
+	validFromDay?: number;
+	validFromMonth?: number;
 	expiryDate?: string;
 	barcode?: string;
 };
@@ -44,21 +45,24 @@ The current year is ${currentYear}.
 The date format on the voucher can vary, examples:
 - Valid 23 Nov - 29 Nov
 - Coupon valid from 23/11/25 to 29/11/25
+- Expires 04-01-2025, Valid 18 Dec - 4 Jan
+- Expires Monday, Valid 30 Dec - 5 Jan
 
-Where year is not specified, assume it is the current year.
+IMPORTANT: Extract dates from the validity range (e.g., "Valid 30 Dec - 5 Jan"). If there's a conflict between a relative date like "Expires Monday" and an explicit date range, USE THE DATE RANGE.
 
 Extract:
 1. **Type**: The discount amount (5, 10, or 20). If it is NOT one of these specific amounts, return "0".
-2. **ValidFrom**: The start date of validity period in YYYY-MM-DD format (e.g., in "Valid 23 Nov - 29 Nov", extract 23 Nov).
-3. **Expiry**: The end date of validity period in YYYY-MM-DD format (e.g., in "Valid 23 Nov - 29 Nov", extract 29 Nov).
-4. **Barcode**: The number below the barcode.
+2. **validFromDay**: The day of the month for the start date (e.g., in "Valid 30 Dec - 5 Jan", extract 30).
+3. **validFromMonth**: The month number for the start date (e.g., in "Valid 30 Dec - 5 Jan", extract 12 for December).
+4. **expiryDate**: Extract from the END of the validity range. If there's a full date with year (e.g., "Expires 04-01-2025"), use that. Otherwise, use the end date from the range (e.g., "Valid 30 Dec - 5 Jan" → use 5 Jan) and convert to YYYY-MM-DD using current year ${currentYear}.
+5. **Barcode**: The number below the barcode.
 
 Return ONLY JSON:
-{"type": "5", "validFrom": "yyyy-mm-dd", "expiryDate": "yyyy-mm-dd", "barcode": "10000000"}
+{"type": "10", "validFromDay": 1, "validFromMonth": 1, "expiryDate": "2025-01-04", "barcode": "1234567890"}
 
 If barcode is missing: null.
 If type is unknown or invalid: "0".
-If validFrom is unknown: null.
+If validFromDay or validFromMonth is unknown: null.
 If expiry is unknown: null.`;
 
 		const response = await fetch(
@@ -103,12 +107,36 @@ If expiry is unknown: null.`;
 		}
 
 		const extracted: ExtractedData = JSON.parse(textContent);
-		console.log("Extracted:", extracted);
+		console.log("Extracted (raw):", extracted);
+
+		let validFrom: string | undefined;
+		const expiryDate = extracted.expiryDate;
+
+		if (extracted.validFromDay && extracted.validFromMonth && expiryDate) {
+			const expiryDateParsed = dayjs(expiryDate);
+			const expiryYear = expiryDateParsed.year();
+
+			let validFromDate = dayjs()
+				.year(expiryYear)
+				.month(extracted.validFromMonth - 1) // dayjs months are 0-indexed
+				.date(extracted.validFromDay)
+				.startOf('day');
+
+			// If validFrom is chronologically after expiryDate, use previous year
+			if (validFromDate.isAfter(expiryDateParsed)) {
+				validFromDate = validFromDate.subtract(1, 'year');
+				console.log(`Adjusted validFrom year to ${validFromDate.year()} (crosses year boundary)`);
+			}
+
+			validFrom = validFromDate.format('YYYY-MM-DD');
+		}
+
+		console.log("Extracted (final):", { type: extracted.type, validFrom, expiryDate, barcode: extracted.barcode });
 
 		return {
 			type: extracted.type,
-			validFrom: extracted.validFrom,
-			expiryDate: extracted.expiryDate,
+			validFrom,
+			expiryDate,
 			barcode: extracted.barcode,
 			rawResponse,
 		};
