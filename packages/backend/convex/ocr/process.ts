@@ -34,6 +34,14 @@ export const processVoucherImage = internalAction({
 		} catch (error: any) {
 			console.error("OCR system error:", { userId, imageStorageId, error });
 
+			const errorMessage = error?.message || String(error);
+
+			await ctx.runMutation(internal.ocr.store.recordSystemError, {
+				userId,
+				imageStorageId,
+				errorMessage: errorMessage.substring(0, 1000),
+			});
+
 			const user = await ctx.runQuery(internal.users.getUserById, { userId });
 			if (user) {
 				await ctx.scheduler.runAfter(0, internal.telegram.sendMessageAction, {

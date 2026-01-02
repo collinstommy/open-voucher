@@ -102,6 +102,21 @@ export default defineSchema({
 		createdAt: v.number(),
 	}).index("by_user", ["userId"]),
 
+	failedUploads: defineTable({
+		userId: v.id("users"),
+		imageStorageId: v.id("_storage"),
+		failureType: v.union(v.literal("validation"), v.literal("system")),
+		failureReason: v.string(),
+		errorMessage: v.optional(v.string()),
+		// OCR data (partial/missing for system errors)
+		rawOcrResponse: v.optional(v.string()),
+		extractedType: v.optional(v.string()),
+		extractedBarcode: v.optional(v.string()),
+		extractedExpiryDate: v.optional(v.string()),
+		extractedValidFrom: v.optional(v.string()),
+	})
+		.index("by_user", ["userId"])
+		.index("by_failure_reason", ["failureReason"]),
 	feedback: defineTable({
 		userId: v.id("users"),
 		text: v.string(),

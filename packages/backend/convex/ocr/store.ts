@@ -1,11 +1,13 @@
 import { v } from "convex/values";
 import { internal } from "../_generated/api";
-import { internalMutation } from "../_generated/server";
+import { internalMutation, MutationCtx } from "../_generated/server";
 import { UPLOAD_REWARDS, MAX_COINS } from "../constants";
 import dayjs from "dayjs";
+import type { Id } from "../_generated/dataModel";
 
 type VoucherOcrFailureReason =
 	| "EXPIRED"
+	| "TOO_LATE_TODAY"
 	| "COULD_NOT_READ_AMOUNT"
 	| "COULD_NOT_READ_BARCODE"
 	| "COULD_NOT_READ_EXPIRY_DATE"
@@ -13,6 +15,26 @@ type VoucherOcrFailureReason =
 	| "INVALID_TYPE"
 	| "DUPLICATE_BARCODE"
 	| "UNKNOWN_ERROR";
+
+async function recordFailedUpload(
+	ctx: MutationCtx,
+	userId: Id<"users">,
+	imageStorageId: Id<"_storage">,
+	reason: VoucherOcrFailureReason,
+	ocrData: { rawResponse: string; type?: string; barcode?: string; expiryDate?: string; validFrom?: string }
+) {
+	await ctx.db.insert("failedUploads", {
+		userId,
+		imageStorageId,
+		failureType: "validation" as const,
+		failureReason: reason,
+		rawOcrResponse: ocrData.rawResponse,
+		extractedType: ocrData.type,
+		extractedBarcode: ocrData.barcode,
+		extractedExpiryDate: ocrData.expiryDate,
+		extractedValidFrom: ocrData.validFrom,
+	});
+}
 
 export const storeVoucherFromOcr = internalMutation({
 	args: {
@@ -46,6 +68,9 @@ export const storeVoucherFromOcr = internalMutation({
 		const expiryDateMs = dayjsExpiry.endOf("day").valueOf();
 
 		if (!validFrom) {
+			await recordFailedUpload(ctx, userId, imageStorageId, "COULD_NOT_READ_VALID_FROM", {
+				rawResponse, type, barcode, expiryDate, validFrom
+			});
 			await sendErrorMessage(ctx, user.telegramChatId, "COULD_NOT_READ_VALID_FROM");
 			return { success: false, reason: "COULD_NOT_READ_VALID_FROM" };
 		}
@@ -54,31 +79,49 @@ export const storeVoucherFromOcr = internalMutation({
 		const isValidFromValid = dayjsValidFrom.isValid() && dayjsValidFrom.valueOf() > oneYearAgo;
 
 		if (!isValidType) {
+			await recordFailedUpload(ctx, userId, imageStorageId, "INVALID_TYPE", {
+				rawResponse, type, barcode, expiryDate, validFrom
+			});
 			await sendErrorMessage(ctx, user.telegramChatId, "INVALID_TYPE");
 			return { success: false, reason: "INVALID_TYPE" };
 		}
 
 		if (!isValidFromValid) {
+			await recordFailedUpload(ctx, userId, imageStorageId, "COULD_NOT_READ_VALID_FROM", {
+				rawResponse, type, barcode, expiryDate, validFrom
+			});
 			await sendErrorMessage(ctx, user.telegramChatId, "COULD_NOT_READ_VALID_FROM");
 			return { success: false, reason: "COULD_NOT_READ_VALID_FROM" };
 		}
 
 		if (!isExpiryDateValid) {
+			await recordFailedUpload(ctx, userId, imageStorageId, "COULD_NOT_READ_EXPIRY_DATE", {
+				rawResponse, type, barcode, expiryDate, validFrom
+			});
 			await sendErrorMessage(ctx, user.telegramChatId, "COULD_NOT_READ_EXPIRY_DATE");
 			return { success: false, reason: "COULD_NOT_READ_EXPIRY_DATE" };
 		}
 
 		if (isAlreadyExpired) {
+			await recordFailedUpload(ctx, userId, imageStorageId, "EXPIRED", {
+				rawResponse, type, barcode, expiryDate, validFrom
+			});
 			await sendErrorMessage(ctx, user.telegramChatId, "EXPIRED", expiryDateMs);
 			return { success: false, reason: "EXPIRED", expiryDate: expiryDateMs };
 		}
 
 		if (isTooLateToday) {
-			await sendErrorMessage(ctx, user.telegramChatId, "EXPIRED", expiryDateMs);
-			return { success: false, reason: "EXPIRED", expiryDate: expiryDateMs };
+			await recordFailedUpload(ctx, userId, imageStorageId, "TOO_LATE_TODAY", {
+				rawResponse, type, barcode, expiryDate, validFrom
+			});
+			await sendErrorMessage(ctx, user.telegramChatId, "TOO_LATE_TODAY", expiryDateMs);
+			return { success: false, reason: "TOO_LATE_TODAY", expiryDate: expiryDateMs };
 		}
 
 		if (!barcode) {
+			await recordFailedUpload(ctx, userId, imageStorageId, "COULD_NOT_READ_BARCODE", {
+				rawResponse, type, barcode, expiryDate, validFrom
+			});
 			await sendErrorMessage(ctx, user.telegramChatId, "COULD_NOT_READ_BARCODE");
 			return { success: false, reason: "COULD_NOT_READ_BARCODE" };
 		}
@@ -89,6 +132,9 @@ export const storeVoucherFromOcr = internalMutation({
 		.first();
 
 		if (existing) {
+			await recordFailedUpload(ctx, userId, imageStorageId, "DUPLICATE_BARCODE", {
+				rawResponse, type, barcode, expiryDate, validFrom
+			});
 			await sendErrorMessage(ctx, user.telegramChatId, "DUPLICATE_BARCODE");
 			return { success: false, reason: "DUPLICATE_BARCODE" };
 		}
@@ -154,6 +200,10 @@ async function sendErrorMessage(
 			const dateStr = expiryDate ? dayjs(expiryDate).format("DD-MM-YYYY") : "unknown";
 			message += `This voucher expired on ${dateStr}.`;
 			break;
+		case "TOO_LATE_TODAY":
+			const todayDateStr = expiryDate ? dayjs(expiryDate).format("DD-MM-YYYY") : "today";
+			message += `This voucher expires ${todayDateStr}, but it's after 9 PM. Vouchers expiring today can only be uploaded before 9 PM.`;
+			break;
 		case "INVALID_TYPE":
 			message += `This voucher does not appear to be a valid €5, €10, or €20 Dunnes voucher. We only accept these specific general spend vouchers.`;
 			break;
@@ -169,3 +219,20 @@ async function sendErrorMessage(
 		text: message,
 	});
 }
+
+export const recordSystemError = internalMutation({
+	args: {
+		userId: v.id("users"),
+		imageStorageId: v.id("_storage"),
+		errorMessage: v.string(),
+	},
+	handler: async (ctx, args) => {
+		await ctx.db.insert("failedUploads", {
+			userId: args.userId,
+			imageStorageId: args.imageStorageId,
+			failureType: "system",
+			failureReason: "SYSTEM_ERROR",
+			errorMessage: args.errorMessage,
+		});
+	},
+});
