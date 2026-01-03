@@ -16,7 +16,6 @@ export const CLAIM_COSTS: Record<string, number> = {
 export const SIGNUP_BONUS = 10;
 
 // Coin limits
-export const MAX_COINS = 100;
 export const MIN_COINS = 0;
 
 // Valid voucher types

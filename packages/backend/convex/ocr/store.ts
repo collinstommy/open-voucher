@@ -1,9 +1,9 @@
 import { v } from "convex/values";
-import { internal } from "../_generated/api";
-import { internalMutation, MutationCtx } from "../_generated/server";
-import { UPLOAD_REWARDS, MAX_COINS } from "../constants";
 import dayjs from "dayjs";
+import { internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
+import { internalMutation, MutationCtx } from "../_generated/server";
+import { UPLOAD_REWARDS } from "../constants";
 
 type VoucherOcrFailureReason =
 	| "EXPIRED"
@@ -67,17 +67,11 @@ export const storeVoucherFromOcr = internalMutation({
 		const isTooLateToday = dayjsExpiry.isSame(now, "day") && now.hour() >= 21;
 		const expiryDateMs = dayjsExpiry.endOf("day").valueOf();
 
-		if (!validFrom) {
-			await recordFailedUpload(ctx, userId, imageStorageId, "COULD_NOT_READ_VALID_FROM", {
-				rawResponse, type, barcode, expiryDate, validFrom
-			});
-			await sendErrorMessage(ctx, user.telegramChatId, "COULD_NOT_READ_VALID_FROM");
-			return { success: false, reason: "COULD_NOT_READ_VALID_FROM" };
-		}
+		// Parse validFrom for later validation
+		const dayjsValidFrom = dayjs(validFrom);
+		const isValidFromValid = validFrom && dayjsValidFrom.isValid() && dayjsValidFrom.valueOf() > oneYearAgo;
 
-		const dayjsValidFrom =  dayjs(validFrom);
-		const isValidFromValid = dayjsValidFrom.isValid() && dayjsValidFrom.valueOf() > oneYearAgo;
-
+		// 1. Check type validity first
 		if (!isValidType) {
 			await recordFailedUpload(ctx, userId, imageStorageId, "INVALID_TYPE", {
 				rawResponse, type, barcode, expiryDate, validFrom
@@ -86,14 +80,7 @@ export const storeVoucherFromOcr = internalMutation({
 			return { success: false, reason: "INVALID_TYPE" };
 		}
 
-		if (!isValidFromValid) {
-			await recordFailedUpload(ctx, userId, imageStorageId, "COULD_NOT_READ_VALID_FROM", {
-				rawResponse, type, barcode, expiryDate, validFrom
-			});
-			await sendErrorMessage(ctx, user.telegramChatId, "COULD_NOT_READ_VALID_FROM");
-			return { success: false, reason: "COULD_NOT_READ_VALID_FROM" };
-		}
-
+		// 2. Check expiry date validity
 		if (!isExpiryDateValid) {
 			await recordFailedUpload(ctx, userId, imageStorageId, "COULD_NOT_READ_EXPIRY_DATE", {
 				rawResponse, type, barcode, expiryDate, validFrom
@@ -116,6 +103,22 @@ export const storeVoucherFromOcr = internalMutation({
 			});
 			await sendErrorMessage(ctx, user.telegramChatId, "TOO_LATE_TODAY", expiryDateMs);
 			return { success: false, reason: "TOO_LATE_TODAY", expiryDate: expiryDateMs };
+		}
+
+		if (!validFrom) {
+			await recordFailedUpload(ctx, userId, imageStorageId, "COULD_NOT_READ_VALID_FROM", {
+				rawResponse, type, barcode, expiryDate, validFrom
+			});
+			await sendErrorMessage(ctx, user.telegramChatId, "COULD_NOT_READ_VALID_FROM");
+			return { success: false, reason: "COULD_NOT_READ_VALID_FROM" };
+		}
+
+		if (!isValidFromValid) {
+			await recordFailedUpload(ctx, userId, imageStorageId, "COULD_NOT_READ_VALID_FROM", {
+				rawResponse, type, barcode, expiryDate, validFrom
+			});
+			await sendErrorMessage(ctx, user.telegramChatId, "COULD_NOT_READ_VALID_FROM");
+			return { success: false, reason: "COULD_NOT_READ_VALID_FROM" };
 		}
 
 		if (!barcode) {
@@ -153,7 +156,7 @@ export const storeVoucherFromOcr = internalMutation({
 		});
 
 		const reward = UPLOAD_REWARDS[type];
-		const newCoins = Math.min(MAX_COINS, user.coins + reward);
+    const newCoins = user.coins + reward;
 		await ctx.db.patch(userId, {
 			coins: newCoins,
 			uploadCount: (user.uploadCount || 0) + 1,

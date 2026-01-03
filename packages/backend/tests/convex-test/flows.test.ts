@@ -13,10 +13,11 @@ import schema from "../../convex/schema";
 import { modules } from "../test.setup";
 
 function mockGeminiResponse(
-	type: string,
-	validFrom: string,
-	expiryDate: string,
-	barcode: string,
+	type: string | number,
+	validFromDay: number | null,
+	validFromMonth: number | null,
+	expiryDate: string | null,
+	barcode: string | null,
 ) {
 	return {
 		candidates: [
@@ -24,7 +25,13 @@ function mockGeminiResponse(
 				content: {
 					parts: [
 						{
-							text: JSON.stringify({ type, validFrom, expiryDate, barcode }),
+							text: JSON.stringify({
+								type,
+								validFromDay,
+								validFromMonth,
+								expiryDate,
+								barcode,
+							}),
 						},
 					],
 				},
@@ -44,7 +51,13 @@ type OCRSenario =
 	| "valid_5"
 	| "valid_20"
 	| "expired"
-	| "invalid_type";
+	| "invalid_type"
+	| "missing_valid_from"
+	| "invalid_valid_from"
+	| "missing_expiry"
+	| "missing_barcode"
+	| "too_late_today"
+	| "gemini_api_error";
 
 // Helper to create a text message
 function createTelegramMessage(
@@ -106,23 +119,41 @@ function setupFetchMock(
 
 	const validFromDate = new Date();
 	validFromDate.setDate(validFromDate.getDate() - 1); // Started yesterday
-	const validFromStr = validFromDate.toISOString().split("T")[0];
+	const validFromDay = validFromDate.getDate();
+	const validFromMonth = validFromDate.getMonth() + 1; // JS months are 0-indexed
 
 	const pastDate = new Date();
 	pastDate.setDate(pastDate.getDate() - 7);
 	const pastDateStr = pastDate.toISOString().split("T")[0];
 
+	const todayDate = new Date();
+	const todayDateStr = todayDate.toISOString().split("T")[0];
+
+	// For testing old validFrom: we need a validFrom that will be >1 year old
+	// even after the extraction logic adjusts the year based on expiry
+	// Today is 2026-01-03, so >1 year ago is before 2025-01-03
+	// Use a date well before that to ensure it's definitely >1 year old
+	const veryOldDay = 1;
+	const veryOldMonth = 12; // December of previous year
+
+	// Use an expiry date at end of current year (will be >1 year after validFrom)
+	const expiryForOldValidFrom = new Date();
+	expiryForOldValidFrom.setMonth(11); // December (0-indexed)
+	expiryForOldValidFrom.setDate(31);
+	const expiryForOldValidFromStr = expiryForOldValidFrom.toISOString().split("T")[0];
+
 	const scenarios = {
-		valid_5: mockGeminiResponse(
-			"5",
-			validFromStr,
-			customExpiryDate || futureDateStr,
-			"1234567890001",
-		),
-		valid_10: mockGeminiResponse("10", validFromStr, futureDateStr, "1234567890002"),
-		valid_20: mockGeminiResponse("20", validFromStr, futureDateStr, "1234567890003"),
-		expired: mockGeminiResponse("10", validFromStr, pastDateStr, "1234567890004"),
-		invalid_type: mockGeminiResponse("0", validFromStr, futureDateStr, "1234567890005"),
+		valid_5: mockGeminiResponse(5, validFromDay, validFromMonth, customExpiryDate || futureDateStr, "1234567890001"),
+		valid_10: mockGeminiResponse(10, validFromDay, validFromMonth, futureDateStr, "1234567890002"),
+		valid_20: mockGeminiResponse(20, validFromDay, validFromMonth, futureDateStr, "1234567890003"),
+		expired: mockGeminiResponse(10, validFromDay, validFromMonth, pastDateStr, "1234567890004"),
+		invalid_type: mockGeminiResponse(0, validFromDay, validFromMonth, futureDateStr, "1234567890005"),
+		missing_valid_from: mockGeminiResponse(10, null, null, futureDateStr, "1234567890006"),
+		invalid_valid_from: mockGeminiResponse(10, veryOldDay, veryOldMonth, expiryForOldValidFromStr, "1234567890007"),
+		missing_expiry: mockGeminiResponse(10, validFromDay, validFromMonth, null, "1234567890008"),
+		missing_barcode: mockGeminiResponse(10, validFromDay, validFromMonth, futureDateStr, null),
+		too_late_today: mockGeminiResponse(10, validFromDay, validFromMonth, todayDateStr, "1234567890010"),
+		gemini_api_error: null, // Will throw error instead of returning mock
 	};
 
 	vi.stubGlobal(
@@ -193,6 +224,9 @@ function setupFetchMock(
 
 			// Mock Gemini OCR
 			if (url.includes("generativelanguage.googleapis.com")) {
+				if (geminiScenario === "gemini_api_error") {
+					throw new Error("Gemini API error");
+				}
 				return {
 					ok: true,
 					json: async () => scenarios[geminiScenario],
@@ -591,7 +625,7 @@ describe("OCR Flow with Mocked Gemini", () => {
 		await t.mutation(internal.ocr.store.storeVoucherFromOcr, {
 			userId,
 			imageStorageId,
-			type: 10,
+			type: "10",
 			expiryDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
 			validFrom: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
 			barcode: "1234567890",
@@ -654,7 +688,7 @@ describe("OCR Flow with Mocked Gemini", () => {
 		await t.mutation(internal.ocr.store.storeVoucherFromOcr, {
 			userId,
 			imageStorageId,
-			type: 10,
+			type: "10",
 			expiryDate: pastDate,
 			barcode: "1234567890",
 			rawResponse: "{}",
@@ -682,16 +716,16 @@ describe("OCR Flow with Mocked Gemini", () => {
 		const t = convexTest(schema, modules);
 		const chatId = "12345";
 
+		const todayStr = "2025-12-21";
+		const mockNow = new Date(`${todayStr}T21:30:00`);
+		vi.useFakeTimers();
+		vi.setSystemTime(mockNow);
+
 		// Create user
 		await t.mutation(internal.users.createUserWithInvite, {
 			telegramChatId: chatId,
 			inviteCode: "TEST",
 		});
-
-		// Set fixed date for test: 2025-12-21 21:30:00
-		const todayStr = "2025-12-21";
-		const mockNow = new Date(`${todayStr}T21:30:00`);
-		vi.setSystemTime(mockNow);
 
 		// Mock response with expiration date set to today
 		setupFetchMock("valid_5", todayStr);
@@ -728,7 +762,7 @@ describe("OCR Flow with Mocked Gemini", () => {
 			(m) =>
 				m.chatId === chatId &&
 				m.text?.includes("Voucher Processing Failed") &&
-				m.text?.includes("This voucher expired on 21-12-2025"),
+				m.text?.includes("Vouchers expiring today can only be uploaded before 9 PM"),
 		);
 
 		expect(failureMessage).toBeDefined();
@@ -1736,5 +1770,709 @@ describe("Ban Flow Tests", () => {
 		});
 		expect(uploader?.isBanned).toBe(false);
 		vi.useRealTimers();
+	});
+});
+
+describe("Failed Uploads", () => {
+	beforeEach(() => {
+		vi.stubEnv("TELEGRAM_BOT_TOKEN", "test-bot-token");
+		vi.stubEnv("GOOGLE_GENERATIVE_AI_API_KEY", "test-api-key");
+	});
+
+	afterEach(() => {
+		vi.unstubAllGlobals();
+		vi.unstubAllEnvs();
+		vi.useRealTimers();
+	});
+
+	describe("Validation Failures", () => {
+		test("records COULD_NOT_READ_VALID_FROM when validFrom missing", async () => {
+			vi.useFakeTimers();
+			setupFetchMock("missing_valid_from");
+			const t = convexTest(schema, modules);
+			const chatId = "123456789";
+
+			// Create invite code and user
+			await t.run(async (ctx) => {
+				await ctx.db.insert("inviteCodes", {
+					code: "TESTCODE",
+					maxUses: 100,
+					usedCount: 0,
+					createdAt: Date.now(),
+				});
+			});
+
+			await t.action(internal.telegram.handleTelegramMessage, {
+				message: createTelegramMessage("code TESTCODE", chatId),
+			});
+
+			const user = await t.query(internal.users.getUserByTelegramChatId, {
+				telegramChatId: chatId,
+			});
+			expect(user).toBeDefined();
+
+			const userId = user!._id;
+			const imageStorageId = await t.run(async (ctx) => {
+				return await ctx.storage.store(new Blob(["fake-image"]));
+			});
+
+			const initialUploadCount = user!.uploadCount || 0;
+
+			// Clear messages from user creation
+			sentMessages = [];
+
+			// Upload voucher
+			await t.mutation(internal.vouchers.uploadVoucher, {
+				userId,
+				imageStorageId,
+			});
+
+			await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+			// Verify failedUpload created
+			const failedUploads = await t.run(async (ctx) => {
+				return await ctx.db.query("failedUploads").collect();
+			});
+
+			expect(failedUploads).toHaveLength(1);
+			expect(failedUploads[0]).toMatchObject({
+				userId,
+				imageStorageId,
+				failureType: "validation",
+				failureReason: "COULD_NOT_READ_VALID_FROM",
+				extractedType: "10",
+				extractedBarcode: "1234567890006",
+				extractedExpiryDate: expect.any(String),
+			});
+			expect(failedUploads[0].extractedValidFrom).toBeUndefined();
+
+			// Verify no voucher created
+			const vouchers = await t.run(async (ctx) => {
+				return await ctx.db.query("vouchers").collect();
+			});
+			expect(vouchers).toHaveLength(0);
+
+			// Verify uploadCount NOT incremented
+			const updatedUser = await t.run(async (ctx) => {
+				return await ctx.db.get(userId);
+			});
+			expect(updatedUser?.uploadCount || 0).toBe(initialUploadCount);
+
+			// Verify error message sent
+			expect(sentMessages).toHaveLength(1);
+			expect(sentMessages[0].text).toContain("valid from date");
+		});
+
+		// Note: We don't test "validFrom >1 year old" because the extraction logic
+		// in extract.ts normalizes the validFrom year to match the expiry year,
+		// which prevents this scenario from occurring in practice.
+
+		test("records INVALID_TYPE when type is not 5, 10, or 20", async () => {
+			vi.useFakeTimers();
+			setupFetchMock("invalid_type");
+			const t = convexTest(schema, modules);
+			const chatId = "111222333";
+
+			await t.run(async (ctx) => {
+				await ctx.db.insert("inviteCodes", {
+					code: "TEST3",
+					maxUses: 100,
+					usedCount: 0,
+					createdAt: Date.now(),
+				});
+			});
+
+			await t.action(internal.telegram.handleTelegramMessage, {
+				message: createTelegramMessage("code TEST3", chatId),
+			});
+
+			const user = await t.query(internal.users.getUserByTelegramChatId, {
+				telegramChatId: chatId,
+			});
+
+			const userId = user!._id;
+			const imageStorageId = await t.run(async (ctx) => {
+				return await ctx.storage.store(new Blob(["fake-image"]));
+			});
+
+			// Clear messages from user creation
+			sentMessages = [];
+
+			await t.mutation(internal.vouchers.uploadVoucher, {
+				userId,
+				imageStorageId,
+			});
+
+			await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+			const failedUploads = await t.run(async (ctx) => {
+				return await ctx.db.query("failedUploads").collect();
+			});
+
+			expect(failedUploads).toHaveLength(1);
+			expect(failedUploads[0]).toMatchObject({
+				failureType: "validation",
+				failureReason: "INVALID_TYPE",
+				extractedType: "0",
+			});
+
+			expect(sentMessages[0].text).toContain("€5, €10, or €20 Dunnes voucher");
+		});
+
+		test("records COULD_NOT_READ_EXPIRY_DATE when expiry date missing", async () => {
+			vi.useFakeTimers();
+			setupFetchMock("missing_expiry");
+			const t = convexTest(schema, modules);
+			const chatId = "444555666";
+
+			await t.run(async (ctx) => {
+				await ctx.db.insert("inviteCodes", {
+					code: "TEST4",
+					maxUses: 100,
+					usedCount: 0,
+					createdAt: Date.now(),
+				});
+			});
+
+			await t.action(internal.telegram.handleTelegramMessage, {
+				message: createTelegramMessage("code TEST4", chatId),
+			});
+
+			const user = await t.query(internal.users.getUserByTelegramChatId, {
+				telegramChatId: chatId,
+			});
+
+			const userId = user!._id;
+			const imageStorageId = await t.run(async (ctx) => {
+				return await ctx.storage.store(new Blob(["fake-image"]));
+			});
+
+			// Clear messages from user creation
+			sentMessages = [];
+
+			await t.mutation(internal.vouchers.uploadVoucher, {
+				userId,
+				imageStorageId,
+			});
+
+			await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+			const failedUploads = await t.run(async (ctx) => {
+				return await ctx.db.query("failedUploads").collect();
+			});
+
+			expect(failedUploads).toHaveLength(1);
+			expect(failedUploads[0]).toMatchObject({
+				failureType: "validation",
+				failureReason: "COULD_NOT_READ_EXPIRY_DATE",
+			});
+
+			expect(sentMessages[0].text).toContain("expiry date");
+		});
+
+		test("records EXPIRED when voucher already expired", async () => {
+			vi.useFakeTimers();
+			setupFetchMock("expired");
+			const t = convexTest(schema, modules);
+			const chatId = "777888999";
+
+			await t.run(async (ctx) => {
+				await ctx.db.insert("inviteCodes", {
+					code: "TEST5",
+					maxUses: 100,
+					usedCount: 0,
+					createdAt: Date.now(),
+				});
+			});
+
+			await t.action(internal.telegram.handleTelegramMessage, {
+				message: createTelegramMessage("code TEST5", chatId),
+			});
+
+			const user = await t.query(internal.users.getUserByTelegramChatId, {
+				telegramChatId: chatId,
+			});
+
+			const userId = user!._id;
+			const imageStorageId = await t.run(async (ctx) => {
+				return await ctx.storage.store(new Blob(["fake-image"]));
+			});
+
+			// Clear messages from user creation
+			sentMessages = [];
+
+			await t.mutation(internal.vouchers.uploadVoucher, {
+				userId,
+				imageStorageId,
+			});
+
+			await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+			const failedUploads = await t.run(async (ctx) => {
+				return await ctx.db.query("failedUploads").collect();
+			});
+
+			expect(failedUploads).toHaveLength(1);
+			expect(failedUploads[0]).toMatchObject({
+				failureType: "validation",
+				failureReason: "EXPIRED",
+			});
+
+			expect(sentMessages[0].text).toContain("expired");
+		});
+
+		test("records TOO_LATE_TODAY when voucher expires today after 9 PM", async () => {
+			vi.useFakeTimers();
+			setupFetchMock("too_late_today");
+			const t = convexTest(schema, modules);
+
+			// Set time to 21:30 (9:30 PM)
+			const now = new Date();
+			now.setHours(21, 30, 0, 0);
+			vi.useFakeTimers({ now: now.getTime() });
+
+			const chatId = "101010101";
+
+			await t.run(async (ctx) => {
+				await ctx.db.insert("inviteCodes", {
+					code: "TEST6",
+					maxUses: 100,
+					usedCount: 0,
+					createdAt: Date.now(),
+				});
+			});
+
+			await t.action(internal.telegram.handleTelegramMessage, {
+				message: createTelegramMessage("code TEST6", chatId),
+			});
+
+			const user = await t.query(internal.users.getUserByTelegramChatId, {
+				telegramChatId: chatId,
+			});
+
+			const userId = user!._id;
+			const imageStorageId = await t.run(async (ctx) => {
+				return await ctx.storage.store(new Blob(["fake-image"]));
+			});
+
+			// Clear messages from user creation
+			sentMessages = [];
+
+			await t.mutation(internal.vouchers.uploadVoucher, {
+				userId,
+				imageStorageId,
+			});
+
+			await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+			const failedUploads = await t.run(async (ctx) => {
+				return await ctx.db.query("failedUploads").collect();
+			});
+
+			expect(failedUploads).toHaveLength(1);
+			expect(failedUploads[0]).toMatchObject({
+				failureType: "validation",
+				failureReason: "TOO_LATE_TODAY",
+			});
+
+			expect(sentMessages[0].text).toContain("after 9 PM");
+		});
+
+		test("records COULD_NOT_READ_BARCODE when barcode missing", async () => {
+			vi.useFakeTimers();
+			setupFetchMock("missing_barcode");
+			const t = convexTest(schema, modules);
+			const chatId = "202020202";
+
+			await t.run(async (ctx) => {
+				await ctx.db.insert("inviteCodes", {
+					code: "TEST7",
+					maxUses: 100,
+					usedCount: 0,
+					createdAt: Date.now(),
+				});
+			});
+
+			await t.action(internal.telegram.handleTelegramMessage, {
+				message: createTelegramMessage("code TEST7", chatId),
+			});
+
+			const user = await t.query(internal.users.getUserByTelegramChatId, {
+				telegramChatId: chatId,
+			});
+
+			const userId = user!._id;
+			const imageStorageId = await t.run(async (ctx) => {
+				return await ctx.storage.store(new Blob(["fake-image"]));
+			});
+
+			// Clear messages from user creation
+			sentMessages = [];
+
+			await t.mutation(internal.vouchers.uploadVoucher, {
+				userId,
+				imageStorageId,
+			});
+
+			await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+			const failedUploads = await t.run(async (ctx) => {
+				return await ctx.db.query("failedUploads").collect();
+			});
+
+			expect(failedUploads).toHaveLength(1);
+			expect(failedUploads[0]).toMatchObject({
+				failureType: "validation",
+				failureReason: "COULD_NOT_READ_BARCODE",
+			});
+			expect(failedUploads[0].extractedBarcode).toBeUndefined();
+
+			expect(sentMessages[0].text).toContain("barcode");
+		});
+
+		test("records DUPLICATE_BARCODE when barcode already exists", async () => {
+			vi.useFakeTimers();
+			setupFetchMock("valid_10");
+			const t = convexTest(schema, modules);
+			const chatId = "303030303";
+
+			await t.run(async (ctx) => {
+				await ctx.db.insert("inviteCodes", {
+					code: "TEST8",
+					maxUses: 100,
+					usedCount: 0,
+					createdAt: Date.now(),
+				});
+			});
+
+			await t.action(internal.telegram.handleTelegramMessage, {
+				message: createTelegramMessage("code TEST8", chatId),
+			});
+
+			const user = await t.query(internal.users.getUserByTelegramChatId, {
+				telegramChatId: chatId,
+			});
+
+			const userId = user!._id;
+
+			// Create existing voucher with same barcode
+			await t.run(async (ctx) => {
+				const futureDate = Date.now() + 14 * 24 * 60 * 60 * 1000;
+				await ctx.db.insert("vouchers", {
+					type: "10",
+					status: "available",
+					imageStorageId: await ctx.storage.store(new Blob(["old-image"])),
+					uploaderId: userId,
+					expiryDate: futureDate,
+					barcodeNumber: "1234567890002", // Same barcode from valid_10 scenario
+					createdAt: Date.now(),
+				});
+			});
+
+			const imageStorageId = await t.run(async (ctx) => {
+				return await ctx.storage.store(new Blob(["fake-image"]));
+			});
+
+			await t.mutation(internal.vouchers.uploadVoucher, {
+				userId,
+				imageStorageId,
+			});
+
+			await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+			const failedUploads = await t.run(async (ctx) => {
+				return await ctx.db.query("failedUploads").collect();
+			});
+
+			expect(failedUploads).toHaveLength(1);
+			expect(failedUploads[0]).toMatchObject({
+				failureType: "validation",
+				failureReason: "DUPLICATE_BARCODE",
+				extractedBarcode: "1234567890002",
+			});
+
+			expect(sentMessages).toContainEqual(
+				expect.objectContaining({
+					text: expect.stringContaining("already been uploaded"),
+				}),
+			);
+
+			// Verify only 1 voucher exists (the original one)
+			const vouchers = await t.run(async (ctx) => {
+				return await ctx.db.query("vouchers").collect();
+			});
+			expect(vouchers).toHaveLength(1);
+		});
+	});
+
+	describe("System Errors", () => {
+		test("records system error when Gemini API fails", async () => {
+			vi.useFakeTimers();
+			setupFetchMock("gemini_api_error");
+			const t = convexTest(schema, modules);
+			const chatId = "404040404";
+
+			await t.run(async (ctx) => {
+				await ctx.db.insert("inviteCodes", {
+					code: "TEST9",
+					maxUses: 100,
+					usedCount: 0,
+					createdAt: Date.now(),
+				});
+			});
+
+			await t.action(internal.telegram.handleTelegramMessage, {
+				message: createTelegramMessage("code TEST9", chatId),
+			});
+
+			const user = await t.query(internal.users.getUserByTelegramChatId, {
+				telegramChatId: chatId,
+			});
+
+			const userId = user!._id;
+			const imageStorageId = await t.run(async (ctx) => {
+				return await ctx.storage.store(new Blob(["fake-image"]));
+			});
+
+			await t.mutation(internal.vouchers.uploadVoucher, {
+				userId,
+				imageStorageId,
+			});
+
+			await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+			const failedUploads = await t.run(async (ctx) => {
+				return await ctx.db.query("failedUploads").collect();
+			});
+
+			expect(failedUploads).toHaveLength(1);
+			expect(failedUploads[0]).toMatchObject({
+				failureType: "system",
+				failureReason: "SYSTEM_ERROR",
+			});
+			expect(failedUploads[0].errorMessage).toContain("Gemini API error");
+
+			// Verify no OCR data
+			expect(failedUploads[0].rawOcrResponse).toBeUndefined();
+			expect(failedUploads[0].extractedType).toBeUndefined();
+
+			// Verify generic error message sent
+			expect(sentMessages).toContainEqual(
+				expect.objectContaining({
+					text: expect.stringContaining("encountered an error"),
+				}),
+			);
+		});
+	});
+
+	describe("Data Integrity", () => {
+		test("verifies all required fields present in failed upload", async () => {
+			vi.useFakeTimers();
+			setupFetchMock("missing_valid_from");
+			const t = convexTest(schema, modules);
+			const chatId = "505050505";
+
+			await t.run(async (ctx) => {
+				await ctx.db.insert("inviteCodes", {
+					code: "TEST10",
+					maxUses: 100,
+					usedCount: 0,
+					createdAt: Date.now(),
+				});
+			});
+
+			await t.action(internal.telegram.handleTelegramMessage, {
+				message: createTelegramMessage("code TEST10", chatId),
+			});
+
+			const user = await t.query(internal.users.getUserByTelegramChatId, {
+				telegramChatId: chatId,
+			});
+
+			const userId = user!._id;
+			const imageStorageId = await t.run(async (ctx) => {
+				return await ctx.storage.store(new Blob(["fake-image"]));
+			});
+
+			await t.mutation(internal.vouchers.uploadVoucher, {
+				userId,
+				imageStorageId,
+			});
+
+			await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+			const failedUploads = await t.run(async (ctx) => {
+				return await ctx.db.query("failedUploads").collect();
+			});
+
+			const failedUpload = failedUploads[0];
+			expect(failedUpload.userId).toBe(userId);
+			expect(failedUpload.imageStorageId).toBe(imageStorageId);
+			expect(failedUpload.failureType).toBe("validation");
+			expect(failedUpload.failureReason).toBe("COULD_NOT_READ_VALID_FROM");
+			expect(failedUpload._creationTime).toBeGreaterThan(0);
+		});
+
+		test("verifies OCR data is properly stored", async () => {
+			vi.useFakeTimers();
+			setupFetchMock("invalid_type");
+			const t = convexTest(schema, modules);
+			const chatId = "606060606";
+
+			await t.run(async (ctx) => {
+				await ctx.db.insert("inviteCodes", {
+					code: "TEST11",
+					maxUses: 100,
+					usedCount: 0,
+					createdAt: Date.now(),
+				});
+			});
+
+			await t.action(internal.telegram.handleTelegramMessage, {
+				message: createTelegramMessage("code TEST11", chatId),
+			});
+
+			const user = await t.query(internal.users.getUserByTelegramChatId, {
+				telegramChatId: chatId,
+			});
+
+			const userId = user!._id;
+			const imageStorageId = await t.run(async (ctx) => {
+				return await ctx.storage.store(new Blob(["fake-image"]));
+			});
+
+			await t.mutation(internal.vouchers.uploadVoucher, {
+				userId,
+				imageStorageId,
+			});
+
+			await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+			const failedUploads = await t.run(async (ctx) => {
+				return await ctx.db.query("failedUploads").collect();
+			});
+
+			const failedUpload = failedUploads[0];
+			expect(failedUpload.rawOcrResponse).toBeDefined();
+			expect(failedUpload.rawOcrResponse).toContain("candidates");
+			expect(failedUpload.extractedType).toBe("0");
+			expect(failedUpload.extractedBarcode).toBe("1234567890005");
+			expect(failedUpload.extractedExpiryDate).toBeDefined();
+		});
+	});
+
+	describe("Integration", () => {
+		test("verifies upload count NOT incremented on failure", async () => {
+			vi.useFakeTimers();
+			setupFetchMock("expired");
+			const t = convexTest(schema, modules);
+			const chatId = "707070707";
+
+			await t.run(async (ctx) => {
+				await ctx.db.insert("inviteCodes", {
+					code: "TEST12",
+					maxUses: 100,
+					usedCount: 0,
+					createdAt: Date.now(),
+				});
+			});
+
+			await t.action(internal.telegram.handleTelegramMessage, {
+				message: createTelegramMessage("code TEST12", chatId),
+			});
+
+			const user = await t.query(internal.users.getUserByTelegramChatId, {
+				telegramChatId: chatId,
+			});
+
+			const userId = user!._id;
+			const initialUploadCount = user!.uploadCount || 0;
+
+			const imageStorageId = await t.run(async (ctx) => {
+				return await ctx.storage.store(new Blob(["fake-image"]));
+			});
+
+			await t.mutation(internal.vouchers.uploadVoucher, {
+				userId,
+				imageStorageId,
+			});
+
+			await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+			// Verify uploadCount remains the same
+			const updatedUser = await t.run(async (ctx) => {
+				return await ctx.db.get(userId);
+			});
+
+			expect(updatedUser?.uploadCount || 0).toBe(initialUploadCount);
+
+			// Now upload a successful voucher and verify count increments
+			setupFetchMock("valid_10");
+			const imageStorageId2 = await t.run(async (ctx) => {
+				return await ctx.storage.store(new Blob(["fake-image-2"]));
+			});
+
+			await t.mutation(internal.vouchers.uploadVoucher, {
+				userId,
+				imageStorageId: imageStorageId2,
+			});
+
+			await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+			const finalUser = await t.run(async (ctx) => {
+				return await ctx.db.get(userId);
+			});
+
+			expect(finalUser?.uploadCount || 0).toBe(initialUploadCount + 1);
+		});
+
+		test("verifies image storage persists for failed uploads", async () => {
+			vi.useFakeTimers();
+			setupFetchMock("missing_barcode");
+			const t = convexTest(schema, modules);
+			const chatId = "808080808";
+
+			await t.run(async (ctx) => {
+				await ctx.db.insert("inviteCodes", {
+					code: "TEST13",
+					maxUses: 100,
+					usedCount: 0,
+					createdAt: Date.now(),
+				});
+			});
+
+			await t.action(internal.telegram.handleTelegramMessage, {
+				message: createTelegramMessage("code TEST13", chatId),
+			});
+
+			const user = await t.query(internal.users.getUserByTelegramChatId, {
+				telegramChatId: chatId,
+			});
+
+			const userId = user!._id;
+			const imageStorageId = await t.run(async (ctx) => {
+				return await ctx.storage.store(new Blob(["fake-image"]));
+			});
+
+			await t.mutation(internal.vouchers.uploadVoucher, {
+				userId,
+				imageStorageId,
+			});
+
+			await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+			const failedUploads = await t.run(async (ctx) => {
+				return await ctx.db.query("failedUploads").collect();
+			});
+
+			expect(failedUploads[0].imageStorageId).toBe(imageStorageId);
+
+			// Verify the storage still exists (not deleted)
+			const storageUrl = await t.run(async (ctx) => {
+				return await ctx.storage.getUrl(imageStorageId);
+			});
+
+			expect(storageUrl).toBeDefined();
+		});
 	});
 });
