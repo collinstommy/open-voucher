@@ -49,10 +49,6 @@ export const uploadVoucher = internalMutation({
 			return null;
 		}
 
-		await ctx.db.patch(userId, {
-			uploadCount: (user.uploadCount || 0) + 1,
-		});
-
 		await ctx.scheduler.runAfter(0, internal.ocr.process.processVoucherImage, {
 			userId,
 			imageStorageId,
