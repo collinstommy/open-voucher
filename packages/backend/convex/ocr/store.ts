@@ -26,7 +26,7 @@ async function recordFailedUpload(
 	await ctx.db.insert("failedUploads", {
 		userId,
 		imageStorageId,
-		failureType: "validation" as const,
+		failureType: "validation",
 		failureReason: reason,
 		rawOcrResponse: ocrData.rawResponse,
 		extractedType: ocrData.type,
@@ -154,7 +154,10 @@ export const storeVoucherFromOcr = internalMutation({
 
 		const reward = UPLOAD_REWARDS[type];
 		const newCoins = Math.min(MAX_COINS, user.coins + reward);
-		await ctx.db.patch(userId, { coins: newCoins });
+		await ctx.db.patch(userId, {
+			coins: newCoins,
+			uploadCount: (user.uploadCount || 0) + 1,
+		});
 
 		await ctx.db.insert("transactions", {
 			userId,

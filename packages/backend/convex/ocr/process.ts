@@ -19,9 +19,9 @@ export const processVoucherImage = internalAction({
 				userId,
 				imageStorageId,
 				type: String(extracted.type),
-				validFrom: extracted.validFrom,
-				expiryDate: extracted.expiryDate,
-				barcode: extracted.barcode,
+				validFrom: extracted.validFrom || undefined,
+				expiryDate: extracted.expiryDate || undefined,
+				barcode: extracted.barcode || undefined,
 				rawResponse: extracted.rawResponse,
 			});
 
