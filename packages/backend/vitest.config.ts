@@ -9,7 +9,7 @@ export default defineConfig({
 	},
 	test: {
 		environment: "edge-runtime",
-		include: ["tests/convex-test/**/*.test.ts", "convex/**/*.test.ts"],
+		include: ["tests/convexTest/**/*.test.ts", "convex/**/*.test.ts"],
 		testTimeout: 10000,
 		// Ignore unhandled errors from scheduled functions running after tests
 		dangerouslyIgnoreUnhandledErrors: true,
