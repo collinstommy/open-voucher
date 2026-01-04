@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { internal } from "../../convex/_generated/api";
 import schema from "../../convex/schema";
 import { modules } from "../test.setup";
-import { mockTelegramResponse } from "./fixtures/testHelpers";
+import { createUser, createVoucher, mockTelegramResponse } from "./fixtures/testHelpers";
 
 let sentMessages: { chatId: string; text?: string }[] = [];
 
@@ -70,69 +70,40 @@ describe("Reminder Flow", () => {
 
 		const t = convexTest(schema, modules);
 
-		const claimerId = await t.run(async (ctx) => {
-			return await ctx.db.insert("users", {
-				telegramChatId: "claimer123",
-				coins: 100,
-				isBanned: false,
-				createdAt: now,
-				lastActiveAt: now,
-			});
-		});
-
-		const uploaderId = await t.run(async (ctx) => {
-			return await ctx.db.insert("users", {
-				telegramChatId: "uploader456",
-				coins: 50,
-				isBanned: false,
-				createdAt: now,
-				lastActiveAt: now,
-			});
-		});
+		const claimerId = await createUser(t, { telegramChatId: "claimer123", coins: 100 });
+		const uploaderId = await createUser(t, { telegramChatId: "uploader456", coins: 50 });
 
 		// Create voucher claimed yesterday (should trigger reminder)
-		const yesterdayVoucherId = await t.run(async (ctx) => {
-			const imageStorageId = await ctx.storage.store(new Blob(["test"]));
-			return await ctx.db.insert("vouchers", {
-				type: "10",
-				status: "claimed",
-				imageStorageId,
-				uploaderId,
-				claimerId,
-				claimedAt: yesterday,
-				expiryDate: futureExpiry,
-				createdAt: yesterday,
-			});
+		await createVoucher(t, {
+			type: "10",
+			uploaderId,
+			status: "claimed",
+			claimerId,
+			claimedAt: yesterday,
+			expiryDate: futureExpiry,
+			createdAt: yesterday,
 		});
 
 		// Create voucher claimed today (should NOT trigger)
-		const todayVoucherId = await t.run(async (ctx) => {
-			const imageStorageId = await ctx.storage.store(new Blob(["test"]));
-			return await ctx.db.insert("vouchers", {
-				type: "5",
-				status: "claimed",
-				imageStorageId,
-				uploaderId,
-				claimerId,
-				claimedAt: now,
-				expiryDate: futureExpiry,
-				createdAt: now,
-			});
+		await createVoucher(t, {
+			type: "5",
+			uploaderId,
+			status: "claimed",
+			claimerId,
+			claimedAt: now,
+			expiryDate: futureExpiry,
+			createdAt: now,
 		});
 
 		// Create voucher claimed 2 days ago (should NOT trigger)
-		const oldVoucherId = await t.run(async (ctx) => {
-			const imageStorageId = await ctx.storage.store(new Blob(["test"]));
-			return await ctx.db.insert("vouchers", {
-				type: "20",
-				status: "claimed",
-				imageStorageId,
-				uploaderId,
-				claimerId,
-				claimedAt: twoDaysAgo,
-				expiryDate: futureExpiry,
-				createdAt: twoDaysAgo,
-			});
+		await createVoucher(t, {
+			type: "20",
+			uploaderId,
+			status: "claimed",
+			claimerId,
+			claimedAt: twoDaysAgo,
+			expiryDate: futureExpiry,
+			createdAt: twoDaysAgo,
 		});
 
 		const chatIds = await t.query(

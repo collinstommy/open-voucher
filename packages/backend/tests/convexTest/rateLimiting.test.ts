@@ -10,6 +10,8 @@ import { modules } from "../test.setup";
 import {
 	createTelegramMessage,
 	createTelegramPhotoMessage,
+	createUser,
+	createVoucher,
 	mockTelegramResponse,
 } from "./fixtures/testHelpers";
 
@@ -117,31 +119,16 @@ describe("Rate Limiting Flow", () => {
 		const t = convexTest(schema, modules);
 		const chatId = "11223344";
 
-		const userId = await t.run(async (ctx) => {
-			return await ctx.db.insert("users", {
-				telegramChatId: chatId,
-				coins: 100,
-				isBanned: false,
-				createdAt: Date.now(),
-				lastActiveAt: Date.now(),
-			});
-		});
-
-		const imageStorageId = await t.run(async (ctx) => {
-			return await ctx.storage.store(new Blob(["test_image"]));
-		});
+		const userId = await createUser(t, { telegramChatId: chatId, coins: 100 });
 
 		// Upload 10 vouchers (the limit)
 		for (let i = 0; i < 10; i++) {
-			await t.run(async (ctx) => {
-				await ctx.db.insert("vouchers", {
-					type: "10",
-					status: "available",
-					imageStorageId,
-					uploaderId: userId,
-					expiryDate: 0,
-					createdAt: Date.now() - 1000, // Just now
-				});
+			await createVoucher(t, {
+				type: "10",
+				uploaderId: userId,
+				status: "available",
+				expiryDate: 0,
+				createdAt: Date.now() - 1000, // Just now
 			});
 		}
 
@@ -181,58 +168,25 @@ describe("Rate Limiting Flow", () => {
 		const claimerChatId = "55667788";
 		const uploaderChatId = "99887766";
 
-		const claimerId = await t.run(async (ctx) => {
-			return await ctx.db.insert("users", {
-				telegramChatId: claimerChatId,
-				coins: 500, // Plenty of coins
-				isBanned: false,
-				createdAt: Date.now(),
-				lastActiveAt: Date.now(),
-			});
-		});
-
-		const uploaderId = await t.run(async (ctx) => {
-			return await ctx.db.insert("users", {
-				telegramChatId: uploaderChatId,
-				coins: 0,
-				isBanned: false,
-				createdAt: Date.now(),
-				lastActiveAt: Date.now(),
-			});
-		});
-
-		const imageStorageId = await t.run(async (ctx) => {
-			return await ctx.storage.store(new Blob(["test_image"]));
-		});
+		const claimerId = await createUser(t, { telegramChatId: claimerChatId, coins: 500 });
+		const uploaderId = await createUser(t, { telegramChatId: uploaderChatId, coins: 0 });
 
 		// Simulate 5 existing claims in the last 24h
 		for (let i = 0; i < 5; i++) {
-			await t.run(async (ctx) => {
-				await ctx.db.insert("vouchers", {
-					type: "5",
-					status: "claimed",
-					imageStorageId,
-					uploaderId,
-					claimerId,
-					claimedAt: Date.now() - 1000, // Just now
-					expiryDate: Date.now() + 86400000,
-					validFrom: Date.now() - 24 * 60 * 60 * 1000,
-					createdAt: Date.now() - 10000,
-				});
+			await createVoucher(t, {
+				type: "5",
+				uploaderId,
+				status: "claimed",
+				claimerId,
+				claimedAt: Date.now() - 1000, // Just now
 			});
 		}
 
 		// Create an available voucher to try and claim
-		await t.run(async (ctx) => {
-			await ctx.db.insert("vouchers", {
-				type: "5",
-				status: "available",
-				imageStorageId,
-				uploaderId,
-				expiryDate: Date.now() + 86400000,
-				validFrom: Date.now() - 24 * 60 * 60 * 1000,
-				createdAt: Date.now(),
-			});
+		await createVoucher(t, {
+			type: "5",
+			uploaderId,
+			status: "available",
 		});
 
 		// Try to claim the 6th voucher via Telegram

@@ -8,7 +8,9 @@ import { internal } from "../../convex/_generated/api";
 import schema from "../../convex/schema";
 import { modules } from "../test.setup";
 import {
+	createInviteCode,
 	createTelegramMessage,
+	createUser,
 	mockGeminiResponse,
 	mockTelegramResponse,
 } from "./fixtures/testHelpers";
@@ -17,12 +19,9 @@ let sentMessages: { chatId: string; text?: string }[] = [];
 
 type OCRSenario =
 	| "valid_10"
-	| "valid_5"
-	| "valid_20"
 	| "expired"
 	| "invalid_type"
 	| "missing_valid_from"
-	| "invalid_valid_from"
 	| "missing_expiry"
 	| "missing_barcode"
 	| "too_late_today"
@@ -47,22 +46,11 @@ function setupFetchMock(geminiScenario: OCRSenario = "valid_10") {
 	const todayDate = new Date();
 	const todayDateStr = todayDate.toISOString().split("T")[0];
 
-	const veryOldDay = 1;
-	const veryOldMonth = 12;
-
-	const expiryForOldValidFrom = new Date();
-	expiryForOldValidFrom.setMonth(11);
-	expiryForOldValidFrom.setDate(31);
-	const expiryForOldValidFromStr = expiryForOldValidFrom.toISOString().split("T")[0];
-
 	const scenarios = {
-		valid_5: mockGeminiResponse({ type: 5, expiryDate: futureDateStr, barcode: "1234567890001" }),
 		valid_10: mockGeminiResponse({ type: 10, validFromDay, validFromMonth, expiryDate: futureDateStr, barcode: "1234567890002" }),
-		valid_20: mockGeminiResponse({ type: 20, validFromDay, validFromMonth, expiryDate: futureDateStr, barcode: "1234567890003" }),
 		expired: mockGeminiResponse({ type: 10, validFromDay, validFromMonth, expiryDate: pastDateStr, barcode: "1234567890004" }),
 		invalid_type: mockGeminiResponse({ type: 0, validFromDay, validFromMonth, expiryDate: futureDateStr, barcode: "1234567890005" }),
 		missing_valid_from: mockGeminiResponse({ type: 10, validFromDay: null, validFromMonth: null, expiryDate: futureDateStr, barcode: "1234567890006" }),
-		invalid_valid_from: mockGeminiResponse({ type: 10, validFromDay: veryOldDay, validFromMonth: veryOldMonth, expiryDate: expiryForOldValidFromStr, barcode: "1234567890007" }),
 		missing_expiry: mockGeminiResponse({ type: 10, validFromDay, validFromMonth, expiryDate: null, barcode: "1234567890008" }),
 		missing_barcode: mockGeminiResponse({ type: 10, validFromDay, validFromMonth, expiryDate: futureDateStr, barcode: null }),
 		too_late_today: mockGeminiResponse({ type: 10, validFromDay, validFromMonth, expiryDate: todayDateStr, barcode: "1234567890010" }),
@@ -179,14 +167,7 @@ describe("Failed Uploads", () => {
 			const chatId = "123456789";
 
 			// Create invite code and user
-			await t.run(async (ctx) => {
-				await ctx.db.insert("inviteCodes", {
-					code: "TESTCODE",
-					maxUses: 100,
-					usedCount: 0,
-					createdAt: Date.now(),
-				});
-			});
+			await createInviteCode(t, { code: "TESTCODE", maxUses: 100 });
 
 			await t.action(internal.telegram.handleTelegramMessage, {
 				message: createTelegramMessage({ text: "code TESTCODE", chatId }),
@@ -255,14 +236,7 @@ describe("Failed Uploads", () => {
 			const t = convexTest(schema, modules);
 			const chatId = "111222333";
 
-			await t.run(async (ctx) => {
-				await ctx.db.insert("inviteCodes", {
-					code: "TEST3",
-					maxUses: 100,
-					usedCount: 0,
-					createdAt: Date.now(),
-				});
-			});
+			await createInviteCode(t, { code: "TEST3", maxUses: 100 });
 
 			await t.action(internal.telegram.handleTelegramMessage, {
 				message: createTelegramMessage({ text: "code TEST3", chatId }),
@@ -307,14 +281,7 @@ describe("Failed Uploads", () => {
 			const t = convexTest(schema, modules);
 			const chatId = "444555666";
 
-			await t.run(async (ctx) => {
-				await ctx.db.insert("inviteCodes", {
-					code: "TEST4",
-					maxUses: 100,
-					usedCount: 0,
-					createdAt: Date.now(),
-				});
-			});
+			await createInviteCode(t, { code: "TEST4", maxUses: 100 });
 
 			await t.action(internal.telegram.handleTelegramMessage, {
 				message: createTelegramMessage({ text: "code TEST4", chatId }),
@@ -358,14 +325,7 @@ describe("Failed Uploads", () => {
 			const t = convexTest(schema, modules);
 			const chatId = "777888999";
 
-			await t.run(async (ctx) => {
-				await ctx.db.insert("inviteCodes", {
-					code: "TEST5",
-					maxUses: 100,
-					usedCount: 0,
-					createdAt: Date.now(),
-				});
-			});
+			await createInviteCode(t, { code: "TEST5", maxUses: 100 });
 
 			await t.action(internal.telegram.handleTelegramMessage, {
 				message: createTelegramMessage({ text: "code TEST5", chatId }),
@@ -415,14 +375,7 @@ describe("Failed Uploads", () => {
 
 			const chatId = "101010101";
 
-			await t.run(async (ctx) => {
-				await ctx.db.insert("inviteCodes", {
-					code: "TEST6",
-					maxUses: 100,
-					usedCount: 0,
-					createdAt: Date.now(),
-				});
-			});
+			await createInviteCode(t, { code: "TEST6", maxUses: 100 });
 
 			await t.action(internal.telegram.handleTelegramMessage, {
 				message: createTelegramMessage({ text: "code TEST6", chatId }),
@@ -466,14 +419,7 @@ describe("Failed Uploads", () => {
 			const t = convexTest(schema, modules);
 			const chatId = "202020202";
 
-			await t.run(async (ctx) => {
-				await ctx.db.insert("inviteCodes", {
-					code: "TEST7",
-					maxUses: 100,
-					usedCount: 0,
-					createdAt: Date.now(),
-				});
-			});
+			await createInviteCode(t, { code: "TEST7", maxUses: 100 });
 
 			await t.action(internal.telegram.handleTelegramMessage, {
 				message: createTelegramMessage({ text: "code TEST7", chatId }),
@@ -518,14 +464,7 @@ describe("Failed Uploads", () => {
 			const t = convexTest(schema, modules);
 			const chatId = "303030303";
 
-			await t.run(async (ctx) => {
-				await ctx.db.insert("inviteCodes", {
-					code: "TEST8",
-					maxUses: 100,
-					usedCount: 0,
-					createdAt: Date.now(),
-				});
-			});
+			await createInviteCode(t, { code: "TEST8", maxUses: 100 });
 
 			await t.action(internal.telegram.handleTelegramMessage, {
 				message: createTelegramMessage({ text: "code TEST8", chatId }),
@@ -594,14 +533,7 @@ describe("Failed Uploads", () => {
 			const t = convexTest(schema, modules);
 			const chatId = "404040404";
 
-			await t.run(async (ctx) => {
-				await ctx.db.insert("inviteCodes", {
-					code: "TEST9",
-					maxUses: 100,
-					usedCount: 0,
-					createdAt: Date.now(),
-				});
-			});
+			await createInviteCode(t, { code: "TEST9", maxUses: 100 });
 
 			await t.action(internal.telegram.handleTelegramMessage, {
 				message: createTelegramMessage({ text: "code TEST9", chatId }),
@@ -654,14 +586,7 @@ describe("Failed Uploads", () => {
 			const t = convexTest(schema, modules);
 			const chatId = "505050505";
 
-			await t.run(async (ctx) => {
-				await ctx.db.insert("inviteCodes", {
-					code: "TEST10",
-					maxUses: 100,
-					usedCount: 0,
-					createdAt: Date.now(),
-				});
-			});
+			await createInviteCode(t, { code: "TEST10", maxUses: 100 });
 
 			await t.action(internal.telegram.handleTelegramMessage, {
 				message: createTelegramMessage({ text: "code TEST10", chatId }),
@@ -701,14 +626,7 @@ describe("Failed Uploads", () => {
 			const t = convexTest(schema, modules);
 			const chatId = "606060606";
 
-			await t.run(async (ctx) => {
-				await ctx.db.insert("inviteCodes", {
-					code: "TEST11",
-					maxUses: 100,
-					usedCount: 0,
-					createdAt: Date.now(),
-				});
-			});
+			await createInviteCode(t, { code: "TEST11", maxUses: 100 });
 
 			await t.action(internal.telegram.handleTelegramMessage, {
 				message: createTelegramMessage({ text: "code TEST11", chatId }),
@@ -750,14 +668,7 @@ describe("Failed Uploads", () => {
 			const t = convexTest(schema, modules);
 			const chatId = "707070707";
 
-			await t.run(async (ctx) => {
-				await ctx.db.insert("inviteCodes", {
-					code: "TEST12",
-					maxUses: 100,
-					usedCount: 0,
-					createdAt: Date.now(),
-				});
-			});
+			await createInviteCode(t, { code: "TEST12", maxUses: 100 });
 
 			await t.action(internal.telegram.handleTelegramMessage, {
 				message: createTelegramMessage({ text: "code TEST12", chatId }),
@@ -814,14 +725,7 @@ describe("Failed Uploads", () => {
 			const t = convexTest(schema, modules);
 			const chatId = "808080808";
 
-			await t.run(async (ctx) => {
-				await ctx.db.insert("inviteCodes", {
-					code: "TEST13",
-					maxUses: 100,
-					usedCount: 0,
-					createdAt: Date.now(),
-				});
-			});
+			await createInviteCode(t, { code: "TEST13", maxUses: 100 });
 
 			await t.action(internal.telegram.handleTelegramMessage, {
 				message: createTelegramMessage({ text: "code TEST13", chatId }),

@@ -8,7 +8,7 @@ import { internal } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
 import schema from "../../convex/schema";
 import { modules } from "../test.setup";
-import { mockTelegramResponse } from "./fixtures/testHelpers";
+import { createUser, createVoucher, mockTelegramResponse } from "./fixtures/testHelpers";
 
 let sentMessages: { chatId: string; text?: string }[] = [];
 
@@ -76,44 +76,18 @@ describe("Report Flow", () => {
 		const t = convexTest(schema, modules);
 
 		// Create uploader
-		const uploaderId = await t.run(async (ctx) => {
-			return await ctx.db.insert("users", {
-				telegramChatId: "uploader123",
-				coins: 10,
-				isBanned: false,
-				createdAt: Date.now(),
-				lastActiveAt: Date.now(),
-			});
-		});
+		const uploaderId = await createUser(t, { telegramChatId: "uploader123", coins: 10 });
 
 		// Create claimer
-		const claimerId = await t.run(async (ctx) => {
-			return await ctx.db.insert("users", {
-				telegramChatId: "claimer456",
-				coins: 10,
-				isBanned: false,
-				createdAt: Date.now(),
-				lastActiveAt: Date.now(),
-			});
-		});
+		const claimerId = await createUser(t, { telegramChatId: "claimer456", coins: 10 });
 
 		// Create claimed voucher
-		const imageStorageId = await t.run(async (ctx) => {
-			return await ctx.storage.store(new Blob(["voucher"]));
-		});
-
-		const voucherId = await t.run(async (ctx) => {
-			return await ctx.db.insert("vouchers", {
-				type: "10",
-				status: "claimed",
-				imageStorageId,
-				uploaderId,
-				claimerId,
-				claimedAt: Date.now(),
-				expiryDate: Date.now() + 7 * 24 * 60 * 60 * 1000,
-				validFrom: Date.now() - 24 * 60 * 60 * 1000,
-				createdAt: Date.now(),
-			});
+		const voucherId = await createVoucher(t, {
+			type: "10",
+			uploaderId,
+			status: "claimed",
+			claimerId,
+			claimedAt: Date.now(),
 		});
 
 		// Report the voucher
@@ -154,46 +128,21 @@ describe("Ban Flow", () => {
 		const reporterChatId = "reporter_test";
 
 		// Create uploader user (will be banned)
-		const uploaderId = await t.run(async (ctx) => {
-			return await ctx.db.insert("users", {
-				telegramChatId: uploaderChatId,
-				coins: 100,
-				isBanned: false,
-				createdAt: Date.now(),
-				lastActiveAt: Date.now(),
-			});
-		});
+		const uploaderId = await createUser(t, { telegramChatId: uploaderChatId, coins: 100 });
 
 		// Create reporter user
-		const reporterId = await t.run(async (ctx) => {
-			return await ctx.db.insert("users", {
-				telegramChatId: reporterChatId,
-				coins: 50,
-				isBanned: false,
-				createdAt: Date.now(),
-				lastActiveAt: Date.now(),
-			});
-		});
+		const reporterId = await createUser(t, { telegramChatId: reporterChatId, coins: 50 });
 
 		// Create 5 vouchers, all claimed by reporter
 		const voucherIds: Id<"vouchers">[] = [];
 		for (let i = 0; i < 5; i++) {
-			const imageStorageId = await t.run(async (ctx) => {
-				return await ctx.storage.store(new Blob([`voucher_${i}`]));
-			});
-
-			const voucherId = await t.run(async (ctx) => {
-				return await ctx.db.insert("vouchers", {
-					type: "10",
-					status: "claimed",
-					imageStorageId,
-					uploaderId,
-					claimerId: reporterId,
-					claimedAt: Date.now() - (5 - i) * 1000,
-					expiryDate: Date.now() + 7 * 24 * 60 * 60 * 1000,
-					validFrom: Date.now() - 24 * 60 * 60 * 1000,
-					createdAt: Date.now() - (5 - i) * 2000,
-				});
+			const voucherId = await createVoucher(t, {
+				type: "10",
+				uploaderId,
+				status: "claimed",
+				claimerId: reporterId,
+				claimedAt: Date.now() - (5 - i) * 1000,
+				createdAt: Date.now() - (5 - i) * 2000,
 			});
 			voucherIds.push(voucherId);
 		}
@@ -254,26 +203,14 @@ describe("Ban Flow", () => {
 		const reporterChatId = "reporter_test";
 
 		// Create uploader user (will be banned)
-		const uploaderId = await t.run(async (ctx) => {
-			return await ctx.db.insert("users", {
-				telegramChatId: uploaderChatId,
-				coins: 100,
-				isBanned: true, // Start as banned for this test
-				createdAt: Date.now(),
-				lastActiveAt: Date.now(),
-			});
+		const uploaderId = await createUser(t, {
+			telegramChatId: uploaderChatId,
+			coins: 100,
+			isBanned: true, // Start as banned for this test
 		});
 
 		// Create reporter user
-		await t.run(async (ctx) => {
-			return await ctx.db.insert("users", {
-				telegramChatId: reporterChatId,
-				coins: 50,
-				isBanned: false,
-				createdAt: Date.now(),
-				lastActiveAt: Date.now(),
-			});
-		});
+		await createUser(t, { telegramChatId: reporterChatId, coins: 50 });
 
 		// Now test that the banned user gets a ban message when trying to interact
 		sentMessages.length = 0; // Clear sent messages
@@ -315,44 +252,20 @@ describe("Ban Flow Tests", () => {
 		const t = convexTest(schema, modules);
 		const now = Date.now();
 
-		const uploaderId = await t.run(async (ctx) => {
-			return await ctx.db.insert("users", {
-				telegramChatId: "uploader123",
-				coins: 0,
-				isBanned: false,
-				createdAt: now,
-				lastActiveAt: now,
-			});
-		});
-
-		const reporterId = await t.run(async (ctx) => {
-			return await ctx.db.insert("users", {
-				telegramChatId: "reporter456",
-				coins: 100,
-				isBanned: false,
-				createdAt: now,
-				lastActiveAt: now,
-			});
-		});
+		const uploaderId = await createUser(t, { telegramChatId: "uploader123", coins: 0 });
+		const reporterId = await createUser(t, { telegramChatId: "reporter456", coins: 100 });
 
 		// Create 5 vouchers and have reporter claim all of them
 		const voucherIds: Id<"vouchers">[] = [];
 		for (let i = 0; i < 5; i++) {
-			const imageStorageId = await t.run(async (ctx) => {
-				return await ctx.storage.store(new Blob([`voucher-${i}`]));
-			});
-
-			const voucherId = await t.run(async (ctx) => {
-				return await ctx.db.insert("vouchers", {
-					type: "5",
-					status: "claimed",
-					imageStorageId,
-					uploaderId,
-					claimerId: reporterId,
-					expiryDate: now + 7 * 24 * 60 * 60 * 1000,
-					claimedAt: now - (5 - i) * 1000, // Stagger claim times
-					createdAt: now - (5 - i) * 2000,
-				});
+			const voucherId = await createVoucher(t, {
+				type: "5",
+				uploaderId,
+				status: "claimed",
+				claimerId: reporterId,
+				expiryDate: now + 7 * 24 * 60 * 60 * 1000,
+				claimedAt: now - (5 - i) * 1000, // Stagger claim times
+				createdAt: now - (5 - i) * 2000,
 			});
 			voucherIds.push(voucherId);
 		}
@@ -412,44 +325,20 @@ describe("Ban Flow Tests", () => {
 		const t = convexTest(schema, modules);
 		const now = Date.now();
 
-		const uploaderId = await t.run(async (ctx) => {
-			return await ctx.db.insert("users", {
-				telegramChatId: "uploader789",
-				coins: 0,
-				isBanned: false,
-				createdAt: now,
-				lastActiveAt: now,
-			});
-		});
-
-		const reporterId = await t.run(async (ctx) => {
-			return await ctx.db.insert("users", {
-				telegramChatId: "reporter101",
-				coins: 100,
-				isBanned: false,
-				createdAt: now,
-				lastActiveAt: now,
-			});
-		});
+		const uploaderId = await createUser(t, { telegramChatId: "uploader789", coins: 0 });
+		const reporterId = await createUser(t, { telegramChatId: "reporter101", coins: 100 });
 
 		// Create 5 vouchers uploaded by uploader, claimed by reporter
 		const voucherIds: Id<"vouchers">[] = [];
 		for (let i = 0; i < 5; i++) {
-			const imageStorageId = await t.run(async (ctx) => {
-				return await ctx.storage.store(new Blob([`voucher-${i}`]));
-			});
-
-			const voucherId = await t.run(async (ctx) => {
-				return await ctx.db.insert("vouchers", {
-					type: "5",
-					status: "claimed",
-					imageStorageId,
-					uploaderId,
-					claimerId: reporterId,
-					expiryDate: now + 7 * 24 * 60 * 60 * 1000,
-					claimedAt: now - (5 - i) * 1000,
-					createdAt: now - (5 - i) * 2000, // Most recent upload last
-				});
+			const voucherId = await createVoucher(t, {
+				type: "5",
+				uploaderId,
+				status: "claimed",
+				claimerId: reporterId,
+				expiryDate: now + 7 * 24 * 60 * 60 * 1000,
+				claimedAt: now - (5 - i) * 1000,
+				createdAt: now - (5 - i) * 2000, // Most recent upload last
 			});
 			voucherIds.push(voucherId);
 		}
@@ -495,56 +384,26 @@ describe("Ban Flow Tests", () => {
 		const now = Date.now();
 
 		// Create uploader
-		const uploaderId = await t.run(async (ctx) => {
-			return await ctx.db.insert("users", {
-				telegramChatId: "gooduploader",
-				coins: 0,
-				isBanned: false,
-				createdAt: now,
-				lastActiveAt: now,
-			});
-		});
-
-		const goodReporterId = await t.run(async (ctx) => {
-			return await ctx.db.insert("users", {
-				telegramChatId: "goodreporter",
-				coins: 100,
-				isBanned: false,
-				createdAt: now,
-				lastActiveAt: now,
-			});
-		});
-
-		const badReporterId = await t.run(async (ctx) => {
-			return await ctx.db.insert("users", {
-				telegramChatId: "badreporter",
-				coins: 100,
-				isBanned: true, // Already banned
-				bannedAt: now - 1000,
-				createdAt: now,
-				lastActiveAt: now,
-			});
+		const uploaderId = await createUser(t, { telegramChatId: "gooduploader", coins: 0 });
+		const goodReporterId = await createUser(t, { telegramChatId: "goodreporter", coins: 100 });
+		const badReporterId = await createUser(t, {
+			telegramChatId: "badreporter",
+			coins: 100,
+			isBanned: true, // Already banned
 		});
 
 		const voucherIds: Id<"vouchers">[] = [];
 		for (let i = 0; i < 5; i++) {
-			const imageStorageId = await t.run(async (ctx) => {
-				return await ctx.storage.store(new Blob([`voucher-${i}`]));
-			});
-
 			const reporterForThisVoucher = i < 3 ? badReporterId : goodReporterId;
 
-			const voucherId = await t.run(async (ctx) => {
-				return await ctx.db.insert("vouchers", {
-					type: "5",
-					status: "claimed",
-					imageStorageId,
-					uploaderId,
-					claimerId: reporterForThisVoucher,
-					expiryDate: now + 7 * 24 * 60 * 60 * 1000,
-					claimedAt: now - (5 - i) * 1000,
-					createdAt: now - (5 - i) * 2000,
-				});
+			const voucherId = await createVoucher(t, {
+				type: "5",
+				uploaderId,
+				status: "claimed",
+				claimerId: reporterForThisVoucher,
+				expiryDate: now + 7 * 24 * 60 * 60 * 1000,
+				claimedAt: now - (5 - i) * 1000,
+				createdAt: now - (5 - i) * 2000,
 			});
 			voucherIds.push(voucherId);
 		}
