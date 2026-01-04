@@ -139,7 +139,8 @@ You've been started with <b>${newUser.coins} coins</b> to get you going! 🚀
 		if (user.isBanned) {
 			await sendTelegramMessage(
 				chatId,
-				"🚫 Your account has been banned from this service.\n\nIf you believe this is a mistake, you can dispute this ban by sending: 'support YOUR_MESSAGE'",
+				"🚫 Your account has been banned from this service.\n\nIf you believe this is a mistake, please reply with a message describing why you think this is an error.",
+				{ force_reply: true },
 			);
 			return;
 		}
@@ -380,7 +381,8 @@ export const handleTelegramCallback = internalAction({
 			if (user.isBanned) {
 				await sendTelegramMessage(
 					chatId,
-					"🚫 Your account has been banned from this service.\n\nIf you believe this is a mistake, you can dispute this ban by sending: 'support YOUR_MESSAGE'",
+					"🚫 Your account has been banned from this service.\n\nIf you believe this is a mistake, please reply with a message describing why you think this is an error.",
+					{ force_reply: true },
 				);
 				return;
 			}
@@ -443,14 +445,16 @@ export const handleTelegramCallback = internalAction({
 				case "support": {
 					await sendTelegramMessage(
 						chatId,
-						"📝 Please send your support message with 'support YOUR_MESSAGE'",
+						"Please reply with a message describing what you need help with",
+						{ force_reply: true },
 					);
 					break;
 				}
 				case "feedback": {
 					await sendTelegramMessage(
 						chatId,
-						"📝 Please include your message. Send 'feedback YOUR_MESSAGE'",
+						"Please reply with your feedback message",
+						{ force_reply: true },
 					);
 					break;
 				}
