@@ -185,18 +185,28 @@ bunx convex env set ADMIN_PASSWORD "your-secure-password-here" --prod
 ```
 
 ## ToDo
+- [ ] ban messages should be clearer - review this flow
+- [ ] double check ban logic from both sides
+- [ ] define rules of the system in docs
+- [ ] onboarding flow for devs
+
+## Later
+- [ ] remove invite code flow
 - [x] fix users query
-- [ ] start date for vouchers
-- [ ] unify the validation, we do this in two places right now
+- [ ] seed dev data - https://docs.convex.dev/database/import-export/import
+- [ ] failed uploads dashboard
+- [ ] vocuhers admin page should be paginated and show all vouchers
+- [ ] refactor help to be a series of buttons. use buttons for everything
+   - [ ] support/feedback/faq links/balance/availability
+- [x] start date for vouchers
+- [x] unify the validation, we do this in two places right now
 - [x] return vouchers that are expires soonest
 - [x] restrict uploads for expiring today to before 9pm
 - [ ] if voucher are not Available right now, send message once Available
 - [ ] update landing page with faq
-- [ ] ban messages should be clearer - review this flow
-- [ ] refactor help to be a series of buttons. use buttons for everything
-- [ ] define rules of the system in docs
-- [ ] allow banners users to message the bot
-- [ ] send message to single telegram user from bot
+- [x] allow banners users to message the bot
+- [x] send message to single telegram user from bot
+- [ ] cron job to clean up old vouchers and failed uploads
 
 ### Tests
 -[ ] message from admin to user
