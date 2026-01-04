@@ -163,13 +163,10 @@ You've been started with <b>${newUser.coins} coins</b> to get you going! 🚀
 					});
 				}
 
-				await ctx.runMutation(
-					internal.vouchers.uploadVoucher,
-					{
-						userId: user._id,
-						imageStorageId: storageId,
-					},
-				);
+				await ctx.runMutation(internal.vouchers.uploadVoucher, {
+					userId: user._id,
+					imageStorageId: storageId,
+				});
 			} catch (e) {
 				console.error(e);
 				await sendTelegramMessage(chatId, "❌ Failed to process image.");
@@ -185,6 +182,28 @@ You've been started with <b>${newUser.coins} coins</b> to get you going! 🚀
 			await sendTelegramMessage(
 				chatId,
 				`📸 Send screenshot to upload vouchers and earn coins\n💳 Send <b>5</b> , <b>10</b>, or <b>20</b> to claim a voucher\n💰 <b>balance</b> to view your balance of coin\n📝 <b>feedback [msg]</b> to send us feedback`,
+				{
+					inline_keyboard: [
+						[
+							{ text: "Balance", callback_data: "help:balance" },
+							{ text: "Support", callback_data: "help:support" },
+						],
+						[
+							{ text: "Feedback", callback_data: "help:feedback" },
+							{ text: "Faq", callback_data: "help:faq" },
+						],
+						[
+							{
+								text: "Voucher Availability",
+								callback_data: "help:availability",
+							},
+						],
+						[
+							{ text: "Upload", callback_data: "help:upload" },
+							{ text: "Claim", callback_data: "help:claim" },
+						],
+					],
+				},
 			);
 			return;
 		} else if (lowerText.startsWith("feedback ")) {
@@ -254,7 +273,11 @@ export const sendMessageAction = internalAction({
 	},
 });
 
-async function sendTelegramMessage(chatId: string, text: string) {
+async function sendTelegramMessage(
+	chatId: string,
+	text: string,
+	replyMarkup?: any,
+) {
 	const token = process.env.TELEGRAM_BOT_TOKEN;
 	if (!token) {
 		console.error("TELEGRAM_BOT_TOKEN is not set");
@@ -263,10 +286,14 @@ async function sendTelegramMessage(chatId: string, text: string) {
 
 	const url = `https://api.telegram.org/bot${token}/sendMessage`;
 	try {
+		const body: any = { chat_id: chatId, text, parse_mode: "HTML" };
+		if (replyMarkup) {
+			body.reply_markup = JSON.stringify(replyMarkup);
+		}
 		const response = await fetch(url, {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ chat_id: chatId, text, parse_mode: "HTML" }),
+			body: JSON.stringify(body),
 		});
 
 		if (!response.ok) {
@@ -395,6 +422,77 @@ export const handleTelegramCallback = internalAction({
 			} else if (result.status === "reported") {
 				// Should not happen if everything goes right, but just in case
 				await sendTelegramMessage(chatId, "✅ Report received.");
+			}
+		} else if (data.startsWith("help:")) {
+			await answerTelegramCallback(callbackQuery.id);
+
+			const helpAction = data.split(":")[1];
+			const user = await ctx.runQuery(internal.users.getUserByTelegramChatId, {
+				telegramChatId: chatId,
+			});
+
+			if (!user) {
+				return;
+			}
+
+			switch (helpAction) {
+				case "balance": {
+					await sendTelegramMessage(chatId, `💰 You have ${user.coins} coins.`);
+					break;
+				}
+				case "support": {
+					await sendTelegramMessage(
+						chatId,
+						"📝 Please send your support message with 'support YOUR_MESSAGE'",
+					);
+					break;
+				}
+				case "feedback": {
+					await sendTelegramMessage(
+						chatId,
+						"📝 Please include your message. Send 'feedback YOUR_MESSAGE'",
+					);
+					break;
+				}
+				case "faq": {
+					await sendTelegramMessage(
+						chatId,
+						"📖 Check our FAQ at: https://openvouchers.org/faq",
+					);
+					break;
+				}
+				case "availability": {
+					const count = await ctx.runQuery(
+						internal.vouchers.getAvailableVoucherCount,
+					);
+
+					if (count >= 10) {
+						await sendTelegramMessage(
+							chatId,
+							`🎉 excellent availability! ${count} vouchers currently available.`,
+						);
+					} else {
+						await sendTelegramMessage(
+							chatId,
+							`📦 ${count} voucher${count !== 1 ? "s" : ""} currently available.`,
+						);
+					}
+					break;
+				}
+				case "upload": {
+					await sendTelegramMessage(
+						chatId,
+						"📸 To upload a voucher, simply send a screenshot of your voucher. Make sure the screenshot shows the barcode clearly.",
+					);
+					break;
+				}
+				case "claim": {
+					await sendTelegramMessage(
+						chatId,
+						"💳 To claim a voucher, send <b>5</b>, <b>10</b>, or <b>20</b> depending on the voucher value you want.",
+					);
+					break;
+				}
 			}
 		}
 	},

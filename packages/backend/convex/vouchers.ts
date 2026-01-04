@@ -423,3 +423,14 @@ export const expireOldVouchers = internalMutation({
 		return expiredCount;
 	},
 });
+
+export const getAvailableVoucherCount = internalQuery({
+	args: {},
+	handler: async (ctx) => {
+		const availableVouchers = await ctx.db
+			.query("vouchers")
+			.withIndex("by_status_type", (q) => q.eq("status", "available"))
+			.collect();
+		return availableVouchers.length;
+	},
+});
