@@ -97,7 +97,7 @@ You've been started with <b>${newUser.coins} coins</b> to get you going! 🚀
 						);
 						await sendTelegramMessage(
 							chatId,
-							`� <b>We're in beta!</b>\nWe're keen to hear about bugs or general feedback.\n\n📝 To send feedback send <b>feedback [your message]</b>`,
+							`💡 <b>We're in beta!</b>\nWe're keen to hear about bugs or general feedback.\n\n📝 To send feedback send <b>feedback [your message]</b>`,
 						);
 						return;
 					} else {
@@ -115,32 +115,63 @@ You've been started with <b>${newUser.coins} coins</b> to get you going! 🚀
 
 		const lowerText = text.toLowerCase().trim();
 
-		if (lowerText.startsWith("support ")) {
-			const supportText = text.slice(8).trim();
-			if (supportText.length > 0) {
-				await ctx.runMutation(internal.users.submitFeedback, {
-					userId: user._id,
-					text: supportText,
-					type: "support",
-				});
-				await sendTelegramMessage(
-					chatId,
-					"✅ Your support request has been received. We'll review your case and get back to you.",
-				);
-			} else {
-				await sendTelegramMessage(
-					chatId,
-					"⚠️ Please include your message, e.g., 'support I believe this ban is a mistake because...'",
-				);
-			}
+		// FSM: Handle user states first
+		if (user.telegramState === "waiting_for_support_message") {
+			await ctx.runMutation(internal.users.submitFeedback, {
+				userId: user._id,
+				text,
+				type: "support",
+			});
+			await ctx.runMutation(internal.users.clearUserTelegramState, {
+				userId: user._id,
+			});
+			await sendTelegramMessage(
+				chatId,
+				"✅ Your support request has been received. We'll review your case and get back to you.",
+			);
+			return;
+		}
+
+		if (user.telegramState === "waiting_for_feedback_message") {
+			await ctx.runMutation(internal.users.submitFeedback, {
+				userId: user._id,
+				text,
+				type: "feedback",
+			});
+			await ctx.runMutation(internal.users.clearUserTelegramState, {
+				userId: user._id,
+			});
+			await sendTelegramMessage(
+				chatId,
+				"✅ Thanks for your feedback! We read every message.",
+			);
+			return;
+		}
+
+		if (user.telegramState === "waiting_for_ban_appeal") {
+			await ctx.runMutation(internal.users.submitFeedback, {
+				userId: user._id,
+				text,
+				type: "support",
+			});
+			await ctx.runMutation(internal.users.clearUserTelegramState, {
+				userId: user._id,
+			});
+			await sendTelegramMessage(
+				chatId,
+				"✅ Your appeal has been received. We'll review your case and get back to you.",
+			);
 			return;
 		}
 
 		if (user.isBanned) {
+			await ctx.runMutation(internal.users.setUserTelegramState, {
+				userId: user._id,
+				state: "waiting_for_ban_appeal",
+			});
 			await sendTelegramMessage(
 				chatId,
-				"🚫 Your account has been banned from this service.\n\nIf you believe this is a mistake, please reply with a message describing why you think this is an error.",
-				{ force_reply: true },
+				"🚫 Your account has been banned from this service.\n\nPlease reply with a message describing why you think this is an error.",
 			);
 			return;
 		}
@@ -379,10 +410,13 @@ export const handleTelegramCallback = internalAction({
 			}
 
 			if (user.isBanned) {
+				await ctx.runMutation(internal.users.setUserTelegramState, {
+					userId: user._id,
+					state: "waiting_for_ban_appeal",
+				});
 				await sendTelegramMessage(
 					chatId,
-					"🚫 Your account has been banned from this service.\n\nIf you believe this is a mistake, please reply with a message describing why you think this is an error.",
-					{ force_reply: true },
+					"🚫 Your account has been banned from this service.\n\nPlease reply with a message describing why you think this is an error.",
 				);
 				return;
 			}
@@ -443,18 +477,24 @@ export const handleTelegramCallback = internalAction({
 					break;
 				}
 				case "support": {
+					await ctx.runMutation(internal.users.setUserTelegramState, {
+						userId: user._id,
+						state: "waiting_for_support_message",
+					});
 					await sendTelegramMessage(
 						chatId,
 						"Please reply with a message describing what you need help with",
-						{ force_reply: true },
 					);
 					break;
 				}
 				case "feedback": {
+					await ctx.runMutation(internal.users.setUserTelegramState, {
+						userId: user._id,
+						state: "waiting_for_feedback_message",
+					});
 					await sendTelegramMessage(
 						chatId,
 						"Please reply with your feedback message",
-						{ force_reply: true },
 					);
 					break;
 				}

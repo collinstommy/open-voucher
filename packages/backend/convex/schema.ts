@@ -27,6 +27,13 @@ export default defineSchema({
 		uploadReportCount: v.optional(v.number()),
 		claimReportCount: v.optional(v.number()),
 		lastReportAt: v.optional(v.number()),
+		telegramState: v.optional(
+			v.union(
+				v.literal("waiting_for_support_message"),
+				v.literal("waiting_for_feedback_message"),
+				v.literal("waiting_for_ban_appeal"),
+			),
+		),
 	}).index("by_chat_id", ["telegramChatId"]),
 
 	messages: defineTable({
