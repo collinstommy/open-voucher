@@ -170,6 +170,13 @@ export const reportVoucher = internalMutation({
 		const user = await ctx.db.get(userId);
 		if (!user) throw new Error("User not found");
 
+		if (user.isBanned) {
+			return {
+				status: "banned",
+				message: "You have been banned from this service.",
+			};
+		}
+
 		const now = Date.now();
 		const startOfDay = dayjs(now).startOf("day").valueOf();
 
@@ -200,16 +207,12 @@ export const reportVoucher = internalMutation({
 				message: "You have already reported this voucher.",
 			};
 		}
-
-		// 3. Check Reporter Ban Conditions
-		// Get last 5 claims by this reporter
 		const last5Claims = await ctx.db
 			.query("vouchers")
 			.withIndex("by_claimer_claimed_at", (q) => q.eq("claimerId", user._id))
 			.order("desc")
 			.take(5);
 
-		// Get all reports by this reporter
 		const reporterReports = await ctx.db
 			.query("reports")
 			.withIndex("by_reporterId", (q) => q.eq("reporterId", user._id))
@@ -249,7 +252,6 @@ export const reportVoucher = internalMutation({
 			}
 		}
 
-		// 4. Mark as Reported
 		let reportId: Id<"reports"> | undefined;
 		if (voucher.status !== "reported") {
 			await ctx.db.patch(voucherId, { status: "reported" });
@@ -274,8 +276,6 @@ export const reportVoucher = internalMutation({
 			}
 		}
 
-		// 5. Check Uploader Ban Conditions
-		// Get last 5 uploads by this uploader
 		const last5Uploads = await ctx.db
 			.query("vouchers")
 			.withIndex("by_uploader_created", (q) =>
@@ -285,13 +285,11 @@ export const reportVoucher = internalMutation({
 			.take(5);
 
 		if (last5Uploads.length >= 5) {
-			// Get all reports for this uploader
 			const uploaderReports = await ctx.db
 				.query("reports")
 				.withIndex("by_uploader", (q) => q.eq("uploaderId", voucher.uploaderId))
 				.collect();
 
-			// Filter out reports from banned users
 			const validReports = [];
 			for (const report of uploaderReports) {
 				const reporter = await ctx.db.get(report.reporterId);
@@ -306,7 +304,9 @@ export const reportVoucher = internalMutation({
 				last5UploadIds.includes(r.voucherId),
 			);
 
-			if (last5Reported.length >= 3) {
+			const threeOutOfFiveReported = last5Reported.length >= 3;
+
+			if (threeOutOfFiveReported) {
 				console.log(
 					`🚫 UPLOADER BAN: User ${voucher.uploaderId} banned for bad uploads. ` +
 						`${last5Reported.length} of last 5 uploads reported. ` +

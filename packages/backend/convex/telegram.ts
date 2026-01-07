@@ -1,10 +1,33 @@
 import { v } from "convex/values";
 import dayjs from "dayjs";
 import advancedFormat from "dayjs/plugin/advancedFormat";
-import { api, internal } from "./_generated/api";
+import { internal } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
 import { internalAction } from "./_generated/server";
 dayjs.extend(advancedFormat);
+
+function getWelcomeMessage(coins: number): string {
+	return `🎉 <b>Welcome to Dunnes Voucher Bot!</b>
+You've been started with <b>${coins} coins</b> to get you going! 🚀
+
+<b>How it works:</b>
+• Upload a voucher → Earn coins
+• Claim a voucher → Spend coins
+
+<b>Coin Values:</b>
+€5 voucher = 15 coins
+€10 voucher = 10 coins
+€20 voucher = 5 coins
+
+📤 <b>Got a voucher?</b> Upload a screenshot via the paperclip icon
+🙏 <b>Need a voucher?</b> Reply with just <b>5</b>, <b>10</b>, or <b>20</b>
+💰 <b>Check Balance:</b> Send <b>balance</b>
+❓ <b>Get Help:</b> Send <b>help</b>`;
+}
+
+function getBetaMessage(): string {
+	return `👋 <b>We're in beta!</b>\nWe're keen to hear about bugs or general feedback.\n\n📝 To send feedback send <b>feedback [your message]</b>`;
+}
 
 /**
  * Handle incoming Telegram message.
@@ -40,14 +63,27 @@ export const handleTelegramMessage = internalAction({
 			return;
 		}
 
-		// 2. Get User
-		// Note: We are using the 'users' file now, so it's api.users...
 		const user = await ctx.runQuery(internal.users.getUserByTelegramChatId, {
 			telegramChatId: chatId,
 		});
 
-		// 3. Handle New User (Invite Code)
 		if (!user) {
+			const requireInviteCode = process.env.REQUIRE_INVITE_CODE === "true";
+
+			if (!requireInviteCode) {
+				const newUser = await ctx.runMutation(
+					internal.users.createUserWithInvite,
+					{
+						telegramChatId: chatId,
+						username,
+						firstName
+					},
+				);
+				await sendTelegramMessage(chatId, getWelcomeMessage(newUser.coins));
+				await sendTelegramMessage(chatId, getBetaMessage());
+				return;
+			}
+
 			if (text.startsWith("/start")) {
 				await sendTelegramMessage(
 					chatId,
@@ -76,29 +112,8 @@ export const handleTelegramMessage = internalAction({
 								inviteCode: code,
 							},
 						);
-						await sendTelegramMessage(
-							chatId,
-							`🎉 <b>Welcome to Dunnes Voucher Bot!</b>
-You've been started with <b>${newUser.coins} coins</b> to get you going! 🚀
-
-<b>How it works:</b>
-• Upload a voucher → Earn coins
-• Claim a voucher → Spend coins
-
-<b>Coin Values:</b>
-€5 voucher = 15 coins
-€10 voucher = 10 coins
-€20 voucher = 5 coins
-
-📤 <b>Got a voucher?</b> Upload a screenshot via the paperclip icon
-🙏 <b>Need a voucher?</b> Reply with just <b>5</b>, <b>10</b>, or <b>20</b>
-💰 <b>Check Balance:</b> Send <b>balance</b>
-❓ <b>Get Help:</b> Send <b>help</b>`,
-						);
-						await sendTelegramMessage(
-							chatId,
-							`� <b>We're in beta!</b>\nWe're keen to hear about bugs or general feedback.\n\n📝 To send feedback send <b>feedback [your message]</b>`,
-						);
+						await sendTelegramMessage(chatId, getWelcomeMessage(newUser.coins));
+						await sendTelegramMessage(chatId, getBetaMessage());
 						return;
 					} else {
 						await sendTelegramMessage(chatId, `❌ ${result.reason}`);
@@ -249,7 +264,7 @@ export const sendMessageAction = internalAction({
 		chatId: v.string(),
 		text: v.string(),
 	},
-	handler: async (ctx, { chatId, text }) => {
+	handler: async (_ctx, { chatId, text }) => {
 		await sendTelegramMessage(chatId, text);
 	},
 });
