@@ -184,10 +184,26 @@ Prod`
 bunx convex env set ADMIN_PASSWORD "your-secure-password-here" --prod
 ```
 
+## Ban Rules
+
+### Reporter Ban
+If a user reports **3 or more of their last 5 claims**, they get banned for abuse.
+
+### Uploader Ban
+If **3 or more of an uploader's last 5 uploads** are reported as not working, they get banned. Reports from banned users are ignored to prevent retaliatory bans.
+
+## Rate Limits
+
+| Action | Limit |
+|--------|-------|
+| Reports | 1 per day |
+| Uploads | 10 per 24 hours |
+| Claims | 5 per 24 hours |
+
 ## ToDo
-- [ ] ban messages should be clearer - review this flow
-- [ ] double check ban logic from both sides
-- [ ] define rules of the system in docs
+- [x] ban messages should be clearer - review this flow
+- [x] double check ban logic from both sides
+- [x] define rules of the system in docs
 - [ ] onboarding flow for devs
 
 ## Later
