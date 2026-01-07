@@ -204,6 +204,7 @@ If **3 or more of an uploader's last 5 uploads** are reported as not working, th
 - [x] ban messages should be clearer - review this flow
 - [x] double check ban logic from both sides
 - [x] define rules of the system in docs
+- [ ] remove invite code flow
 - [ ] onboarding flow for devs
 
 ## Later
@@ -211,7 +212,7 @@ If **3 or more of an uploader's last 5 uploads** are reported as not working, th
 - [x] fix users query
 - [ ] seed dev data - https://docs.convex.dev/database/import-export/import
 - [ ] failed uploads dashboard
-- [ ] vocuhers admin page should be paginated and show all vouchers
+- [ ] vouchers admin page should be paginated and show all vouchers
 - [ ] refactor help to be a series of buttons. use buttons for everything
    - [ ] support/feedback/faq links/balance/availability
 - [x] start date for vouchers

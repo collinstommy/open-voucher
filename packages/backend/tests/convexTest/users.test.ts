@@ -63,6 +63,7 @@ describe("User Signup Flow", () => {
 	beforeEach(() => {
 		setupFetchMock();
 		vi.stubEnv("TELEGRAM_BOT_TOKEN", "test-bot-token");
+		vi.stubEnv("REQUIRE_INVITE_CODE", "true");
 	});
 
 	afterEach(() => {
@@ -97,6 +98,7 @@ describe("User Signup Flow", () => {
 		);
 		expect(welcomeMsg).toBeDefined();
 	});
+
 
 	test("validate invite code increments usage via Telegram message", async () => {
 		const t = convexTest(schema, modules);
@@ -147,5 +149,34 @@ describe("User Signup Flow", () => {
 				.first();
 		});
 		expect(user).toBeNull();
+	});
+
+
+	test("new user can join without invite code when REQUIRE_INVITE_CODE is false", async () => {
+		vi.stubEnv("REQUIRE_INVITE_CODE", "false");
+		const t = convexTest(schema, modules);
+		const chatId = "999888777";
+
+		await t.action(internal.telegram.handleTelegramMessage, {
+			message: createTelegramMessage({ text: "/start", chatId }),
+		});
+
+		const user = await t.run(async (ctx) => {
+			return await ctx.db
+				.query("users")
+				.withIndex("by_chat_id", (q) => q.eq("telegramChatId", chatId))
+				.first();
+		});
+
+		expect(user).toBeDefined();
+		expect(user?.isBanned).toBe(false);
+		expect(user?.inviteCode).toBeUndefined();
+
+		const welcomeMsg = sentMessages.find(
+			(m) =>
+				m.chatId === chatId &&
+				m.text?.includes("Welcome to Dunnes Voucher Bot!"),
+		);
+		expect(welcomeMsg).toBeDefined();
 	});
 });
