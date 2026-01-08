@@ -48,6 +48,12 @@ export function NavigationLayout() {
 					Vouchers
 				</Link>
 				<Link
+					to="/failed-uploads"
+					className="text-muted-foreground hover:text-foreground"
+				>
+					Failed Uploads
+				</Link>
+				<Link
 					to="/users"
 					className="text-muted-foreground hover:text-foreground"
 				>

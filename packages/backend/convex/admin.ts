@@ -702,3 +702,38 @@ export const clearUserData = internalMutation({
 		};
 	},
 });
+
+export const getFailedUploads = adminQuery({
+	args: {},
+	handler: async (ctx) => {
+		// Get the 50 most recent failed uploads
+		const failedUploads = await ctx.db
+			.query("failedUploads")
+			.order("desc")
+			.take(50);
+
+		// Get failed uploads with user information and image URLs
+		const failedUploadsWithDetails = await Promise.all(
+			failedUploads.map(async (failedUpload) => {
+				const user = await ctx.db.get(failedUpload.userId);
+				const imageUrl = await ctx.storage.getUrl(failedUpload.imageStorageId);
+
+				return {
+					_id: failedUpload._id,
+					userId: failedUpload.userId,
+					username: user?.username,
+					firstName: user?.firstName,
+					telegramChatId: user?.telegramChatId,
+					imageUrl,
+					failureType: failedUpload.failureType,
+					failureReason: failedUpload.failureReason,
+					errorMessage: failedUpload.errorMessage,
+					extractedType: failedUpload.extractedType,
+					createdAt: failedUpload._creationTime,
+				};
+			}),
+		);
+
+		return { failedUploads: failedUploadsWithDetails };
+	},
+});

@@ -208,7 +208,6 @@ If **3 or more of an uploader's last 5 uploads** are reported as not working, th
 - [ ] onboarding flow for devs
 
 ## Later
-- [ ] remove invite code flow
 - [x] fix users query
 - [ ] seed dev data - https://docs.convex.dev/database/import-export/import
 - [ ] failed uploads dashboard
