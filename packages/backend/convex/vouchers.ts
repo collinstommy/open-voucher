@@ -431,6 +431,11 @@ export const getAvailableVoucherCount = internalQuery({
 			.query("vouchers")
 			.withIndex("by_status_type", (q) => q.eq("status", "available"))
 			.collect();
-		return availableVouchers.length;
+
+		const counts: Record<string, number> = { "5": 0, "10": 0, "20": 0 };
+		for (const v of availableVouchers) {
+			counts[v.type] = (counts[v.type] || 0) + 1;
+		}
+		return counts;
 	},
 });

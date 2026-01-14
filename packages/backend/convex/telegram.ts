@@ -513,21 +513,20 @@ export const handleTelegramCallback = internalAction({
 					break;
 				}
 				case "availability": {
-					const count = await ctx.runQuery(
+					const counts = await ctx.runQuery(
 						internal.vouchers.getAvailableVoucherCount,
 					);
 
-					if (count >= 10) {
-						await sendTelegramMessage(
-							chatId,
-							`🎉 excellent availability! ${count} vouchers currently available.`,
-						);
-					} else {
-						await sendTelegramMessage(
-							chatId,
-							`📦 ${count} voucher${count !== 1 ? "s" : ""} currently available.`,
-						);
-					}
+					const getStatus = (count: number) => {
+						if (count === 0) return "🔴 none";
+						if (count < 5) return "🟡 low";
+						return "🟢 good availability";
+					};
+
+					await sendTelegramMessage(
+						chatId,
+						`€5 vouchers: ${getStatus(counts["5"])}\n€10 vouchers: ${getStatus(counts["10"])}\n€20 vouchers: ${getStatus(counts["20"])}`,
+					);
 					break;
 				}
 				case "upload": {

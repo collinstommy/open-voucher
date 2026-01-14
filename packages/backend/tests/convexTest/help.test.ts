@@ -165,7 +165,7 @@ describe("Help Callback Responses", () => {
 		expect(feedbackMsg?.text).toContain("message");
 	});
 
-	test("voucher availability callback shows exact count when under 10", async () => {
+	test("voucher availability callback shows none for €5, low for €10, good for €20", async () => {
 		const t = convexTest(schema, modules);
 		const chatId = "123456";
 		const userId = await createUser(t, { telegramChatId: chatId, coins: 100 });
@@ -181,33 +181,13 @@ describe("Help Callback Responses", () => {
 			status: "available",
 		});
 		await createVoucher(t, {
-			type: "5",
+			type: "10",
 			uploaderId: userId,
 			status: "available",
 		});
-
-		await t.action(internal.telegram.handleTelegramCallback, {
-			callbackQuery: createTelegramCallback({
-				data: "help:availability",
-				chatId,
-			}),
-		});
-
-		const availMsg = sentMessages.find(
-			(m) => m.chatId === chatId && m.text?.includes("voucher"),
-		);
-		expect(availMsg).toBeDefined();
-		expect(availMsg?.text).toContain("3");
-	});
-
-	test("voucher availability callback shows excellent availability when 10 or more", async () => {
-		const t = convexTest(schema, modules);
-		const chatId = "123456";
-		const userId = await createUser(t, { telegramChatId: chatId, coins: 100 });
-
-		for (let i = 0; i < 15; i++) {
+		for (let i = 0; i < 6; i++) {
 			await createVoucher(t, {
-				type: "10",
+				type: "20",
 				uploaderId: userId,
 				status: "available",
 			});
@@ -220,11 +200,11 @@ describe("Help Callback Responses", () => {
 			}),
 		});
 
-		const availMsg = sentMessages.find(
-			(m) => m.chatId === chatId && m.text?.toLowerCase().includes("voucher"),
-		);
+		const availMsg = sentMessages.find((m) => m.chatId === chatId);
 		expect(availMsg).toBeDefined();
-		expect(availMsg?.text).toContain("excellent");
+		expect(availMsg?.text).toContain("€5 vouchers: 🔴 none");
+		expect(availMsg?.text).toContain("€10 vouchers: 🟡 low");
+		expect(availMsg?.text).toContain("€20 vouchers: 🟢 good availability");
 	});
 
 	test("upload callback shows instruction text on how to upload", async () => {
@@ -262,7 +242,7 @@ describe("Help Callback Responses", () => {
 });
 
 describe("Voucher Availability Query", () => {
-	test("getVoucherAvailability returns correct counts", async () => {
+	test("getVoucherAvailability returns correct counts per type", async () => {
 		const t = convexTest(schema, modules);
 		const chatId = "123456";
 		const userId = await createUser(t, { telegramChatId: chatId, coins: 100 });
@@ -287,15 +267,16 @@ describe("Voucher Availability Query", () => {
 			uploaderId: userId,
 			status: "claimed",
 		});
-
-		const result = await t.run(async (ctx) => {
-			const availableVouchers = await ctx.db
-				.query("vouchers")
-				.withIndex("by_status_type", (q) => q.eq("status", "available"))
-				.collect();
-			return availableVouchers.length;
+		await createVoucher(t, {
+			type: "20",
+			uploaderId: userId,
+			status: "available",
 		});
 
-		expect(result).toBe(3);
+		const result = await t.run(async (ctx) => {
+			return await ctx.runQuery(internal.vouchers.getAvailableVoucherCount);
+		});
+
+		expect(result).toEqual({ "5": 2, "10": 1, "20": 1 });
 	});
 });
