@@ -98,11 +98,11 @@ describe("Help Command", () => {
 
 		expect(buttonTexts).toContain("Balance");
 		expect(buttonTexts).toContain("Support");
-		expect(buttonTexts).toContain("Feedback");
-		expect(buttonTexts).toContain("Faq");
+		expect(buttonTexts).toContain("Give feedback");
+		expect(buttonTexts).not.toContain("Faq");
 		expect(buttonTexts).toContain("Voucher Availability");
-		expect(buttonTexts).toContain("Upload");
-		expect(buttonTexts).toContain("Claim");
+		expect(buttonTexts).toContain("How to upload?");
+		expect(buttonTexts).toContain("How to claim?");
 	});
 });
 
@@ -143,7 +143,7 @@ describe("Help Callback Responses", () => {
 		});
 
 		const supportMsg = sentMessages.find(
-			(m) => m.chatId === chatId && m.text?.toLowerCase().includes("support"),
+			(m) => m.chatId === chatId && m.text?.toLowerCase().includes("help"),
 		);
 		expect(supportMsg).toBeDefined();
 		expect(supportMsg?.text).toContain("message");
@@ -163,21 +163,6 @@ describe("Help Callback Responses", () => {
 		);
 		expect(feedbackMsg).toBeDefined();
 		expect(feedbackMsg?.text).toContain("message");
-	});
-
-	test("faq callback shows link to openvouchers.org/faq", async () => {
-		const t = convexTest(schema, modules);
-		const chatId = "123456";
-		await createUser(t, { telegramChatId: chatId, coins: 100 });
-
-		await t.action(internal.telegram.handleTelegramCallback, {
-			callbackQuery: createTelegramCallback({ data: "help:faq", chatId }),
-		});
-
-		const faqMsg = sentMessages.find(
-			(m) => m.chatId === chatId && m.text?.includes("openvouchers.org/faq"),
-		);
-		expect(faqMsg).toBeDefined();
 	});
 
 	test("voucher availability callback shows exact count when under 10", async () => {

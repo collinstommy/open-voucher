@@ -221,8 +221,7 @@ You've been started with <b>${newUser.coins} coins</b> to get you going! 🚀
 							{ text: "Support", callback_data: "help:support" },
 						],
 						[
-							{ text: "Feedback", callback_data: "help:feedback" },
-							{ text: "Faq", callback_data: "help:faq" },
+							{ text: "Give feedback", callback_data: "help:feedback" },
 						],
 						[
 							{
@@ -231,8 +230,8 @@ You've been started with <b>${newUser.coins} coins</b> to get you going! 🚀
 							},
 						],
 						[
-							{ text: "Upload", callback_data: "help:upload" },
-							{ text: "Claim", callback_data: "help:claim" },
+							{ text: "How to upload?", callback_data: "help:upload" },
+							{ text: "How to claim?", callback_data: "help:claim" },
 						],
 					],
 				},
@@ -495,13 +494,6 @@ export const handleTelegramCallback = internalAction({
 					await sendTelegramMessage(
 						chatId,
 						"Please reply with your feedback message",
-					);
-					break;
-				}
-				case "faq": {
-					await sendTelegramMessage(
-						chatId,
-						"📖 Check our FAQ at: https://openvouchers.org/faq",
 					);
 					break;
 				}
