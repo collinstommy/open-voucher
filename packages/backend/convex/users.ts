@@ -127,7 +127,7 @@ export const createUserWithInvite = internalMutation({
 		telegramChatId: v.string(),
 		username: v.optional(v.string()),
 		firstName: v.optional(v.string()),
-		inviteCode: v.string(),
+		inviteCode: v.optional(v.string()),
 	},
 	handler: async (ctx, { telegramChatId, username, firstName, inviteCode }) => {
 		const existing = await ctx.db
@@ -150,7 +150,7 @@ export const createUserWithInvite = internalMutation({
 			firstName,
 			coins: SIGNUP_BONUS,
 			isBanned: false,
-			inviteCode: inviteCode.toUpperCase(),
+			inviteCode: inviteCode?.toUpperCase(),
 			createdAt: now,
 			lastActiveAt: now,
 		});
@@ -170,11 +170,6 @@ export const createUserWithInvite = internalMutation({
 	},
 });
 
-/**
- * Store a new message in the messages table.
- * Returns null if message already exists (deduplication).
- * Internal mutation.
- */
 export const storeMessage = internalMutation({
 	args: {
 		telegramMessageId: v.number(),
@@ -194,10 +189,6 @@ export const storeMessage = internalMutation({
 	},
 });
 
-/**
- * Update a message with the image storage ID after upload.
- * Internal mutation.
- */
 export const patchMessageImage = internalMutation({
 	args: {
 		messageId: v.id("messages"),
