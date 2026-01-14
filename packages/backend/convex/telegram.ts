@@ -130,31 +130,63 @@ export const handleTelegramMessage = internalAction({
 
 		const lowerText = text.toLowerCase().trim();
 
-		if (lowerText.startsWith("support ")) {
-			const supportText = text.slice(8).trim();
-			if (supportText.length > 0) {
-				await ctx.runMutation(internal.users.submitFeedback, {
-					userId: user._id,
-					text: supportText,
-					type: "support",
-				});
-				await sendTelegramMessage(
-					chatId,
-					"✅ Your support request has been received. We'll review your case and get back to you.",
-				);
-			} else {
-				await sendTelegramMessage(
-					chatId,
-					"⚠️ Please include your message, e.g., 'support I believe this ban is a mistake because...'",
-				);
-			}
+		// FSM: Handle user states first
+		if (user.telegramState === "waiting_for_support_message") {
+			await ctx.runMutation(internal.users.submitFeedback, {
+				userId: user._id,
+				text,
+				type: "support",
+			});
+			await ctx.runMutation(internal.users.clearUserTelegramState, {
+				userId: user._id,
+			});
+			await sendTelegramMessage(
+				chatId,
+				"✅ Your support request has been received. We'll review your case and get back to you.",
+			);
+			return;
+		}
+
+		if (user.telegramState === "waiting_for_feedback_message") {
+			await ctx.runMutation(internal.users.submitFeedback, {
+				userId: user._id,
+				text,
+				type: "feedback",
+			});
+			await ctx.runMutation(internal.users.clearUserTelegramState, {
+				userId: user._id,
+			});
+			await sendTelegramMessage(
+				chatId,
+				"✅ Thanks for your feedback! We read every message.",
+			);
+			return;
+		}
+
+		if (user.telegramState === "waiting_for_ban_appeal") {
+			await ctx.runMutation(internal.users.submitFeedback, {
+				userId: user._id,
+				text,
+				type: "support",
+			});
+			await ctx.runMutation(internal.users.clearUserTelegramState, {
+				userId: user._id,
+			});
+			await sendTelegramMessage(
+				chatId,
+				"✅ Your appeal has been received. We'll review your case and get back to you.",
+			);
 			return;
 		}
 
 		if (user.isBanned) {
+			await ctx.runMutation(internal.users.setUserTelegramState, {
+				userId: user._id,
+				state: "waiting_for_ban_appeal",
+			});
 			await sendTelegramMessage(
 				chatId,
-				"🚫 Your account has been banned from this service.\n\nIf you believe this is a mistake, you can dispute this ban by sending: 'support YOUR_MESSAGE'",
+				"🚫 Your account has been banned from this service.\n\nPlease reply with a message describing why you think this is an error.",
 			);
 			return;
 		}
@@ -178,13 +210,10 @@ export const handleTelegramMessage = internalAction({
 					});
 				}
 
-				await ctx.runMutation(
-					internal.vouchers.uploadVoucher,
-					{
-						userId: user._id,
-						imageStorageId: storageId,
-					},
-				);
+				await ctx.runMutation(internal.vouchers.uploadVoucher, {
+					userId: user._id,
+					imageStorageId: storageId,
+				});
 			} catch (e) {
 				console.error(e);
 				await sendTelegramMessage(chatId, "❌ Failed to process image.");
@@ -198,8 +227,28 @@ export const handleTelegramMessage = internalAction({
 			return;
 		} else if (lowerText === "/help" || lowerText === "help") {
 			await sendTelegramMessage(
-				chatId,
-				`📸 Send screenshot to upload vouchers and earn coins\n💳 Send <b>5</b> , <b>10</b>, or <b>20</b> to claim a voucher\n💰 <b>balance</b> to view your balance of coin\n📝 <b>feedback [msg]</b> to send us feedback`,
+				chatId,`Choose an option below`,
+				{
+					inline_keyboard: [
+						[
+							{ text: "Balance", callback_data: "help:balance" },
+							{ text: "Support", callback_data: "help:support" },
+						],
+						[
+							{ text: "Give feedback", callback_data: "help:feedback" },
+						],
+						[
+							{
+								text: "Voucher Availability",
+								callback_data: "help:availability",
+							},
+						],
+						[
+							{ text: "How to upload?", callback_data: "help:upload" },
+							{ text: "How to claim?", callback_data: "help:claim" },
+						],
+					],
+				},
 			);
 			return;
 		} else if (lowerText.startsWith("feedback ")) {
@@ -269,7 +318,11 @@ export const sendMessageAction = internalAction({
 	},
 });
 
-async function sendTelegramMessage(chatId: string, text: string) {
+async function sendTelegramMessage(
+	chatId: string,
+	text: string,
+	replyMarkup?: any,
+) {
 	const token = process.env.TELEGRAM_BOT_TOKEN;
 	if (!token) {
 		console.error("TELEGRAM_BOT_TOKEN is not set");
@@ -278,10 +331,14 @@ async function sendTelegramMessage(chatId: string, text: string) {
 
 	const url = `https://api.telegram.org/bot${token}/sendMessage`;
 	try {
+		const body: any = { chat_id: chatId, text, parse_mode: "HTML" };
+		if (replyMarkup) {
+			body.reply_markup = JSON.stringify(replyMarkup);
+		}
 		const response = await fetch(url, {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ chat_id: chatId, text, parse_mode: "HTML" }),
+			body: JSON.stringify(body),
 		});
 
 		if (!response.ok) {
@@ -366,9 +423,13 @@ export const handleTelegramCallback = internalAction({
 			}
 
 			if (user.isBanned) {
+				await ctx.runMutation(internal.users.setUserTelegramState, {
+					userId: user._id,
+					state: "waiting_for_ban_appeal",
+				});
 				await sendTelegramMessage(
 					chatId,
-					"🚫 Your account has been banned from this service.\n\nIf you believe this is a mistake, you can dispute this ban by sending: 'support YOUR_MESSAGE'",
+					"🚫 Your account has been banned from this service.\n\nPlease reply with a message describing why you think this is an error.",
 				);
 				return;
 			}
@@ -410,6 +471,77 @@ export const handleTelegramCallback = internalAction({
 			} else if (result.status === "reported") {
 				// Should not happen if everything goes right, but just in case
 				await sendTelegramMessage(chatId, "✅ Report received.");
+			}
+		} else if (data.startsWith("help:")) {
+			await answerTelegramCallback(callbackQuery.id);
+
+			const helpAction = data.split(":")[1];
+			const user = await ctx.runQuery(internal.users.getUserByTelegramChatId, {
+				telegramChatId: chatId,
+			});
+
+			if (!user) {
+				return;
+			}
+
+			switch (helpAction) {
+				case "balance": {
+					await sendTelegramMessage(chatId, `💰 You have ${user.coins} coins.`);
+					break;
+				}
+				case "support": {
+					await ctx.runMutation(internal.users.setUserTelegramState, {
+						userId: user._id,
+						state: "waiting_for_support_message",
+					});
+					await sendTelegramMessage(
+						chatId,
+						"Please reply with a message describing what you need help with",
+					);
+					break;
+				}
+				case "feedback": {
+					await ctx.runMutation(internal.users.setUserTelegramState, {
+						userId: user._id,
+						state: "waiting_for_feedback_message",
+					});
+					await sendTelegramMessage(
+						chatId,
+						"Please reply with your feedback message",
+					);
+					break;
+				}
+				case "availability": {
+					const counts = await ctx.runQuery(
+						internal.vouchers.getAvailableVoucherCount,
+					);
+
+					const getStatus = (count: number) => {
+						if (count === 0) return "🔴 none";
+						if (count < 5) return "🟡 low";
+						return "🟢 good availability";
+					};
+
+					await sendTelegramMessage(
+						chatId,
+						`€5 vouchers: ${getStatus(counts["5"])}\n€10 vouchers: ${getStatus(counts["10"])}\n€20 vouchers: ${getStatus(counts["20"])}`,
+					);
+					break;
+				}
+				case "upload": {
+					await sendTelegramMessage(
+						chatId,
+						"📸 To upload a voucher, simply send a screenshot of your voucher. Make sure the screenshot shows the barcode clearly.",
+					);
+					break;
+				}
+				case "claim": {
+					await sendTelegramMessage(
+						chatId,
+						"💳 To claim a voucher, send <b>5</b>, <b>10</b>, or <b>20</b> depending on the voucher value you want.",
+					);
+					break;
+				}
 			}
 		}
 	},

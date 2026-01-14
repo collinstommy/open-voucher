@@ -215,3 +215,28 @@ export const submitFeedback = internalMutation({
 		});
 	},
 });
+
+export const setUserTelegramState = internalMutation({
+	args: {
+		userId: v.id("users"),
+		state: v.optional(
+			v.union(
+				v.literal("waiting_for_support_message"),
+				v.literal("waiting_for_feedback_message"),
+				v.literal("waiting_for_ban_appeal"),
+			),
+		),
+	},
+	handler: async (ctx, { userId, state }) => {
+		await ctx.db.patch(userId, { telegramState: state });
+	},
+});
+
+export const clearUserTelegramState = internalMutation({
+	args: {
+		userId: v.id("users"),
+	},
+	handler: async (ctx, { userId }) => {
+		await ctx.db.patch(userId, { telegramState: undefined });
+	},
+});
