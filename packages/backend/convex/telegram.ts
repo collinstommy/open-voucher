@@ -10,7 +10,7 @@ const TUTORIAL_STEP_1_MESSAGE =
 	"Let's show you how to use the bot. Send the number <b>10</b> to get a voucher.";
 
 const TUTORIAL_STEP_1_RETRY_MESSAGE =
-	"Please send the number <b>0</b> to continue the tutorial.";
+	"Please send the number <b>10</b> to continue the tutorial.";
 
 const TUTORIAL_COMPLETE_MESSAGE = (coins: number) => `
 You are now ready to go!
@@ -34,11 +34,10 @@ We've given you a welcome bonus of <b>${coins} coins</b> to get you started! �
 <b>Important</b>
 • Please do not use vouchers you have already uploaded. Request a voucher through the bot instead.
 • Only report a voucher as not working, when it does not scan at the till. Please do not report a voucher for any other reason.
-`
-;
+`;
 
 function getWelcomeMessage(coins: number): string {
-	return `🎉 <b>Welcome to Dunnes Voucher Bot!</b>`
+	return `🎉 <b>Welcome to Dunnes Voucher Bot!</b>`;
 }
 
 function getBetaMessage(): string {
@@ -53,9 +52,318 @@ async function getSampleVoucherImageUrl(ctx: any): Promise<string | null> {
 	return await ctx.storage.getUrl(storageId);
 }
 
-/**
- * Handle incoming Telegram message.
- */
+async function handleNewUser(
+	ctx: any,
+	chatId: string,
+	text: string,
+	username: string | undefined,
+	firstName: string,
+) {
+	const requireInviteCode = process.env.REQUIRE_INVITE_CODE === "true";
+
+	if (!requireInviteCode) {
+		const newUser = await ctx.runMutation(
+			internal.users.createUserWithInvite,
+			{
+				telegramChatId: chatId,
+				username,
+				firstName,
+			},
+		);
+		await sendTelegramMessage(chatId, getWelcomeMessage(newUser.coins));
+		await sendTelegramMessage(chatId, getBetaMessage());
+		await ctx.runMutation(internal.users.setUserOnboardingStep, {
+			userId: newUser._id,
+			step: 1,
+		});
+		await sendTelegramMessage(chatId, TUTORIAL_STEP_1_MESSAGE);
+		return;
+	}
+
+	if (text.startsWith("/start")) {
+		await sendTelegramMessage(
+			chatId,
+			"👋 Welcome! You need an invite code to join. Respond with 'code YOUR_INVITE_CODE_HERE'",
+		);
+		return;
+	}
+
+	if (text.startsWith("code") || text.startsWith("Code")) {
+		const parts = text.split(" ");
+		const code = parts.length > 1 ? parts[1] : null;
+
+		if (!code) {
+			await sendTelegramMessage(
+				chatId,
+				"👋 Welcome! You need an invite code to join. Respond with 'code YOUR_INVITE_CODE_HERE'",
+			);
+			return;
+		}
+
+		const result = await ctx.runMutation(
+			internal.users.validateAndUseInviteCode,
+			{ code },
+		);
+
+		if (!result.valid) {
+			await sendTelegramMessage(chatId, `❌ ${result.reason}`);
+			return;
+		}
+
+		const newUser = await ctx.runMutation(
+			internal.users.createUserWithInvite,
+			{
+				telegramChatId: chatId,
+				username,
+				firstName,
+				inviteCode: code,
+			},
+		);
+		await sendTelegramMessage(chatId, getWelcomeMessage(newUser.coins));
+		await sendTelegramMessage(chatId, getBetaMessage());
+		return;
+	}
+
+	await sendTelegramMessage(
+		chatId,
+		"👋 Welcome! You need an invite code to join. Respond with 'code YOUR_INVITE_CODE_HERE'",
+	);
+}
+
+async function handleUserState(
+	ctx: any,
+	chatId: string,
+	text: string,
+	user: any,
+) {
+	switch (user.telegramState) {
+		case "waiting_for_support_message":
+			await ctx.runMutation(internal.users.submitFeedback, {
+				userId: user._id,
+				text,
+				type: "support",
+			});
+			await ctx.runMutation(internal.users.clearUserTelegramState, {
+				userId: user._id,
+			});
+			await sendTelegramMessage(
+				chatId,
+				"✅ Your support request has been received. We'll review your case and get back to you.",
+			);
+			return true;
+
+		case "waiting_for_feedback_message":
+			await ctx.runMutation(internal.users.submitFeedback, {
+				userId: user._id,
+				text,
+				type: "feedback",
+			});
+			await ctx.runMutation(internal.users.clearUserTelegramState, {
+				userId: user._id,
+			});
+			await sendTelegramMessage(
+				chatId,
+				"✅ Thanks for your feedback! We read every message.",
+			);
+			return true;
+
+		case "waiting_for_ban_appeal":
+			await ctx.runMutation(internal.users.submitFeedback, {
+				userId: user._id,
+				text,
+				type: "support",
+			});
+			await ctx.runMutation(internal.users.clearUserTelegramState, {
+				userId: user._id,
+			});
+			await sendTelegramMessage(
+				chatId,
+				"✅ Your appeal has been received. We'll review your case and get back to you.",
+			);
+			return true;
+
+		case "onboarding_tutorial":
+			return await handleOnboardingTutorial(ctx, chatId, text, user);
+
+		default:
+			return false;
+	}
+}
+
+async function handleOnboardingTutorial(
+	ctx: any,
+	chatId: string,
+	text: string,
+	user: any,
+) {
+	const step = user.onboardingStep ?? 1;
+
+	if (step === 1 && text.toLowerCase().trim() === "10") {
+		await ctx.runMutation(internal.users.setUserOnboardingStep, {
+			userId: user._id,
+			step: 2,
+		});
+		const imageUrl = await getSampleVoucherImageUrl(ctx);
+		if (imageUrl) {
+			await sendTelegramPhoto(chatId, imageUrl, "Here is your sample voucher!");
+		} else {
+			console.error('Sample image not found')
+			await sendTelegramMessage(chatId, "Here is your sample voucher!");
+		}
+		await ctx.runMutation(internal.users.clearOnboardingTutorial, {
+			userId: user._id,
+		});
+		await sendTelegramMessage(chatId, TUTORIAL_COMPLETE_MESSAGE(user.coins));
+		return true;
+	}
+
+	if (step === 1) {
+		await sendTelegramMessage(chatId, TUTORIAL_STEP_1_RETRY_MESSAGE);
+		return true;
+	}
+
+	return false;
+}
+
+async function handleImageUpload(
+	ctx: any,
+	chatId: string,
+	message: any,
+	messageDbId: any,
+	user: any,
+) {
+	await sendTelegramMessage(chatId, "📸 Processing your voucher...");
+
+	const photo = message.photo[message.photo.length - 1];
+	const fileId = photo.file_id;
+
+	try {
+		const imageUrl = await getTelegramFileUrl(fileId);
+		const imageBlob = await fetch(imageUrl).then((r) => r.blob());
+		const storageId = await ctx.storage.store(imageBlob);
+
+		if (messageDbId) {
+			await ctx.runMutation(internal.users.patchMessageImage, {
+				messageId: messageDbId,
+				imageStorageId: storageId,
+			});
+		}
+
+		await ctx.runMutation(internal.vouchers.uploadVoucher, {
+			userId: user._id,
+			imageStorageId: storageId,
+		});
+	} catch (e) {
+		console.error(e);
+		await sendTelegramMessage(chatId, "❌ Failed to process image.");
+	}
+}
+
+async function handleCommand(
+	ctx: any,
+	chatId: string,
+	lowerText: string,
+	text: string,
+	user: any,
+) {
+	if (lowerText === "balance") {
+		await sendTelegramMessage(chatId, `💰 You have ${user.coins} coins.`);
+		return true;
+	}
+
+	if (lowerText === "help") {
+		await sendTelegramMessage(
+			chatId,
+			"Choose an option below",
+			{
+				inline_keyboard: [
+					[
+						{ text: "Balance", callback_data: "help:balance" },
+						{ text: "Support", callback_data: "help:support" },
+					],
+					[
+						{ text: "Give feedback", callback_data: "help:feedback" },
+					],
+					[
+						{
+							text: "Voucher Availability",
+							callback_data: "help:availability",
+						},
+					],
+					[
+						{ text: "How to upload?", callback_data: "help:upload" },
+						{ text: "How to claim?", callback_data: "help:claim" },
+					],
+				],
+			},
+		);
+		return true;
+	}
+
+	if (lowerText.startsWith("feedback ")) {
+		const feedbackText = text.slice(9).trim();
+		if (feedbackText.length > 0) {
+			await ctx.runMutation(internal.users.submitFeedback, {
+				userId: user._id,
+				text: feedbackText,
+			});
+			await sendTelegramMessage(
+				chatId,
+				"✅ Thanks for your feedback! We read every message.",
+			);
+		} else {
+			await sendTelegramMessage(
+				chatId,
+				"⚠️ Please include a message, e.g., 'feedback fix this bug!'",
+			);
+		}
+		return true;
+	}
+
+	return false;
+}
+
+async function handleVoucherRequest(
+	ctx: any,
+	chatId: string,
+	lowerText: string,
+	user: any,
+) {
+	const match = lowerText.match(/\b(5|10|20)\b/);
+	if (!match) return false;
+
+	// Only respond if message is short (< 10 chars)
+	if (lowerText.length >= 10) return false;
+
+	const type = match[1] as "5" | "10" | "20";
+	const result = await ctx.runMutation(internal.vouchers.requestVoucher, {
+		userId: user._id,
+		type,
+	});
+
+	if (!result.success) {
+		await sendTelegramMessage(chatId, `❌ ${result.error}`);
+	} else {
+		await sendTelegramPhoto(
+			chatId,
+			result.imageUrl!,
+			`✅ <b>Here is your €${type} voucher!</b>\n\nExpires: ${dayjs(result.expiryDate!).format("MMM Do")}\nRemaining coins: ${result.remainingCoins}`,
+			{
+				inline_keyboard: [
+					[
+						{
+							text: "⚠️ Its not working",
+							callback_data: `report:${result.voucherId}`,
+						},
+					],
+				],
+			},
+		);
+	}
+	return true;
+}
+
+
 export const handleTelegramMessage = internalAction({
 	args: {
 		message: v.any(),
@@ -70,8 +378,6 @@ export const handleTelegramMessage = internalAction({
 		const mediaGroupId = message.media_group_id;
 
 		// 1. Idempotency Check & Storage
-		// Store message immediately. If it exists, this returns null.
-		// For now, we ignore images content, just storing the fact that it was an image
 		const messageDbId = await ctx.runMutation(internal.users.storeMessage, {
 			telegramMessageId: messageId,
 			telegramChatId: chatId,
@@ -79,7 +385,7 @@ export const handleTelegramMessage = internalAction({
 			messageType: isImage ? "image" : "text",
 			text: text,
 			mediaGroupId,
-			imageStorageId: undefined, // Ignoring image storage for this step
+			imageStorageId: undefined,
 		});
 
 		if (!messageDbId) {
@@ -92,148 +398,13 @@ export const handleTelegramMessage = internalAction({
 		});
 
 		if (!user) {
-			const requireInviteCode = process.env.REQUIRE_INVITE_CODE === "true";
-
-			if (!requireInviteCode) {
-				const newUser = await ctx.runMutation(
-					internal.users.createUserWithInvite,
-					{
-						telegramChatId: chatId,
-						username,
-						firstName
-					},
-				);
-				await sendTelegramMessage(chatId, getWelcomeMessage(newUser.coins));
-				await sendTelegramMessage(chatId, getBetaMessage());
-				await ctx.runMutation(internal.users.setUserOnboardingStep, {
-					userId: newUser._id,
-					step: 1,
-				});
-				await sendTelegramMessage(chatId, TUTORIAL_STEP_1_MESSAGE);
-				return;
-			}
-
-			if (text.startsWith("/start")) {
-				await sendTelegramMessage(
-					chatId,
-					"👋 Welcome! You need an invite code to join. Respond with 'code YOUR_INVITE_CODE_HERE' ",
-				);
-				return;
-			}
-
-			if (text.startsWith("code") || text.startsWith("Code")) {
-				const parts = text.split(" ");
-				const code = parts.length > 1 ? parts[1] : null;
-
-				if (code) {
-					const result = await ctx.runMutation(
-						internal.users.validateAndUseInviteCode,
-						{ code },
-					);
-
-					if (result.valid) {
-						const newUser = await ctx.runMutation(
-							internal.users.createUserWithInvite,
-							{
-								telegramChatId: chatId,
-								username,
-								firstName,
-								inviteCode: code,
-							},
-						);
-						await sendTelegramMessage(chatId, getWelcomeMessage(newUser.coins));
-						await sendTelegramMessage(chatId, getBetaMessage());
-						return;
-					} else {
-						await sendTelegramMessage(chatId, `❌ ${result.reason}`);
-						return;
-					}
-				}
-			}
-			await sendTelegramMessage(
-				chatId,
-				"👋 Welcome! You need an invite code to join. Respond with 'code YOUR_INVITE_CODE_HERE' ",
-			);
+			await handleNewUser(ctx, chatId, text, username, firstName);
 			return;
 		}
 
-		const lowerText = text.toLowerCase().trim();
-
-		if (user.telegramState === "waiting_for_support_message") {
-			await ctx.runMutation(internal.users.submitFeedback, {
-				userId: user._id,
-				text,
-				type: "support",
-			});
-			await ctx.runMutation(internal.users.clearUserTelegramState, {
-				userId: user._id,
-			});
-			await sendTelegramMessage(
-				chatId,
-				"✅ Your support request has been received. We'll review your case and get back to you.",
-			);
-			return;
-		}
-
-		if (user.telegramState === "waiting_for_feedback_message") {
-			await ctx.runMutation(internal.users.submitFeedback, {
-				userId: user._id,
-				text,
-				type: "feedback",
-			});
-			await ctx.runMutation(internal.users.clearUserTelegramState, {
-				userId: user._id,
-			});
-			await sendTelegramMessage(
-				chatId,
-				"✅ Thanks for your feedback! We read every message.",
-			);
-			return;
-		}
-
-		if (user.telegramState === "waiting_for_ban_appeal") {
-			await ctx.runMutation(internal.users.submitFeedback, {
-				userId: user._id,
-				text,
-				type: "support",
-			});
-			await ctx.runMutation(internal.users.clearUserTelegramState, {
-				userId: user._id,
-			});
-			await sendTelegramMessage(
-				chatId,
-				"✅ Your appeal has been received. We'll review your case and get back to you.",
-			);
-			return;
-		}
-
-		if (user.telegramState === "onboarding_tutorial") {
-			const step = user.onboardingStep ?? 1;
-
-			if (step === 1) {
-				const lowerText = text.toLowerCase().trim();
-				if (lowerText === "10") {
-					await ctx.runMutation(internal.users.setUserOnboardingStep, {
-						userId: user._id,
-						step: 2,
-					});
-					// Send sample image
-					const imageUrl = await getSampleVoucherImageUrl(ctx);
-					if (imageUrl) {
-						await sendTelegramPhoto(chatId, imageUrl, "Here is your sample voucher!");
-					} else {
-						await sendTelegramMessage(chatId, "Here is your sample voucher!");
-					}
-					await ctx.runMutation(internal.users.clearOnboardingTutorial, {
-						userId: user._id,
-					});
-					await sendTelegramMessage(chatId, TUTORIAL_COMPLETE_MESSAGE(user.coins));
-				} else {
-					await sendTelegramMessage(chatId, TUTORIAL_STEP_1_RETRY_MESSAGE);
-				}
-				return;
-		}
-	}
+		// handle user state (support, feedback, onboarding, etc.)
+		const stateHandled = await handleUserState(ctx, chatId, text, user);
+		if (stateHandled) return;
 
 		if (user.isBanned) {
 			await ctx.runMutation(internal.users.setUserTelegramState, {
@@ -248,120 +419,16 @@ export const handleTelegramMessage = internalAction({
 		}
 
 		if (isImage) {
-			await sendTelegramMessage(chatId, "📸 Processing your voucher...");
-
-			// Telegram sends multiple sizes, take the largest (last one)
-			const photo = message.photo[message.photo.length - 1];
-			const fileId = photo.file_id;
-
-			try {
-				const imageUrl = await getTelegramFileUrl(fileId);
-				const imageBlob = await fetch(imageUrl).then((r) => r.blob());
-				const storageId = await ctx.storage.store(imageBlob);
-
-				if (messageDbId) {
-					await ctx.runMutation(internal.users.patchMessageImage, {
-						messageId: messageDbId,
-						imageStorageId: storageId,
-					});
-				}
-
-				await ctx.runMutation(internal.vouchers.uploadVoucher, {
-					userId: user._id,
-					imageStorageId: storageId,
-				});
-			} catch (e) {
-				console.error(e);
-				await sendTelegramMessage(chatId, "❌ Failed to process image.");
-			}
+			await handleImageUpload(ctx, chatId, message, messageDbId, user);
 			return;
 		}
 
-		// 5. Handle Commands
-		if (lowerText === "/balance" || lowerText === "balance") {
-			await sendTelegramMessage(chatId, `💰 You have ${user.coins} coins.`);
-			return;
-		} else if (lowerText === "/help" || lowerText === "help") {
-			await sendTelegramMessage(
-				chatId,`Choose an option below`,
-				{
-					inline_keyboard: [
-						[
-							{ text: "Balance", callback_data: "help:balance" },
-							{ text: "Support", callback_data: "help:support" },
-						],
-						[
-							{ text: "Give feedback", callback_data: "help:feedback" },
-						],
-						[
-							{
-								text: "Voucher Availability",
-								callback_data: "help:availability",
-							},
-						],
-						[
-							{ text: "How to upload?", callback_data: "help:upload" },
-							{ text: "How to claim?", callback_data: "help:claim" },
-						],
-					],
-				},
-			);
-			return;
-		} else if (lowerText.startsWith("feedback ")) {
-			const feedbackText = text.slice(9).trim();
-			if (feedbackText.length > 0) {
-				await ctx.runMutation(internal.users.submitFeedback, {
-					userId: user._id,
-					text: feedbackText,
-				});
-				await sendTelegramMessage(
-					chatId,
-					"✅ Thanks for your feedback! We read every message.",
-				);
-			} else {
-				await sendTelegramMessage(
-					chatId,
-					"⚠️ Please include a message, e.g., 'feedback fix this bug!'",
-				);
-			}
-			return;
-		}
+		const lowerText = text.toLowerCase().trim();
 
-		// Handle Voucher Requests
-		const match = lowerText.match(/\b(5|10|20)\b/);
-		if (match) {
-		}
-			const type = match[1] as "5" | "10" | "20";
-			// We do a loose check: if message length is short (< 20 chars) and contains the number
-			if (lowerText.length < 10) {
-				const result = await ctx.runMutation(internal.vouchers.requestVoucher, {
-					userId: user._id,
-					type,
-				});
+		if (await handleCommand(ctx, chatId, lowerText, text, user)) return;
 
-				if (!result.success) {
-					await sendTelegramMessage(chatId, `❌ ${result.error}`);
-				} else {
-					// Image URL is now guaranteed to be present if success is true
-					await sendTelegramPhoto(
-						chatId,
-						result.imageUrl!,
-						`✅ <b>Here is your €${type} voucher!</b>\n\nExpires: ${dayjs(result.expiryDate!).format("MMM Do")}\nRemaining coins: ${result.remainingCoins}`,
-						{
-							inline_keyboard: [
-								[
-									{
-										text: "⚠️ Its not working",
-										callback_data: `report:${result.voucherId}`,
-									},
-								],
-							],
-						},
-					);
-				}
-				return;
-			}
-	}
+		if (await handleVoucherRequest(ctx, chatId, lowerText, user)) return;
+	},
 });
 
 export const sendMessageAction = internalAction({
@@ -417,7 +484,6 @@ async function sendTelegramPhoto(
 		return;
 	}
 
-	// Handle placeholder "image" for tutorial
 	if (photoUrl === "image") {
 		await sendTelegramMessage(chatId, caption || "Sample image placeholder", replyMarkup);
 		return;
@@ -425,7 +491,6 @@ async function sendTelegramPhoto(
 
 	const url = `https://api.telegram.org/bot${token}/sendPhoto`;
 	try {
-		// 1. Fetch the image from the Storage URL
 		const imageRes = await fetch(photoUrl);
 		if (!imageRes.ok) {
 			console.error(
@@ -443,7 +508,6 @@ async function sendTelegramPhoto(
 			formData.append("parse_mode", "HTML");
 		}
 		if (replyMarkup) {
-			// reply_markup must be a JSON string when using multipart/form-data
 			formData.append("reply_markup", JSON.stringify(replyMarkup));
 		}
 
@@ -520,7 +584,7 @@ export const handleTelegramCallback = internalAction({
 								{
 									text: "⚠️ Its not working",
 									callback_data: `report:${result.voucher._id}`,
-								}, // Allow reporting the replacement too
+								},
 							],
 						],
 					},
@@ -531,7 +595,6 @@ export const handleTelegramCallback = internalAction({
 					"⚠️ No replacement vouchers available.",
 				);
 			} else if (result.status === "reported") {
-				// Should not happen if everything goes right, but just in case
 				await sendTelegramMessage(chatId, "✅ Report received.");
 			}
 		} else if (data.startsWith("help:")) {
