@@ -9,7 +9,13 @@ export interface MockGeminiParams {
 }
 
 export function mockGeminiResponse(params: MockGeminiParams) {
-	const { type, validFromDay = null, validFromMonth = null, expiryDate = null, barcode = null } = params;
+	const {
+		type,
+		validFromDay = null,
+		validFromMonth = null,
+		expiryDate = null,
+		barcode = null,
+	} = params;
 	return {
 		candidates: [
 			{
@@ -35,7 +41,6 @@ export function mockTelegramResponse() {
 	return { ok: true, result: { message_id: 123 } };
 }
 
-
 export interface CreateTelegramMessageParams {
 	text: string;
 	chatId?: string;
@@ -43,7 +48,11 @@ export interface CreateTelegramMessageParams {
 }
 
 export function createTelegramMessage(params: CreateTelegramMessageParams): any;
-export function createTelegramMessage(text: string, chatId?: string, username?: string): any;
+export function createTelegramMessage(
+	text: string,
+	chatId?: string,
+	username?: string,
+): any;
 export function createTelegramMessage(
 	textOrParams: string | CreateTelegramMessageParams,
 	chatIdOrUndefined?: string,
@@ -77,7 +86,9 @@ export interface CreateTelegramPhotoMessageParams {
 	chatId?: string;
 }
 
-export function createTelegramPhotoMessage(params?: CreateTelegramPhotoMessageParams): any {
+export function createTelegramPhotoMessage(
+	params?: CreateTelegramPhotoMessageParams,
+): any {
 	const chatId = params?.chatId ?? "123456";
 	const numericChatId = isNaN(Number(chatId)) ? chatId : Number(chatId);
 	return {
@@ -97,7 +108,9 @@ export interface CreateTelegramCallbackParams {
 	chatId?: string;
 }
 
-export function createTelegramCallback(params: CreateTelegramCallbackParams): any;
+export function createTelegramCallback(
+	params: CreateTelegramCallbackParams,
+): any;
 export function createTelegramCallback(data: string, chatId?: string): any;
 export function createTelegramCallback(
 	dataOrParams: string | CreateTelegramCallbackParams,
@@ -126,7 +139,6 @@ export function createTelegramCallback(
 	};
 }
 
-
 export interface CreateUserParams {
 	telegramChatId: string | number;
 	username?: string;
@@ -141,7 +153,10 @@ export async function createUser(
 	t: any,
 	params: CreateUserParams,
 ): Promise<Id<"users">> {
-	const chatId = typeof params.telegramChatId === "string" ? params.telegramChatId : String(params.telegramChatId);
+	const chatId =
+		typeof params.telegramChatId === "string"
+			? params.telegramChatId
+			: String(params.telegramChatId);
 	return await t.run(async (ctx: any) => {
 		return await ctx.db.insert("users", {
 			telegramChatId: chatId,
@@ -176,10 +191,11 @@ export async function createVoucher(
 		return await ctx.db.insert("vouchers", {
 			type: params.type,
 			status: params.status ?? "available",
-			imageStorageId: params.imageStorageId ?? (await ctx.storage.store(new Blob(["test"]))),
+			imageStorageId:
+				params.imageStorageId ?? (await ctx.storage.store(new Blob(["test"]))),
 			uploaderId: params.uploaderId,
-			expiryDate: params.expiryDate ?? (Date.now() + 7 * 24 * 60 * 60 * 1000),
-			validFrom: params.validFrom ?? (Date.now() - 24 * 60 * 60 * 1000),
+			expiryDate: params.expiryDate ?? Date.now() + 7 * 24 * 60 * 60 * 1000,
+			validFrom: params.validFrom ?? Date.now() - 24 * 60 * 60 * 1000,
 			barcodeNumber: params.barcodeNumber,
 			claimedAt: params.claimedAt,
 			claimerId: params.claimerId,
@@ -187,7 +203,6 @@ export async function createVoucher(
 		});
 	});
 }
-
 
 export type OCRScenario =
 	| "valid_10"

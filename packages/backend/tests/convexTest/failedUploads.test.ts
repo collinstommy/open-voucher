@@ -45,13 +45,55 @@ function setupFetchMock(geminiScenario: OCRSenario = "valid_10") {
 	const todayDateStr = todayDate.toISOString().split("T")[0];
 
 	const scenarios = {
-		valid_10: mockGeminiResponse({ type: 10, validFromDay, validFromMonth, expiryDate: futureDateStr, barcode: "1234567890002" }),
-		expired: mockGeminiResponse({ type: 10, validFromDay, validFromMonth, expiryDate: pastDateStr, barcode: "1234567890004" }),
-		invalid_type: mockGeminiResponse({ type: 0, validFromDay, validFromMonth, expiryDate: futureDateStr, barcode: "1234567890005" }),
-		missing_valid_from: mockGeminiResponse({ type: 10, validFromDay: null, validFromMonth: null, expiryDate: futureDateStr, barcode: "1234567890006" }),
-		missing_expiry: mockGeminiResponse({ type: 10, validFromDay, validFromMonth, expiryDate: null, barcode: "1234567890008" }),
-		missing_barcode: mockGeminiResponse({ type: 10, validFromDay, validFromMonth, expiryDate: futureDateStr, barcode: null }),
-		too_late_today: mockGeminiResponse({ type: 10, validFromDay, validFromMonth, expiryDate: todayDateStr, barcode: "1234567890010" }),
+		valid_10: mockGeminiResponse({
+			type: 10,
+			validFromDay,
+			validFromMonth,
+			expiryDate: futureDateStr,
+			barcode: "1234567890002",
+		}),
+		expired: mockGeminiResponse({
+			type: 10,
+			validFromDay,
+			validFromMonth,
+			expiryDate: pastDateStr,
+			barcode: "1234567890004",
+		}),
+		invalid_type: mockGeminiResponse({
+			type: 0,
+			validFromDay,
+			validFromMonth,
+			expiryDate: futureDateStr,
+			barcode: "1234567890005",
+		}),
+		missing_valid_from: mockGeminiResponse({
+			type: 10,
+			validFromDay: null,
+			validFromMonth: null,
+			expiryDate: futureDateStr,
+			barcode: "1234567890006",
+		}),
+		missing_expiry: mockGeminiResponse({
+			type: 10,
+			validFromDay,
+			validFromMonth,
+			expiryDate: null,
+			barcode: "1234567890008",
+		}),
+		missing_barcode: mockGeminiResponse({
+			type: 10,
+			validFromDay,
+			validFromMonth,
+			expiryDate: futureDateStr,
+			barcode: null,
+		}),
+		too_late_today: mockGeminiResponse({
+			type: 10,
+			validFromDay,
+			validFromMonth,
+			expiryDate: todayDateStr,
+			barcode: "1234567890010",
+		}),
 		gemini_api_error: null,
 	};
 

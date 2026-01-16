@@ -1,42 +1,21 @@
 import { Button } from "@/components/ui/button";
-import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuRadioGroup,
-	DropdownMenuRadioItem,
-	DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { useAdminAuth } from '@/hooks/useAdminAuth';
+import { useAdminAuth } from "@/hooks/useAdminAuth";
 
-import { api } from "@open-router/backend/convex/_generated/api";
+import { api } from "@open-voucher/backend/convex/_generated/api";
 import { createFileRoute } from "@tanstack/react-router";
-import { ChevronDownIcon } from "lucide-react";
-import { useState } from "react";
 import { usePaginatedQuery } from "convex/react";
 
 export const Route = createFileRoute("/vouchers")({
 	component: VouchersPage,
 });
 
-
 function VouchersPage() {
 	const { token } = useAdminAuth();
-	const [deployment, setDeployment] = useState<"dev" | "prod">(() => {
-		if (typeof window === "undefined") return "prod";
-		return (
-			(localStorage.getItem("convex-deployment") as "dev" | "prod") || "prod"
-		);
-	});
-
-	const handleDeploymentChange = (value: string) => {
-		localStorage.setItem("convex-deployment", value);
-		window.location.reload();
-	};
 
 	const { results, status, loadMore } = usePaginatedQuery(
 		api.admin.getAllVouchers,
 		token ? { token } : "skip",
-		{ initialNumItems: 50 }
+		{ initialNumItems: 50 },
 	);
 
 	const isLoading = status === "LoadingFirstPage";
@@ -72,27 +51,6 @@ function VouchersPage() {
 						</span>
 					)}
 				</h1>
-				<DropdownMenu>
-					<DropdownMenuTrigger asChild>
-						<Button variant="outline" size="sm">
-							{deployment === "dev" ? "Development" : "Production"}
-							<ChevronDownIcon />
-						</Button>
-					</DropdownMenuTrigger>
-					<DropdownMenuContent align="end">
-						<DropdownMenuRadioGroup
-							value={deployment}
-							onValueChange={handleDeploymentChange}
-						>
-							<DropdownMenuRadioItem value="dev">
-								Development
-							</DropdownMenuRadioItem>
-							<DropdownMenuRadioItem value="prod">
-								Production
-							</DropdownMenuRadioItem>
-						</DropdownMenuRadioGroup>
-					</DropdownMenuContent>
-				</DropdownMenu>
 			</div>
 			<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
 				{results.map((voucher) => (
@@ -105,15 +63,11 @@ function VouchersPage() {
 							/>
 						) : (
 							<div className="bg-muted mb-3 flex h-96 w-full items-center justify-center rounded">
-								<span className="text-muted-foreground text-xs">
-									No image
-								</span>
+								<span className="text-muted-foreground text-xs">No image</span>
 							</div>
 						)}
 						<div className="mb-3">
-							<div className="mb-2 font-medium">
-								€{voucher.type} Voucher
-							</div>
+							<div className="mb-2 font-medium">€{voucher.type} Voucher</div>
 							<div className="text-muted-foreground mb-1 text-xs font-mono">
 								Voucher ID: {voucher._id}
 							</div>

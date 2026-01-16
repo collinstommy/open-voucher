@@ -1,8 +1,11 @@
-import { api } from "@open-router/backend/convex/_generated/api";
+import { api } from "@open-voucher/backend/convex/_generated/api";
 import { useConvex } from "convex/react";
 import { useCallback, useEffect, useState } from "react";
+import { getDeployment } from "@/components/EnvironmentDropdown";
 
-const TOKEN_KEY = "admin-token";
+function getTokenKey(): string {
+	return `admin-token-${getDeployment()}`;
+}
 
 export function useAdminAuth() {
 	const convex = useConvex();
@@ -11,7 +14,8 @@ export function useAdminAuth() {
 	const [isLoading, setIsLoading] = useState(true);
 
 	useEffect(() => {
-		const storedToken = localStorage.getItem(TOKEN_KEY);
+		const tokenKey = getTokenKey();
+		const storedToken = localStorage.getItem(tokenKey);
 		if (!storedToken) {
 			setIsLoading(false);
 			return;
@@ -24,11 +28,11 @@ export function useAdminAuth() {
 					setToken(storedToken);
 					setIsValid(true);
 				} else {
-					localStorage.removeItem(TOKEN_KEY);
+					localStorage.removeItem(tokenKey);
 				}
 			})
 			.catch(() => {
-				localStorage.removeItem(TOKEN_KEY);
+				localStorage.removeItem(tokenKey);
 			})
 			.finally(() => {
 				setIsLoading(false);
@@ -38,7 +42,7 @@ export function useAdminAuth() {
 	const login = useCallback(
 		async (password: string) => {
 			const result = await convex.mutation(api.admin.login, { password });
-			localStorage.setItem(TOKEN_KEY, result.token);
+			localStorage.setItem(getTokenKey(), result.token);
 			setToken(result.token);
 			setIsValid(true);
 			return result;
@@ -50,7 +54,7 @@ export function useAdminAuth() {
 		if (token) {
 			await convex.mutation(api.admin.logout, { token });
 		}
-		localStorage.removeItem(TOKEN_KEY);
+		localStorage.removeItem(getTokenKey());
 		setToken(null);
 		setIsValid(false);
 	}, [convex, token]);

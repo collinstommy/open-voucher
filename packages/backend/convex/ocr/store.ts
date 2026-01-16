@@ -21,7 +21,13 @@ async function recordFailedUpload(
 	userId: Id<"users">,
 	imageStorageId: Id<"_storage">,
 	reason: VoucherOcrFailureReason,
-	ocrData: { rawResponse: string; type?: string; barcode?: string; expiryDate?: string; validFrom?: string }
+	ocrData: {
+		rawResponse: string;
+		type?: string;
+		barcode?: string;
+		expiryDate?: string;
+		validFrom?: string;
+	},
 ) {
 	await ctx.db.insert("failedUploads", {
 		userId,
@@ -47,7 +53,15 @@ export const storeVoucherFromOcr = internalMutation({
 		rawResponse: v.string(),
 	},
 	handler: async (ctx, args) => {
-		const { userId, imageStorageId, type, validFrom, expiryDate, barcode, rawResponse } = args;
+		const {
+			userId,
+			imageStorageId,
+			type,
+			validFrom,
+			expiryDate,
+			barcode,
+			rawResponse,
+		} = args;
 
 		const user = await ctx.db.get(userId);
 		if (!user) {
@@ -62,19 +76,27 @@ export const storeVoucherFromOcr = internalMutation({
 
 		// Parse and validate expiry date
 		const dayjsExpiry = dayjs(expiryDate!);
-		const isExpiryDateValid = expiryDate && dayjsExpiry.isValid() && dayjsExpiry.valueOf() > oneYearAgo;
+		const isExpiryDateValid =
+			expiryDate && dayjsExpiry.isValid() && dayjsExpiry.valueOf() > oneYearAgo;
 		const isAlreadyExpired = dayjsExpiry.isBefore(now, "day");
 		const isTooLateToday = dayjsExpiry.isSame(now, "day") && now.hour() >= 21;
 		const expiryDateMs = dayjsExpiry.endOf("day").valueOf();
 
 		// Parse validFrom for later validation
 		const dayjsValidFrom = dayjs(validFrom);
-		const isValidFromValid = validFrom && dayjsValidFrom.isValid() && dayjsValidFrom.valueOf() > oneYearAgo;
+		const isValidFromValid =
+			validFrom &&
+			dayjsValidFrom.isValid() &&
+			dayjsValidFrom.valueOf() > oneYearAgo;
 
 		// 1. Check type validity first
 		if (!isValidType) {
 			await recordFailedUpload(ctx, userId, imageStorageId, "INVALID_TYPE", {
-				rawResponse, type, barcode, expiryDate, validFrom
+				rawResponse,
+				type,
+				barcode,
+				expiryDate,
+				validFrom,
 			});
 			await sendErrorMessage(ctx, user.telegramChatId, "INVALID_TYPE");
 			return { success: false, reason: "INVALID_TYPE" };
@@ -82,16 +104,34 @@ export const storeVoucherFromOcr = internalMutation({
 
 		// 2. Check expiry date validity
 		if (!isExpiryDateValid) {
-			await recordFailedUpload(ctx, userId, imageStorageId, "COULD_NOT_READ_EXPIRY_DATE", {
-				rawResponse, type, barcode, expiryDate, validFrom
-			});
-			await sendErrorMessage(ctx, user.telegramChatId, "COULD_NOT_READ_EXPIRY_DATE");
+			await recordFailedUpload(
+				ctx,
+				userId,
+				imageStorageId,
+				"COULD_NOT_READ_EXPIRY_DATE",
+				{
+					rawResponse,
+					type,
+					barcode,
+					expiryDate,
+					validFrom,
+				},
+			);
+			await sendErrorMessage(
+				ctx,
+				user.telegramChatId,
+				"COULD_NOT_READ_EXPIRY_DATE",
+			);
 			return { success: false, reason: "COULD_NOT_READ_EXPIRY_DATE" };
 		}
 
 		if (isAlreadyExpired) {
 			await recordFailedUpload(ctx, userId, imageStorageId, "EXPIRED", {
-				rawResponse, type, barcode, expiryDate, validFrom
+				rawResponse,
+				type,
+				barcode,
+				expiryDate,
+				validFrom,
 			});
 			await sendErrorMessage(ctx, user.telegramChatId, "EXPIRED", expiryDateMs);
 			return { success: false, reason: "EXPIRED", expiryDate: expiryDateMs };
@@ -99,45 +139,110 @@ export const storeVoucherFromOcr = internalMutation({
 
 		if (isTooLateToday) {
 			await recordFailedUpload(ctx, userId, imageStorageId, "TOO_LATE_TODAY", {
-				rawResponse, type, barcode, expiryDate, validFrom
+				rawResponse,
+				type,
+				barcode,
+				expiryDate,
+				validFrom,
 			});
-			await sendErrorMessage(ctx, user.telegramChatId, "TOO_LATE_TODAY", expiryDateMs);
-			return { success: false, reason: "TOO_LATE_TODAY", expiryDate: expiryDateMs };
+			await sendErrorMessage(
+				ctx,
+				user.telegramChatId,
+				"TOO_LATE_TODAY",
+				expiryDateMs,
+			);
+			return {
+				success: false,
+				reason: "TOO_LATE_TODAY",
+				expiryDate: expiryDateMs,
+			};
 		}
 
 		if (!validFrom) {
-			await recordFailedUpload(ctx, userId, imageStorageId, "COULD_NOT_READ_VALID_FROM", {
-				rawResponse, type, barcode, expiryDate, validFrom
-			});
-			await sendErrorMessage(ctx, user.telegramChatId, "COULD_NOT_READ_VALID_FROM");
+			await recordFailedUpload(
+				ctx,
+				userId,
+				imageStorageId,
+				"COULD_NOT_READ_VALID_FROM",
+				{
+					rawResponse,
+					type,
+					barcode,
+					expiryDate,
+					validFrom,
+				},
+			);
+			await sendErrorMessage(
+				ctx,
+				user.telegramChatId,
+				"COULD_NOT_READ_VALID_FROM",
+			);
 			return { success: false, reason: "COULD_NOT_READ_VALID_FROM" };
 		}
 
 		if (!isValidFromValid) {
-			await recordFailedUpload(ctx, userId, imageStorageId, "COULD_NOT_READ_VALID_FROM", {
-				rawResponse, type, barcode, expiryDate, validFrom
-			});
-			await sendErrorMessage(ctx, user.telegramChatId, "COULD_NOT_READ_VALID_FROM");
+			await recordFailedUpload(
+				ctx,
+				userId,
+				imageStorageId,
+				"COULD_NOT_READ_VALID_FROM",
+				{
+					rawResponse,
+					type,
+					barcode,
+					expiryDate,
+					validFrom,
+				},
+			);
+			await sendErrorMessage(
+				ctx,
+				user.telegramChatId,
+				"COULD_NOT_READ_VALID_FROM",
+			);
 			return { success: false, reason: "COULD_NOT_READ_VALID_FROM" };
 		}
 
 		if (!barcode) {
-			await recordFailedUpload(ctx, userId, imageStorageId, "COULD_NOT_READ_BARCODE", {
-				rawResponse, type, barcode, expiryDate, validFrom
-			});
-			await sendErrorMessage(ctx, user.telegramChatId, "COULD_NOT_READ_BARCODE");
+			await recordFailedUpload(
+				ctx,
+				userId,
+				imageStorageId,
+				"COULD_NOT_READ_BARCODE",
+				{
+					rawResponse,
+					type,
+					barcode,
+					expiryDate,
+					validFrom,
+				},
+			);
+			await sendErrorMessage(
+				ctx,
+				user.telegramChatId,
+				"COULD_NOT_READ_BARCODE",
+			);
 			return { success: false, reason: "COULD_NOT_READ_BARCODE" };
 		}
 
 		const existing = await ctx.db
-		.query("vouchers")
-		.withIndex("by_barcode", (q) => q.eq("barcodeNumber", barcode))
-		.first();
+			.query("vouchers")
+			.withIndex("by_barcode", (q) => q.eq("barcodeNumber", barcode))
+			.first();
 
 		if (existing) {
-			await recordFailedUpload(ctx, userId, imageStorageId, "DUPLICATE_BARCODE", {
-				rawResponse, type, barcode, expiryDate, validFrom
-			});
+			await recordFailedUpload(
+				ctx,
+				userId,
+				imageStorageId,
+				"DUPLICATE_BARCODE",
+				{
+					rawResponse,
+					type,
+					barcode,
+					expiryDate,
+					validFrom,
+				},
+			);
 			await sendErrorMessage(ctx, user.telegramChatId, "DUPLICATE_BARCODE");
 			return { success: false, reason: "DUPLICATE_BARCODE" };
 		}
@@ -156,7 +261,7 @@ export const storeVoucherFromOcr = internalMutation({
 		});
 
 		const reward = UPLOAD_REWARDS[type];
-    const newCoins = user.coins + reward;
+		const newCoins = user.coins + reward;
 		await ctx.db.patch(userId, {
 			coins: newCoins,
 			uploadCount: (user.uploadCount || 0) + 1,
@@ -175,7 +280,9 @@ export const storeVoucherFromOcr = internalMutation({
 			text: `✅ <b>Voucher Accepted!</b>\n\nThanks for sharing a €${type} voucher.\nCoins earned: +${reward}\nNew balance: ${newCoins}`,
 		});
 
-		console.log(`Voucher created: ${voucherId} (type=${type}, barcode=${barcode})`);
+		console.log(
+			`Voucher created: ${voucherId} (type=${type}, barcode=${barcode})`,
+		);
 
 		return { success: true, voucherId };
 	},
@@ -203,11 +310,15 @@ async function sendErrorMessage(
 			message += `We couldn't read the barcode. Please ensure it's fully visible and clear.`;
 			break;
 		case "EXPIRED":
-			const dateStr = expiryDate ? dayjs(expiryDate).format("DD-MM-YYYY") : "unknown";
+			const dateStr = expiryDate
+				? dayjs(expiryDate).format("DD-MM-YYYY")
+				: "unknown";
 			message += `This voucher expired on ${dateStr}.`;
 			break;
 		case "TOO_LATE_TODAY":
-			const todayDateStr = expiryDate ? dayjs(expiryDate).format("DD-MM-YYYY") : "today";
+			const todayDateStr = expiryDate
+				? dayjs(expiryDate).format("DD-MM-YYYY")
+				: "today";
 			message += `This voucher expires ${todayDateStr}, but it's after 9 PM. Vouchers expiring today can only be uploaded before 9 PM.`;
 			break;
 		case "INVALID_TYPE":

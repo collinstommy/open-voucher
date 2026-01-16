@@ -11,19 +11,25 @@ export const processVoucherImage = internalAction({
 		const { userId, imageStorageId } = args;
 
 		try {
-			const extracted = await ctx.runAction(internal.ocr.extract.extractFromImage, {
-				imageStorageId,
-			});
+			const extracted = await ctx.runAction(
+				internal.ocr.extract.extractFromImage,
+				{
+					imageStorageId,
+				},
+			);
 
-			const result = await ctx.runMutation(internal.ocr.store.storeVoucherFromOcr, {
-				userId,
-				imageStorageId,
-				type: String(extracted.type),
-				validFrom: extracted.validFrom || undefined,
-				expiryDate: extracted.expiryDate || undefined,
-				barcode: extracted.barcode || undefined,
-				rawResponse: extracted.rawResponse,
-			});
+			const result = await ctx.runMutation(
+				internal.ocr.store.storeVoucherFromOcr,
+				{
+					userId,
+					imageStorageId,
+					type: String(extracted.type),
+					validFrom: extracted.validFrom || undefined,
+					expiryDate: extracted.expiryDate || undefined,
+					barcode: extracted.barcode || undefined,
+					rawResponse: extracted.rawResponse,
+				},
+			);
 
 			if (result.success) {
 				console.log(`Voucher created: ${result.voucherId}`);

@@ -46,7 +46,6 @@ Keep it simple:
 
 ### 3. README.md Updates
 
-- Rename title from "open-router" to "open-voucher"
 - Update any remaining references to secrets
 - Add "Community" section with contributor guidelines link
 

@@ -9,9 +9,7 @@ export const getStats = query({
 
 		const now = Date.now();
 		const availableVouchers = vouchers.filter(
-			(v) =>
-				v.status === "available" &&
-				(!v.validFrom || v.validFrom <= now),
+			(v) => v.status === "available" && (!v.validFrom || v.validFrom <= now),
 		);
 
 		const vouchersByType = {
