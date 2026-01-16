@@ -6,11 +6,13 @@ import { Id } from "./_generated/dataModel";
 import { internalAction } from "./_generated/server";
 dayjs.extend(advancedFormat);
 
+const TUTORIAL_VOUCHER_AMOUNT = 10;
+
 const TUTORIAL_STEP_1_MESSAGE =
-	"Let's show you how to use the bot. Send the number <b>10</b> to get a voucher.";
+	`Let's show you how to use the bot. Send the number <b>${TUTORIAL_VOUCHER_AMOUNT}</b> to get a voucher.`;
 
 const TUTORIAL_STEP_1_RETRY_MESSAGE =
-	"Please send the number <b>10</b> to continue the tutorial.";
+	`Please send the number <b>${TUTORIAL_VOUCHER_AMOUNT}</b> to continue the tutorial.`;
 
 const TUTORIAL_COMPLETE_MESSAGE = (coins: number) => `
 You are now ready to go!
@@ -41,7 +43,7 @@ function getWelcomeMessage(coins: number): string {
 }
 
 function getBetaMessage(): string {
-	return `<b>Beta Notice:</b> This is a work in progress. Please report any issues via the help menu.`;
+	return `👋 <b>We're in beta!</b>\nWe're keen to hear about bugs or general feedback.\n\n📝 To send feedback send <b>feedback [your message]</b>`
 }
 
 async function getSampleVoucherImageUrl(ctx: any): Promise<string | null> {
@@ -72,6 +74,13 @@ async function handleNewUser(
 		);
 		await sendTelegramMessage(chatId, getWelcomeMessage(newUser.coins));
 		await sendTelegramMessage(chatId, getBetaMessage());
+
+		const sampleImageUrl = await getSampleVoucherImageUrl(ctx);
+		if (!sampleImageUrl) {
+			await sendTelegramMessage(chatId, TUTORIAL_COMPLETE_MESSAGE(newUser.coins));
+			return;
+		}
+
 		await ctx.runMutation(internal.users.setUserOnboardingStep, {
 			userId: newUser._id,
 			step: 1,
@@ -121,6 +130,18 @@ async function handleNewUser(
 		);
 		await sendTelegramMessage(chatId, getWelcomeMessage(newUser.coins));
 		await sendTelegramMessage(chatId, getBetaMessage());
+
+		const sampleImageUrl = await getSampleVoucherImageUrl(ctx);
+		if (!sampleImageUrl) {
+			await sendTelegramMessage(chatId, TUTORIAL_COMPLETE_MESSAGE(newUser.coins));
+			return;
+		}
+
+		await ctx.runMutation(internal.users.setUserOnboardingStep, {
+			userId: newUser._id,
+			step: 1,
+		});
+		await sendTelegramMessage(chatId, TUTORIAL_STEP_1_MESSAGE);
 		return;
 	}
 
@@ -198,7 +219,7 @@ async function handleOnboardingTutorial(
 ) {
 	const step = user.onboardingStep ?? 1;
 
-	if (step === 1 && text.toLowerCase().trim() === "10") {
+	if (step === 1 && text.toLowerCase().trim() === String(TUTORIAL_VOUCHER_AMOUNT)) {
 		await ctx.runMutation(internal.users.setUserOnboardingStep, {
 			userId: user._id,
 			step: 2,

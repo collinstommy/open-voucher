@@ -49,5 +49,5 @@ The following `bun run` scripts are available from the root directory:
 *   **Monorepo Management:** Turborepo is used for efficient management and building of different applications/packages within the monorepo.
 
 
-##  Coding guidles
+##  Coding guidlines
 - Use `import { useQuery, useMutation } from "convex/react";` for convex queries and mutations on the client

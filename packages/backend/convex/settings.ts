@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { internalMutation, internalQuery, query } from "./_generated/server";
+import { Id } from "./_generated/dataModel";
 
 export const getSetting = internalQuery({
 	args: { key: v.string() },
@@ -38,6 +39,6 @@ export const getSampleVoucherImageUrl = query({
 			.withIndex("by_key", (q) => q.eq("key", "sample-voucher-image"))
 			.first();
 		if (!setting?.value) return null;
-		return await ctx.storage.getUrl(setting.value);
+		return await ctx.storage.getUrl(setting.value as Id<"_storage">);
 	},
 });
