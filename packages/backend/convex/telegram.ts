@@ -2,17 +2,16 @@ import { v } from "convex/values";
 import dayjs from "dayjs";
 import advancedFormat from "dayjs/plugin/advancedFormat";
 import { internal } from "./_generated/api";
-import { Id } from "./_generated/dataModel";
+import type { Id } from "./_generated/dataModel";
 import { internalAction } from "./_generated/server";
+
 dayjs.extend(advancedFormat);
 
 const TUTORIAL_VOUCHER_AMOUNT = 10;
 
-const TUTORIAL_STEP_1_MESSAGE =
-	`Let's show you how to use the bot. Send the number <b>${TUTORIAL_VOUCHER_AMOUNT}</b> to get a voucher.`;
+const TUTORIAL_STEP_1_MESSAGE = `Let's show you how to use the bot. Send the number <b>${TUTORIAL_VOUCHER_AMOUNT}</b> to get a voucher.`;
 
-const TUTORIAL_STEP_1_RETRY_MESSAGE =
-	`Please send the number <b>${TUTORIAL_VOUCHER_AMOUNT}</b> to continue the tutorial.`;
+const TUTORIAL_STEP_1_RETRY_MESSAGE = `Please send the number <b>${TUTORIAL_VOUCHER_AMOUNT}</b> to continue the tutorial.`;
 
 const TUTORIAL_COMPLETE_MESSAGE = (coins: number) => `
 You are now ready to go!
@@ -39,11 +38,11 @@ We've given you a welcome bonus of <b>${coins} coins</b> to get you started! �
 `;
 
 function getWelcomeMessage(coins: number): string {
-	return `🎉 <b>Welcome to Dunnes Voucher Bot!</b>`;
+	return "🎉 <b>Welcome to Dunnes Voucher Bot!</b>";
 }
 
 function getBetaMessage(): string {
-	return `👋 <b>We're in beta!</b>\nWe're keen to hear about bugs or general feedback.\n\n📝 To send feedback send <b>feedback [your message]</b>`
+	return `👋 <b>We're in beta!</b>\nWe're keen to hear about bugs or general feedback.\n\n📝 To send feedback send <b>feedback [your message]</b>`;
 }
 
 async function getSampleVoucherImageUrl(ctx: any): Promise<string | null> {
@@ -60,14 +59,11 @@ async function handleNewUser(
 	username: string | undefined,
 	firstName: string,
 ) {
-	const newUser = await ctx.runMutation(
-		internal.users.createUser,
-		{
-			telegramChatId: chatId,
-			username,
-			firstName,
-		},
-	);
+	const newUser = await ctx.runMutation(internal.users.createUser, {
+		telegramChatId: chatId,
+		username,
+		firstName,
+	});
 	await sendTelegramMessage(chatId, getWelcomeMessage(newUser.coins));
 	await sendTelegramMessage(chatId, getBetaMessage());
 	await ctx.runMutation(internal.users.setUserOnboardingStep, {
@@ -132,6 +128,9 @@ async function handleUserState(
 		case "onboarding_tutorial":
 			return await handleOnboardingTutorial(ctx, chatId, text, user);
 
+		case "waiting_for_report_confirmation":
+			return await handleReportConfirmation(ctx, chatId, text, user);
+
 		default:
 			return false;
 	}
@@ -145,7 +144,10 @@ async function handleOnboardingTutorial(
 ) {
 	const step = user.onboardingStep ?? 1;
 
-	if (step === 1 && text.toLowerCase().trim() === String(TUTORIAL_VOUCHER_AMOUNT)) {
+	if (
+		step === 1 &&
+		text.toLowerCase().trim() === String(TUTORIAL_VOUCHER_AMOUNT)
+	) {
 		await ctx.runMutation(internal.users.setUserOnboardingStep, {
 			userId: user._id,
 			step: 2,
@@ -154,7 +156,7 @@ async function handleOnboardingTutorial(
 		if (imageUrl) {
 			await sendTelegramPhoto(chatId, imageUrl, "Here is your sample voucher!");
 		} else {
-			console.error('Sample image not found')
+			console.error("Sample image not found");
 			await sendTelegramMessage(chatId, "Here is your sample voucher!");
 		}
 		await ctx.runMutation(internal.users.clearOnboardingTutorial, {
@@ -170,6 +172,71 @@ async function handleOnboardingTutorial(
 	}
 
 	return false;
+}
+
+async function handleReportConfirmation(
+	ctx: any,
+	chatId: string,
+	text: string,
+	user: any,
+) {
+	const lowerText = text.toLowerCase().trim();
+
+	if (lowerText === "yes" && user.pendingReportVoucherId) {
+		await ctx.runMutation(internal.users.clearUserTelegramState, {
+			userId: user._id,
+		});
+
+		const result = await ctx.runMutation(internal.vouchers.reportVoucher, {
+			userId: user._id,
+			voucherId: user.pendingReportVoucherId,
+		});
+
+		if (!result) {
+			return true;
+		}
+
+		if (result.status === "rate_limited") {
+			await sendTelegramMessage(chatId, `⏰ ${result.message}`);
+		} else if (result.status === "already_reported") {
+			await sendTelegramMessage(chatId, `⚠️ ${result.message}`);
+		} else if (result.status === "replaced" && result.voucher) {
+			await sendTelegramPhoto(
+				chatId,
+				result.voucher.imageUrl,
+				`🔄 <b>Here is a replacement €${result.voucher.type} voucher.</b>\n\nExpires: ${dayjs(result.voucher.expiryDate).format("MMM Do")}`,
+				{
+					inline_keyboard: [
+						[
+							{
+								text: "⚠️ Its not working",
+								callback_data: `report:${result.voucher._id}`,
+							},
+						],
+					],
+				},
+			);
+		} else if (result.status === "refunded") {
+			await sendTelegramMessage(chatId, "⚠️ No replacement vouchers available.");
+		} else if (result.status === "reported") {
+			await sendTelegramMessage(chatId, "✅ Report received.");
+		}
+		return true;
+	}
+
+	if (lowerText === "no") {
+		await ctx.runMutation(internal.users.clearUserTelegramState, {
+			userId: user._id,
+		});
+		await sendTelegramMessage(chatId, "✅ Cancelled. No action taken.");
+		return true;
+	}
+
+	await sendTelegramMessage(
+		chatId,
+		"Please reply with <b>Yes</b> to confirm or <b>No</b> to cancel.",
+	);
+	return true;
 }
 
 async function handleImageUpload(
@@ -219,31 +286,25 @@ async function handleCommand(
 	}
 
 	if (lowerText === "help") {
-		await sendTelegramMessage(
-			chatId,
-			"Choose an option below",
-			{
-				inline_keyboard: [
-					[
-						{ text: "Balance", callback_data: "help:balance" },
-						{ text: "Support", callback_data: "help:support" },
-					],
-					[
-						{ text: "Give feedback", callback_data: "help:feedback" },
-					],
-					[
-						{
-							text: "Voucher Availability",
-							callback_data: "help:availability",
-						},
-					],
-					[
-						{ text: "How to upload?", callback_data: "help:upload" },
-						{ text: "How to claim?", callback_data: "help:claim" },
-					],
+		await sendTelegramMessage(chatId, "Choose an option below", {
+			inline_keyboard: [
+				[
+					{ text: "Balance", callback_data: "help:balance" },
+					{ text: "Support", callback_data: "help:support" },
 				],
-			},
-		);
+				[{ text: "Give feedback", callback_data: "help:feedback" }],
+				[
+					{
+						text: "Voucher Availability",
+						callback_data: "help:availability",
+					},
+				],
+				[
+					{ text: "How to upload?", callback_data: "help:upload" },
+					{ text: "How to claim?", callback_data: "help:claim" },
+				],
+			],
+		});
 		return true;
 	}
 
@@ -309,7 +370,6 @@ async function handleVoucherRequest(
 	}
 	return true;
 }
-
 
 export const handleTelegramMessage = internalAction({
 	args: {
@@ -432,7 +492,11 @@ async function sendTelegramPhoto(
 	}
 
 	if (photoUrl === "image") {
-		await sendTelegramMessage(chatId, caption || "Sample image placeholder", replyMarkup);
+		await sendTelegramMessage(
+			chatId,
+			caption || "Sample image placeholder",
+			replyMarkup,
+		);
 		return;
 	}
 
@@ -485,7 +549,7 @@ export const handleTelegramCallback = internalAction({
 		if (data.startsWith("report:")) {
 			const voucherId = data.split(":")[1];
 
-			await answerTelegramCallback(callbackQuery.id, "Checking...");
+			await answerTelegramCallback(callbackQuery.id);
 
 			const user = await ctx.runQuery(internal.users.getUserByTelegramChatId, {
 				telegramChatId: telegramUserId,
@@ -507,43 +571,16 @@ export const handleTelegramCallback = internalAction({
 				return;
 			}
 
-			const result = await ctx.runMutation(internal.vouchers.reportVoucher, {
+			await ctx.runMutation(internal.users.setUserTelegramState, {
 				userId: user._id,
-				voucherId: voucherId as Id<"vouchers">,
+				state: "waiting_for_report_confirmation",
+				pendingReportVoucherId: voucherId as Id<"vouchers">,
 			});
 
-			if (!result) {
-				return;
-			}
-
-			if (result.status === "rate_limited") {
-				await sendTelegramMessage(chatId, `⏰ ${result.message}`);
-			} else if (result.status === "already_reported") {
-				await sendTelegramMessage(chatId, `⚠️ ${result.message}`);
-			} else if (result.status === "replaced" && result.voucher) {
-				await sendTelegramPhoto(
-					chatId,
-					result.voucher.imageUrl,
-					`🔄 <b>Here is a replacement €${result.voucher.type} voucher.</b>\n\nExpires: ${dayjs(result.voucher.expiryDate).format("MMM Do")}`,
-					{
-						inline_keyboard: [
-							[
-								{
-									text: "⚠️ Its not working",
-									callback_data: `report:${result.voucher._id}`,
-								},
-							],
-						],
-					},
-				);
-			} else if (result.status === "refunded") {
-				await sendTelegramMessage(
-					chatId,
-					"⚠️ No replacement vouchers available.",
-				);
-			} else if (result.status === "reported") {
-				await sendTelegramMessage(chatId, "✅ Report received.");
-			}
+			await sendTelegramMessage(
+				chatId,
+				"⚠️ <b>Report this voucher as not working?</b>\n\nA replacement voucher will be sent if available. If not, your coins will be refunded.\n\nPlease reply with <b>Yes</b> to confirm or <b>No</b> to cancel.",
+			);
 		} else if (data.startsWith("help:")) {
 			await answerTelegramCallback(callbackQuery.id);
 

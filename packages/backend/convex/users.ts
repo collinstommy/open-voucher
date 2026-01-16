@@ -141,11 +141,16 @@ export const setUserTelegramState = internalMutation({
 				v.literal("waiting_for_feedback_message"),
 				v.literal("waiting_for_ban_appeal"),
 				v.literal("onboarding_tutorial"),
+				v.literal("waiting_for_report_confirmation"),
 			),
 		),
+		pendingReportVoucherId: v.optional(v.id("vouchers")),
 	},
-	handler: async (ctx, { userId, state }) => {
-		await ctx.db.patch(userId, { telegramState: state });
+	handler: async (ctx, { userId, state, pendingReportVoucherId }) => {
+		await ctx.db.patch(userId, {
+			telegramState: state,
+			pendingReportVoucherId,
+		});
 	},
 });
 
