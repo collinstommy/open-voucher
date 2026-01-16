@@ -125,6 +125,32 @@ set_convex_vars() {
     echo ""
 }
 
+upload_sample_voucher() {
+    local env_name=$1
+    local image_path="$(pwd)/config/sample-voucher.png"
+
+    if [ ! -f "$image_path" ]; then
+        echo "Warning: Sample voucher image not found at ${image_path}"
+        return
+    fi
+
+    echo "Uploading sample voucher image for ${env_name}..."
+    storage_id=$(cd packages/backend && npx convex storage upload "$image_path" 2>/dev/null | tail -1)
+
+    if [ ! -z "$storage_id" ]; then
+        echo "Storage ID: $storage_id"
+        echo "Setting sample-voucher-image in settings table..."
+        local prod_flag=""
+        if [ "$env_name" = "PROD" ]; then
+            prod_flag="--prod"
+        fi
+        (cd packages/backend && npx convex run $prod_flag settings.setSampleVoucherImage "{\"imageStorageId\": \"$storage_id\"}")
+    else
+        echo "Warning: Failed to upload sample voucher image"
+    fi
+    echo ""
+}
+
 # Delete existing webhooks
 echo "=== Step 1: Deleting existing webhooks ==="
 delete_webhook "$PROD_TOKEN" "PROD"
@@ -137,13 +163,10 @@ set_webhook "$DEV_TOKEN" "$DEV_URL_WEBHOOK" "DEV" "$DEV_TELEGRAM_WEBHOOK_SECRET"
 
 # Set Convex environment variables
 echo "=== Step 3: Setting Convex environment variables ==="
-# These need to be set in your .env file:
-# PROD_TEAM=your-prod-team-name
-# PROD_PROJECT=your-prod-project-name
-# PROD_GEMINI_TOKEN=your-prod-gemini-token
-# DEV_TEAM=your-dev-team-name
-# DEV_PROJECT=your-dev-project-name
-# DEV_GEMINI_TOKEN=your-dev-gemini-token
+
+# Upload sample voucher images for dev and prod
+upload_sample_voucher "DEV"
+upload_sample_voucher "PROD"
 
 set_convex_vars "" "" "$PROD_TOKEN" "$PROD_GOOGLE_GENERATIVE_AI_API_KEY" "PROD" "$PROD_TELEGRAM_WEBHOOK_SECRET"
 set_convex_vars "" "" "$DEV_TOKEN" "$DEV_GOOGLE_GENERATIVE_AI_API_KEY" "DEV" "$DEV_TELEGRAM_WEBHOOK_SECRET"
