@@ -1,10 +1,37 @@
-import { v } from "convex/values";
+import type { v } from "convex/values";
 import dayjs from "dayjs";
 import advancedFormat from "dayjs/plugin/advancedFormat";
 import { internal } from "./_generated/api";
-import { Id } from "./_generated/dataModel";
+import type { Id } from "./_generated/dataModel";
 import { internalAction } from "./_generated/server";
+import type { ActionCtx } from "./_generated/server";
 dayjs.extend(advancedFormat);
+
+type TelegramUserState =
+	| "waiting_for_support_message"
+	| "waiting_for_feedback_message"
+	| "waiting_for_ban_appeal"
+	| "onboarding_tutorial";
+
+interface User {
+	_id: Id<"users">;
+	telegramChatId: string;
+	username?: string;
+	firstName?: string;
+	coins: number;
+	isBanned: boolean;
+	inviteCode?: string;
+	createdAt: number;
+	lastActiveAt: number;
+	bannedAt?: number;
+	uploadCount?: number;
+	claimCount?: number;
+	uploadReportCount?: number;
+	claimReportCount?: number;
+	lastReportAt?: number;
+	onboardingStep?: number;
+	telegramState?: TelegramUserState;
+}
 
 const TUTORIAL_VOUCHER_AMOUNT = 10;
 
@@ -36,7 +63,7 @@ We've given you a welcome bonus of <b>${coins} coins</b> to get you started! �
 • Only report a voucher as not working, when it does not scan at the till. Please do not report a voucher for any other reason.
 `;
 
-function getWelcomeMessage(coins: number): string {
+function getWelcomeMessage(): string {
 	return "🎉 <b>Welcome to Dunnes Voucher Bot!</b>";
 }
 
@@ -44,7 +71,9 @@ function getBetaMessage(): string {
 	return `👋 <b>We're in beta!</b>\nWe're keen to hear about bugs or general feedback.\n\n📝 To send feedback send <b>feedback [your message]</b>`;
 }
 
-async function getSampleVoucherImageUrl(ctx: any): Promise<string | null> {
+async function getSampleVoucherImageUrl(
+	ctx: ActionCtx,
+): Promise<string | null> {
 	const storageId = await ctx.runQuery(internal.settings.getSetting, {
 		key: "sample-voucher-image",
 	});
@@ -53,7 +82,7 @@ async function getSampleVoucherImageUrl(ctx: any): Promise<string | null> {
 }
 
 async function handleNewUser(
-	ctx: any,
+	ctx: ActionCtx,
 	chatId: string,
 	username: string | undefined,
 	firstName: string,
@@ -63,7 +92,7 @@ async function handleNewUser(
 		username,
 		firstName,
 	});
-	await sendTelegramMessage(chatId, getWelcomeMessage(newUser.coins));
+	await sendTelegramMessage(chatId, getWelcomeMessage());
 	await sendTelegramMessage(chatId, getBetaMessage());
 	await ctx.runMutation(internal.users.setUserOnboardingStep, {
 		userId: newUser._id,
@@ -73,10 +102,10 @@ async function handleNewUser(
 }
 
 async function handleUserState(
-	ctx: any,
+	ctx: ActionCtx,
 	chatId: string,
 	text: string,
-	user: any,
+	user: User,
 ) {
 	switch (user.telegramState) {
 		case "waiting_for_support_message":
@@ -133,10 +162,10 @@ async function handleUserState(
 }
 
 async function handleOnboardingTutorial(
-	ctx: any,
+	ctx: ActionCtx,
 	chatId: string,
 	text: string,
-	user: any,
+	user: User,
 ) {
 	const step = user.onboardingStep ?? 1;
 
@@ -171,13 +200,26 @@ async function handleOnboardingTutorial(
 }
 
 async function handleImageUpload(
-	ctx: any,
+	ctx: ActionCtx,
 	chatId: string,
-	message: any,
-	messageDbId: any,
-	user: any,
+	message: {
+		chat: { id: number };
+		message_id: number;
+		text?: string;
+		caption?: string;
+		from: { username?: string; first_name: string };
+		photo?: Array<{ file_id: string }>;
+		media_group_id?: string;
+	},
+	messageDbId: Id<"messages"> | undefined,
+	user: User,
 ) {
 	await sendTelegramMessage(chatId, "📸 Processing your voucher...");
+
+	if (!message.photo) {
+		await sendTelegramMessage(chatId, "❌ No photo found in message.");
+		return;
+	}
 
 	const photo = message.photo[message.photo.length - 1];
 	const fileId = photo.file_id;
@@ -205,11 +247,11 @@ async function handleImageUpload(
 }
 
 async function handleCommand(
-	ctx: any,
+	ctx: ActionCtx,
 	chatId: string,
 	lowerText: string,
 	text: string,
-	user: any,
+	user: User,
 ) {
 	if (lowerText === "balance") {
 		await sendTelegramMessage(chatId, `💰 You have ${user.coins} coins.`);
@@ -263,10 +305,10 @@ async function handleCommand(
 }
 
 async function handleVoucherRequest(
-	ctx: any,
+	ctx: ActionCtx,
 	chatId: string,
 	lowerText: string,
-	user: any,
+	user: User,
 ) {
 	const match = lowerText.match(/\b(5|10|20)\b/);
 	if (!match) return false;
@@ -316,7 +358,7 @@ export const handleTelegramMessage = internalAction({
 		const mediaGroupId = message.media_group_id;
 
 		// 1. Idempotency Check & Storage
-		const messageDbId = await ctx.runMutation(internal.users.storeMessage, {
+		const messageDbId = (await ctx.runMutation(internal.users.storeMessage, {
 			telegramMessageId: messageId,
 			telegramChatId: chatId,
 			direction: "inbound",
@@ -324,7 +366,7 @@ export const handleTelegramMessage = internalAction({
 			text: text,
 			mediaGroupId,
 			imageStorageId: undefined,
-		});
+		})) as Id<"messages"> | null;
 
 		if (!messageDbId) {
 			console.log(`Duplicate message ${messageId} from ${chatId}, ignoring.`);
@@ -382,7 +424,7 @@ export const sendMessageAction = internalAction({
 async function sendTelegramMessage(
 	chatId: string,
 	text: string,
-	replyMarkup?: any,
+	replyMarkup?: Record<string, unknown>,
 ) {
 	const token = process.env.TELEGRAM_BOT_TOKEN;
 	if (!token) {
@@ -392,7 +434,11 @@ async function sendTelegramMessage(
 
 	const url = `https://api.telegram.org/bot${token}/sendMessage`;
 	try {
-		const body: any = { chat_id: chatId, text, parse_mode: "HTML" };
+		const body: Record<string, unknown> = {
+			chat_id: chatId,
+			text,
+			parse_mode: "HTML",
+		};
 		if (replyMarkup) {
 			body.reply_markup = JSON.stringify(replyMarkup);
 		}
@@ -415,7 +461,7 @@ async function sendTelegramPhoto(
 	chatId: string,
 	photoUrl: string,
 	caption?: string,
-	replyMarkup?: any,
+	replyMarkup?: Record<string, unknown>,
 ) {
 	const token = process.env.TELEGRAM_BOT_TOKEN;
 	if (!token) {
