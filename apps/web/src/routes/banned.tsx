@@ -1,18 +1,8 @@
-import { Button } from "@/components/ui/button";
-import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuRadioGroup,
-	DropdownMenuRadioItem,
-	DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { convexQuery } from "@convex-dev/react-query";
 import { api } from "@open-router/backend/convex/_generated/api";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
-import { ChevronDownIcon } from "lucide-react";
-import { useState } from "react";
 
 export const Route = createFileRoute("/banned")({
 	component: BannedUsers,
@@ -20,17 +10,6 @@ export const Route = createFileRoute("/banned")({
 
 function BannedUsers() {
 	const { token } = useAdminAuth();
-	const [deployment, setDeployment] = useState<"dev" | "prod">(() => {
-		if (typeof window === "undefined") return "prod";
-		return (
-			(localStorage.getItem("convex-deployment") as "dev" | "prod") || "prod"
-		);
-	});
-
-	const handleDeploymentChange = (value: string) => {
-		localStorage.setItem("convex-deployment", value);
-		window.location.reload();
-	};
 
 	const { data: bannedUsers, isLoading } = useQuery(
 		convexQuery(api.admin.getBannedUsers, token ? { token } : "skip"),
@@ -53,27 +32,6 @@ function BannedUsers() {
 						Recently banned users and ban reasons
 					</p>
 				</div>
-				<DropdownMenu>
-					<DropdownMenuTrigger asChild>
-						<Button variant="outline" size="sm">
-							{deployment === "dev" ? "Development" : "Production"}
-							<ChevronDownIcon />
-						</Button>
-					</DropdownMenuTrigger>
-					<DropdownMenuContent align="end">
-						<DropdownMenuRadioGroup
-							value={deployment}
-							onValueChange={handleDeploymentChange}
-						>
-							<DropdownMenuRadioItem value="dev">
-								Development
-							</DropdownMenuRadioItem>
-							<DropdownMenuRadioItem value="prod">
-								Production
-							</DropdownMenuRadioItem>
-						</DropdownMenuRadioGroup>
-					</DropdownMenuContent>
-				</DropdownMenu>
 			</div>
 
 			<div className="space-y-4">

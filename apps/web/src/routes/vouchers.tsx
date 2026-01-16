@@ -1,17 +1,8 @@
-import { Button } from "@/components/ui/button";
-import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuRadioGroup,
-	DropdownMenuRadioItem,
-	DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { Button } from '@/components/ui/button';
 import { useAdminAuth } from '@/hooks/useAdminAuth';
 
 import { api } from "@open-router/backend/convex/_generated/api";
 import { createFileRoute } from "@tanstack/react-router";
-import { ChevronDownIcon } from "lucide-react";
-import { useState } from "react";
 import { usePaginatedQuery } from "convex/react";
 
 export const Route = createFileRoute("/vouchers")({
@@ -21,17 +12,6 @@ export const Route = createFileRoute("/vouchers")({
 
 function VouchersPage() {
 	const { token } = useAdminAuth();
-	const [deployment, setDeployment] = useState<"dev" | "prod">(() => {
-		if (typeof window === "undefined") return "prod";
-		return (
-			(localStorage.getItem("convex-deployment") as "dev" | "prod") || "prod"
-		);
-	});
-
-	const handleDeploymentChange = (value: string) => {
-		localStorage.setItem("convex-deployment", value);
-		window.location.reload();
-	};
 
 	const { results, status, loadMore } = usePaginatedQuery(
 		api.admin.getAllVouchers,
@@ -72,27 +52,6 @@ function VouchersPage() {
 						</span>
 					)}
 				</h1>
-				<DropdownMenu>
-					<DropdownMenuTrigger asChild>
-						<Button variant="outline" size="sm">
-							{deployment === "dev" ? "Development" : "Production"}
-							<ChevronDownIcon />
-						</Button>
-					</DropdownMenuTrigger>
-					<DropdownMenuContent align="end">
-						<DropdownMenuRadioGroup
-							value={deployment}
-							onValueChange={handleDeploymentChange}
-						>
-							<DropdownMenuRadioItem value="dev">
-								Development
-							</DropdownMenuRadioItem>
-							<DropdownMenuRadioItem value="prod">
-								Production
-							</DropdownMenuRadioItem>
-						</DropdownMenuRadioGroup>
-					</DropdownMenuContent>
-				</DropdownMenu>
 			</div>
 			<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
 				{results.map((voucher) => (

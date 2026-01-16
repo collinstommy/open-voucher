@@ -1,19 +1,9 @@
-import { Button } from "@/components/ui/button";
-import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuRadioGroup,
-	DropdownMenuRadioItem,
-	DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { useAdminAuth } from '@/hooks/useAdminAuth';
 
 import { convexQuery } from "@convex-dev/react-query";
 import { api } from "@open-router/backend/convex/_generated/api";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ChevronDownIcon } from "lucide-react";
-import { useState } from "react";
 
 export const Route = createFileRoute("/failed-uploads")({
 	component: FailedUploadsPage,
@@ -21,17 +11,6 @@ export const Route = createFileRoute("/failed-uploads")({
 
 function FailedUploadsPage() {
 	const { token } = useAdminAuth();
-	const [deployment, setDeployment] = useState<"dev" | "prod">(() => {
-		if (typeof window === "undefined") return "prod";
-		return (
-			(localStorage.getItem("convex-deployment") as "dev" | "prod") || "prod"
-		);
-	});
-
-	const handleDeploymentChange = (value: string) => {
-		localStorage.setItem("convex-deployment", value);
-		window.location.reload();
-	};
 
 	const { data, isLoading, error } = useQuery(
 		convexQuery(api.admin.getFailedUploads, token ? { token } : "skip"),
@@ -54,27 +33,6 @@ function FailedUploadsPage() {
 					<h1 className="text-xl font-semibold">
 						Failed Uploads (0)
 					</h1>
-					<DropdownMenu>
-						<DropdownMenuTrigger asChild>
-							<Button variant="outline" size="sm">
-								{deployment === "dev" ? "Development" : "Production"}
-								<ChevronDownIcon />
-							</Button>
-						</DropdownMenuTrigger>
-						<DropdownMenuContent align="end">
-							<DropdownMenuRadioGroup
-								value={deployment}
-								onValueChange={handleDeploymentChange}
-							>
-								<DropdownMenuRadioItem value="dev">
-									Development
-								</DropdownMenuRadioItem>
-								<DropdownMenuRadioItem value="prod">
-									Production
-								</DropdownMenuRadioItem>
-							</DropdownMenuRadioGroup>
-						</DropdownMenuContent>
-					</DropdownMenu>
 				</div>
 				<div className="text-muted-foreground py-12 text-center">
 					No failed uploads
@@ -89,27 +47,6 @@ function FailedUploadsPage() {
 				<h1 className="text-xl font-semibold">
 					Failed Uploads ({failedUploads.length})
 				</h1>
-				<DropdownMenu>
-					<DropdownMenuTrigger asChild>
-						<Button variant="outline" size="sm">
-							{deployment === "dev" ? "Development" : "Production"}
-							<ChevronDownIcon />
-						</Button>
-					</DropdownMenuTrigger>
-					<DropdownMenuContent align="end">
-						<DropdownMenuRadioGroup
-							value={deployment}
-							onValueChange={handleDeploymentChange}
-						>
-							<DropdownMenuRadioItem value="dev">
-								Development
-							</DropdownMenuRadioItem>
-							<DropdownMenuRadioItem value="prod">
-								Production
-							</DropdownMenuRadioItem>
-						</DropdownMenuRadioGroup>
-					</DropdownMenuContent>
-				</DropdownMenu>
 			</div>
 			<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
 				{failedUploads.map((failedUpload) => (

@@ -5,6 +5,7 @@ import { ConvexQueryClient } from "@convex-dev/react-query";
 import { ConvexProvider, ConvexReactClient } from "convex/react";
 import { routeTree } from "./routeTree.gen";
 import Loader from "./components/loader";
+import { getDeployment } from "@/components/EnvironmentDropdown";
 import "./index.css";
 
 const DEPLOYMENTS = {
@@ -13,12 +14,9 @@ const DEPLOYMENTS = {
 };
 
 export function getRouter() {
-	const storedDeployment =
-		typeof window !== "undefined"
-			? (localStorage.getItem("convex-deployment") as keyof typeof DEPLOYMENTS)
-			: null;
+	const deployment = getDeployment();
 	const CONVEX_URL =
-		DEPLOYMENTS[storedDeployment || "prod"] ||
+		DEPLOYMENTS[deployment] ||
 		(import.meta as any).env.VITE_CONVEX_URL!;
 	if (!CONVEX_URL) {
 		console.error("missing convex URL");

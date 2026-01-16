@@ -1,29 +1,11 @@
 import { Button } from "@/components/ui/button";
-import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuRadioGroup,
-	DropdownMenuRadioItem,
-	DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
 import { Link } from "@tanstack/react-router";
-import { ChevronDownIcon, LogOut } from "lucide-react";
-import { useState } from "react";
+import { LogOut } from "lucide-react";
+import { EnvironmentDropdown } from "@/components/EnvironmentDropdown";
 
 export function NavigationLayout() {
 	const { isValid, logout } = useAdminAuth();
-	const [deployment, setDeployment] = useState<"dev" | "prod">(() => {
-		if (typeof window === "undefined") return "prod";
-		return (
-			(localStorage.getItem("convex-deployment") as "dev" | "prod") || "prod"
-		);
-	});
-
-	const handleDeploymentChange = (value: string) => {
-		localStorage.setItem("convex-deployment", value);
-		window.location.reload();
-	};
 
 	const handleLogout = async () => {
 		await logout();
@@ -83,27 +65,7 @@ export function NavigationLayout() {
 					<LogOut className="mr-2 h-4 w-4" />
 					Logout
 				</Button>
-				<DropdownMenu>
-					<DropdownMenuTrigger asChild>
-						<Button variant="outline" size="sm">
-							{deployment === "dev" ? "Development" : "Production"}
-							<ChevronDownIcon />
-						</Button>
-					</DropdownMenuTrigger>
-					<DropdownMenuContent align="end">
-						<DropdownMenuRadioGroup
-							value={deployment}
-							onValueChange={handleDeploymentChange}
-						>
-							<DropdownMenuRadioItem value="dev">
-								Development
-							</DropdownMenuRadioItem>
-							<DropdownMenuRadioItem value="prod">
-								Production
-							</DropdownMenuRadioItem>
-						</DropdownMenuRadioGroup>
-					</DropdownMenuContent>
-				</DropdownMenu>
+				<EnvironmentDropdown />
 			</div>
 		</div>
 	);

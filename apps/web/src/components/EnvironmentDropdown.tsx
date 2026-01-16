@@ -7,15 +7,16 @@ import {
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ChevronDownIcon } from "lucide-react";
-import { useState } from "react";
 
-type Deployment = "dev" | "prod";
+export type Deployment = "dev" | "prod";
+
+export function getDeployment(): Deployment {
+	if (typeof window === "undefined") return "prod";
+	return (localStorage.getItem("convex-deployment") as Deployment) || "prod";
+}
 
 export function EnvironmentDropdown() {
-	const [deployment, setDeployment] = useState<Deployment>(() => {
-		if (typeof window === "undefined") return "prod";
-		return (localStorage.getItem("convex-deployment") as Deployment) || "prod";
-	});
+	const deployment = getDeployment();
 
 	const handleDeploymentChange = (value: string) => {
 		localStorage.setItem("convex-deployment", value);
