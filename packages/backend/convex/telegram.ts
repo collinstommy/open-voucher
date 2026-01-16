@@ -57,98 +57,24 @@ async function getSampleVoucherImageUrl(ctx: any): Promise<string | null> {
 async function handleNewUser(
 	ctx: any,
 	chatId: string,
-	text: string,
 	username: string | undefined,
 	firstName: string,
 ) {
-	const requireInviteCode = process.env.REQUIRE_INVITE_CODE === "true";
-
-	if (!requireInviteCode) {
-		const newUser = await ctx.runMutation(
-			internal.users.createUserWithInvite,
-			{
-				telegramChatId: chatId,
-				username,
-				firstName,
-			},
-		);
-		await sendTelegramMessage(chatId, getWelcomeMessage(newUser.coins));
-		await sendTelegramMessage(chatId, getBetaMessage());
-
-		const sampleImageUrl = await getSampleVoucherImageUrl(ctx);
-		if (!sampleImageUrl) {
-			await sendTelegramMessage(chatId, TUTORIAL_COMPLETE_MESSAGE(newUser.coins));
-			return;
-		}
-
-		await ctx.runMutation(internal.users.setUserOnboardingStep, {
-			userId: newUser._id,
-			step: 1,
-		});
-		await sendTelegramMessage(chatId, TUTORIAL_STEP_1_MESSAGE);
-		return;
-	}
-
-	if (text.startsWith("/start")) {
-		await sendTelegramMessage(
-			chatId,
-			"👋 Welcome! You need an invite code to join. Respond with 'code YOUR_INVITE_CODE_HERE'",
-		);
-		return;
-	}
-
-	if (text.startsWith("code") || text.startsWith("Code")) {
-		const parts = text.split(" ");
-		const code = parts.length > 1 ? parts[1] : null;
-
-		if (!code) {
-			await sendTelegramMessage(
-				chatId,
-				"👋 Welcome! You need an invite code to join. Respond with 'code YOUR_INVITE_CODE_HERE'",
-			);
-			return;
-		}
-
-		const result = await ctx.runMutation(
-			internal.users.validateAndUseInviteCode,
-			{ code },
-		);
-
-		if (!result.valid) {
-			await sendTelegramMessage(chatId, `❌ ${result.reason}`);
-			return;
-		}
-
-		const newUser = await ctx.runMutation(
-			internal.users.createUserWithInvite,
-			{
-				telegramChatId: chatId,
-				username,
-				firstName,
-				inviteCode: code,
-			},
-		);
-		await sendTelegramMessage(chatId, getWelcomeMessage(newUser.coins));
-		await sendTelegramMessage(chatId, getBetaMessage());
-
-		const sampleImageUrl = await getSampleVoucherImageUrl(ctx);
-		if (!sampleImageUrl) {
-			await sendTelegramMessage(chatId, TUTORIAL_COMPLETE_MESSAGE(newUser.coins));
-			return;
-		}
-
-		await ctx.runMutation(internal.users.setUserOnboardingStep, {
-			userId: newUser._id,
-			step: 1,
-		});
-		await sendTelegramMessage(chatId, TUTORIAL_STEP_1_MESSAGE);
-		return;
-	}
-
-	await sendTelegramMessage(
-		chatId,
-		"👋 Welcome! You need an invite code to join. Respond with 'code YOUR_INVITE_CODE_HERE'",
+	const newUser = await ctx.runMutation(
+		internal.users.createUser,
+		{
+			telegramChatId: chatId,
+			username,
+			firstName,
+		},
 	);
+	await sendTelegramMessage(chatId, getWelcomeMessage(newUser.coins));
+	await sendTelegramMessage(chatId, getBetaMessage());
+	await ctx.runMutation(internal.users.setUserOnboardingStep, {
+		userId: newUser._id,
+		step: 1,
+	});
+	await sendTelegramMessage(chatId, TUTORIAL_STEP_1_MESSAGE);
 }
 
 async function handleUserState(
@@ -419,7 +345,7 @@ export const handleTelegramMessage = internalAction({
 		});
 
 		if (!user) {
-			await handleNewUser(ctx, chatId, text, username, firstName);
+			await handleNewUser(ctx, chatId, username, firstName);
 			return;
 		}
 

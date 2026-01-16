@@ -8,8 +8,6 @@ import { internal } from "../../convex/_generated/api";
 import schema from "../../convex/schema";
 import { modules } from "../test.setup";
 import {
-	createInviteCode,
-	createTelegramMessage,
 	createUser,
 	mockGeminiResponse,
 	mockTelegramResponse,
@@ -166,24 +164,12 @@ describe("Failed Uploads", () => {
 			const t = convexTest(schema, modules);
 			const chatId = "123456789";
 
-			// Create invite code and user
-			await createInviteCode(t, { code: "TESTCODE", maxUses: 100 });
-
-			await t.action(internal.telegram.handleTelegramMessage, {
-				message: createTelegramMessage({ text: "code TESTCODE", chatId }),
-			});
-
-			const user = await t.query(internal.users.getUserByTelegramChatId, {
-				telegramChatId: chatId,
-			});
-			expect(user).toBeDefined();
-
-			const userId = user!._id;
+			// Create user with createUser helper
+			const userId = await createUser(t, { telegramChatId: chatId });
+			const initialUploadCount = 0;
 			const imageStorageId = await t.run(async (ctx) => {
 				return await ctx.storage.store(new Blob(["fake-image"]));
 			});
-
-			const initialUploadCount = user!.uploadCount || 0;
 
 			// Clear messages from user creation
 			sentMessages = [];
@@ -236,17 +222,7 @@ describe("Failed Uploads", () => {
 			const t = convexTest(schema, modules);
 			const chatId = "111222333";
 
-			await createInviteCode(t, { code: "TEST3", maxUses: 100 });
-
-			await t.action(internal.telegram.handleTelegramMessage, {
-				message: createTelegramMessage({ text: "code TEST3", chatId }),
-			});
-
-			const user = await t.query(internal.users.getUserByTelegramChatId, {
-				telegramChatId: chatId,
-			});
-
-			const userId = user!._id;
+			const userId = await createUser(t, { telegramChatId: chatId });
 			const imageStorageId = await t.run(async (ctx) => {
 				return await ctx.storage.store(new Blob(["fake-image"]));
 			});
@@ -281,17 +257,8 @@ describe("Failed Uploads", () => {
 			const t = convexTest(schema, modules);
 			const chatId = "444555666";
 
-			await createInviteCode(t, { code: "TEST4", maxUses: 100 });
-
-			await t.action(internal.telegram.handleTelegramMessage, {
-				message: createTelegramMessage({ text: "code TEST4", chatId }),
-			});
-
-			const user = await t.query(internal.users.getUserByTelegramChatId, {
-				telegramChatId: chatId,
-			});
-
-			const userId = user!._id;
+			// Create user with createUser helper
+			const userId = await createUser(t, { telegramChatId: chatId });
 			const imageStorageId = await t.run(async (ctx) => {
 				return await ctx.storage.store(new Blob(["fake-image"]));
 			});
@@ -325,17 +292,8 @@ describe("Failed Uploads", () => {
 			const t = convexTest(schema, modules);
 			const chatId = "777888999";
 
-			await createInviteCode(t, { code: "TEST5", maxUses: 100 });
-
-			await t.action(internal.telegram.handleTelegramMessage, {
-				message: createTelegramMessage({ text: "code TEST5", chatId }),
-			});
-
-			const user = await t.query(internal.users.getUserByTelegramChatId, {
-				telegramChatId: chatId,
-			});
-
-			const userId = user!._id;
+			// Create user with createUser helper
+			const userId = await createUser(t, { telegramChatId: chatId });
 			const imageStorageId = await t.run(async (ctx) => {
 				return await ctx.storage.store(new Blob(["fake-image"]));
 			});
@@ -375,17 +333,8 @@ describe("Failed Uploads", () => {
 
 			const chatId = "101010101";
 
-			await createInviteCode(t, { code: "TEST6", maxUses: 100 });
-
-			await t.action(internal.telegram.handleTelegramMessage, {
-				message: createTelegramMessage({ text: "code TEST6", chatId }),
-			});
-
-			const user = await t.query(internal.users.getUserByTelegramChatId, {
-				telegramChatId: chatId,
-			});
-
-			const userId = user!._id;
+			// Create user with createUser helper
+			const userId = await createUser(t, { telegramChatId: chatId });
 			const imageStorageId = await t.run(async (ctx) => {
 				return await ctx.storage.store(new Blob(["fake-image"]));
 			});
@@ -419,17 +368,8 @@ describe("Failed Uploads", () => {
 			const t = convexTest(schema, modules);
 			const chatId = "202020202";
 
-			await createInviteCode(t, { code: "TEST7", maxUses: 100 });
-
-			await t.action(internal.telegram.handleTelegramMessage, {
-				message: createTelegramMessage({ text: "code TEST7", chatId }),
-			});
-
-			const user = await t.query(internal.users.getUserByTelegramChatId, {
-				telegramChatId: chatId,
-			});
-
-			const userId = user!._id;
+			// Create user with createUser helper
+			const userId = await createUser(t, { telegramChatId: chatId });
 			const imageStorageId = await t.run(async (ctx) => {
 				return await ctx.storage.store(new Blob(["fake-image"]));
 			});
@@ -464,17 +404,8 @@ describe("Failed Uploads", () => {
 			const t = convexTest(schema, modules);
 			const chatId = "303030303";
 
-			await createInviteCode(t, { code: "TEST8", maxUses: 100 });
-
-			await t.action(internal.telegram.handleTelegramMessage, {
-				message: createTelegramMessage({ text: "code TEST8", chatId }),
-			});
-
-			const user = await t.query(internal.users.getUserByTelegramChatId, {
-				telegramChatId: chatId,
-			});
-
-			const userId = user!._id;
+			// Create user with createUser helper
+			const userId = await createUser(t, { telegramChatId: chatId });
 
 			// Create existing voucher with same barcode
 			await t.run(async (ctx) => {
@@ -533,17 +464,8 @@ describe("Failed Uploads", () => {
 			const t = convexTest(schema, modules);
 			const chatId = "404040404";
 
-			await createInviteCode(t, { code: "TEST9", maxUses: 100 });
-
-			await t.action(internal.telegram.handleTelegramMessage, {
-				message: createTelegramMessage({ text: "code TEST9", chatId }),
-			});
-
-			const user = await t.query(internal.users.getUserByTelegramChatId, {
-				telegramChatId: chatId,
-			});
-
-			const userId = user!._id;
+			// Create user with createUser helper
+			const userId = await createUser(t, { telegramChatId: chatId });
 			const imageStorageId = await t.run(async (ctx) => {
 				return await ctx.storage.store(new Blob(["fake-image"]));
 			});
@@ -586,17 +508,8 @@ describe("Failed Uploads", () => {
 			const t = convexTest(schema, modules);
 			const chatId = "505050505";
 
-			await createInviteCode(t, { code: "TEST10", maxUses: 100 });
-
-			await t.action(internal.telegram.handleTelegramMessage, {
-				message: createTelegramMessage({ text: "code TEST10", chatId }),
-			});
-
-			const user = await t.query(internal.users.getUserByTelegramChatId, {
-				telegramChatId: chatId,
-			});
-
-			const userId = user!._id;
+			// Create user with createUser helper
+			const userId = await createUser(t, { telegramChatId: chatId });
 			const imageStorageId = await t.run(async (ctx) => {
 				return await ctx.storage.store(new Blob(["fake-image"]));
 			});
@@ -626,17 +539,8 @@ describe("Failed Uploads", () => {
 			const t = convexTest(schema, modules);
 			const chatId = "606060606";
 
-			await createInviteCode(t, { code: "TEST11", maxUses: 100 });
-
-			await t.action(internal.telegram.handleTelegramMessage, {
-				message: createTelegramMessage({ text: "code TEST11", chatId }),
-			});
-
-			const user = await t.query(internal.users.getUserByTelegramChatId, {
-				telegramChatId: chatId,
-			});
-
-			const userId = user!._id;
+			// Create user with createUser helper
+			const userId = await createUser(t, { telegramChatId: chatId });
 			const imageStorageId = await t.run(async (ctx) => {
 				return await ctx.storage.store(new Blob(["fake-image"]));
 			});
@@ -668,18 +572,9 @@ describe("Failed Uploads", () => {
 			const t = convexTest(schema, modules);
 			const chatId = "707070707";
 
-			await createInviteCode(t, { code: "TEST12", maxUses: 100 });
-
-			await t.action(internal.telegram.handleTelegramMessage, {
-				message: createTelegramMessage({ text: "code TEST12", chatId }),
-			});
-
-			const user = await t.query(internal.users.getUserByTelegramChatId, {
-				telegramChatId: chatId,
-			});
-
-			const userId = user!._id;
-			const initialUploadCount = user!.uploadCount || 0;
+			// Create user with createUser helper
+			const userId = await createUser(t, { telegramChatId: chatId });
+			const initialUploadCount = 0;
 
 			const imageStorageId = await t.run(async (ctx) => {
 				return await ctx.storage.store(new Blob(["fake-image"]));
@@ -725,17 +620,8 @@ describe("Failed Uploads", () => {
 			const t = convexTest(schema, modules);
 			const chatId = "808080808";
 
-			await createInviteCode(t, { code: "TEST13", maxUses: 100 });
-
-			await t.action(internal.telegram.handleTelegramMessage, {
-				message: createTelegramMessage({ text: "code TEST13", chatId }),
-			});
-
-			const user = await t.query(internal.users.getUserByTelegramChatId, {
-				telegramChatId: chatId,
-			});
-
-			const userId = user!._id;
+			// Create user with createUser helper
+			const userId = await createUser(t, { telegramChatId: chatId });
 			const imageStorageId = await t.run(async (ctx) => {
 				return await ctx.storage.store(new Blob(["fake-image"]));
 			});

@@ -116,58 +116,9 @@ curl -X POST "https://api.telegram.org/bot{PROD_TOKEN}/setWebhook" \
 
 ## Admin CLI Tools
 
-### Create Invite Codes
+### Create User Accounts
 
-The project includes a CLI tool for creating invite codes for user onboarding:
-
-**Setup:**
-```bash
-# Make the script executable (if not already)
-chmod +x pacakges/backend/createInviteCode.sh
-```
-
-**Usage Examples:**
-
-1. **Create an auto-generated invite code:**
-   ```bash
-   ./pacakges/backend/createInviteCode.sh
-   ```
-
-2. **Create a custom code with a label:**
-   ```bash
-   ./pacakges/backend/createInviteCode.sh -c "REDDIT" -l "Reddit launch campaign"
-   ```
-
-3. **Create code with limits and expiry:**
-   ```bash
-   ./pacakges/backend/createInviteCode.sh -c "TWITTER100" -l "Twitter giveaway" -m 100 -e 30
-   ```
-
-4. **Create code for production environment:**
-   ```bash
-   ./pacakges/backend/createInviteCode.sh -c "PARTY25" -l "Birthday party" -p
-   ```
-
-**Parameters:**
-- `-c, --code CODE` - Custom invite code (optional, auto-generated if not provided)
-- `-l, --label LABEL` - Description for tracking purposes (optional)
-- `-m, --max-uses NUM` - Maximum number of uses (default: 50)
-- `-e, --expires NUM` - Expiry in days (default: no expiry)
-- `-p, --prod` - Use production environment (default: development)
-- `-h, --help` - Show help message
-
-**Example Output:**
-```
-✅ Invite code created successfully!
-
-📋 Details:
-   Code: REDDIT50
-   Label: Reddit launch campaign
-   Max Uses: 50
-   Environment: development
-
-🔗 Share: https://t.me/your_bot?start=REDDIT50
-```
+To create user accounts for testing, use the Convex dashboard or CLI to insert records directly into the database.
 
 ## Admin Authentication
 
@@ -204,11 +155,10 @@ If **3 or more of an uploader's last 5 uploads** are reported as not working, th
 - [x] ban messages should be clearer - review this flow
 - [x] double check ban logic from both sides
 - [x] define rules of the system in docs
-- [ ] remove invite code flow
+- [x] remove invite code flow
 - [ ] onboarding flow for devs
 
 ## Later
-- [ ] remove invite code flow
 - [x] fix users query
 - [ ] seed dev data - https://docs.convex.dev/database/import-export/import
 - [ ] failed uploads dashboard

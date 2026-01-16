@@ -1,5 +1,5 @@
 /**
- * User Signup Flow Tests
+ * User Signup Flow Tests (No Invite Codes)
  */
 
 import { convexTest } from "convex-test";
@@ -8,8 +8,8 @@ import { internal } from "../../convex/_generated/api";
 import schema from "../../convex/schema";
 import { modules } from "../test.setup";
 import {
-	createInviteCode,
 	createTelegramMessage,
+	createUser,
 	mockTelegramResponse,
 } from "./fixtures/testHelpers";
 
@@ -63,7 +63,6 @@ describe("User Signup Flow", () => {
 	beforeEach(() => {
 		setupFetchMock();
 		vi.stubEnv("TELEGRAM_BOT_TOKEN", "test-bot-token");
-		vi.stubEnv("REQUIRE_INVITE_CODE", "true");
 	});
 
 	afterEach(() => {
@@ -71,14 +70,14 @@ describe("User Signup Flow", () => {
 		vi.unstubAllEnvs();
 	});
 
-	test("new user with valid invite code is created via Telegram message", async () => {
+	test("new user is created via Telegram message", async () => {
 		const t = convexTest(schema, modules);
 		const chatId = "123456789";
-
-		await createInviteCode(t, { code: "TESTCODE", maxUses: 100 });
+		const username = "testuser";
+		const firstName = "Test";
 
 		await t.action(internal.telegram.handleTelegramMessage, {
-			message: createTelegramMessage({ text: "code TESTCODE", chatId }),
+			message: createTelegramMessage({ text: "/start", chatId, username }),
 		});
 
 		const user = await t.run(async (ctx) => {
@@ -88,9 +87,12 @@ describe("User Signup Flow", () => {
 				.first();
 		});
 
-		expect(user).toBeDefined();
+		expect(user?.telegramChatId).toBe(chatId);
+		expect(user?.username).toBe(username);
+		expect(user?.firstName).toBe(firstName);
 		expect(user?.isBanned).toBe(false);
 
+		// Verify welcome message was sent
 		const welcomeMsg = sentMessages.find(
 			(m) =>
 				m.chatId === chatId &&
@@ -99,48 +101,64 @@ describe("User Signup Flow", () => {
 		expect(welcomeMsg).toBeDefined();
 	});
 
-
-	test("validate invite code increments usage via Telegram message", async () => {
+	test("existing user is recognized and redirected properly", async () => {
 		const t = convexTest(schema, modules);
 		const chatId = "987654321";
+		const username = "existinguser";
 
-		await createInviteCode(t, { code: "SINGLEUSE", maxUses: 1 });
+		await createUser(t, { telegramChatId: chatId, username, firstName: "Existing" });
+
+		sentMessages = [];
 
 		await t.action(internal.telegram.handleTelegramMessage, {
-			message: createTelegramMessage({ text: "code SINGLEUSE", chatId }),
+			message: createTelegramMessage({ text: "hello", chatId, username }),
 		});
 
-		const user = await t.run(async (ctx) => {
+		const users = await t.run(async (ctx) => {
 			return await ctx.db
 				.query("users")
 				.withIndex("by_chat_id", (q) => q.eq("telegramChatId", chatId))
-				.first();
-		});
-		expect(user).toBeDefined();
-
-		const chatId2 = "987654322";
-		await t.action(internal.telegram.handleTelegramMessage, {
-			message: createTelegramMessage({ text: "code SINGLEUSE", chatId: chatId2 }),
+				.collect();
 		});
 
-		const errorMsg = sentMessages.find(
-			(m) => m.chatId === chatId2 && m.text?.includes("limit"),
+		expect(users).toHaveLength(1);
+
+		const welcomeMsg = sentMessages.find(
+			(m) =>
+				m.chatId === chatId &&
+				m.text?.includes("Welcome to Dunnes Voucher Bot!"),
 		);
-		expect(errorMsg).toBeDefined();
+		expect(welcomeMsg).toBeUndefined();
 	});
 
-	test("invalid invite code returns error via Telegram message", async () => {
+	test("user receives signup bonus and transaction is recorded", async () => {
 		const t = convexTest(schema, modules);
 		const chatId = "111222333";
+		const SIGNUP_BONUS = 10; // Matches constants.ts
 
-		await t.action(internal.telegram.handleTelegramMessage, {
-			message: createTelegramMessage({ text: "code DOESNOTEXIST", chatId }),
+		await t.mutation(internal.users.createUser, {
+			telegramChatId: chatId,
+			username: "bonususer",
+			firstName: "Bonus",
 		});
 
-		const errorMsg = sentMessages.find(
-			(m) => m.chatId === chatId && m.text?.includes("Invalid"),
-		);
-		expect(errorMsg).toBeDefined();
+		const transactions = await t.run(async (ctx) => {
+			const user = await ctx.db
+				.query("users")
+				.withIndex("by_chat_id", (q) => q.eq("telegramChatId", chatId))
+				.first();
+			if (!user) return [];
+			return await ctx.db
+				.query("transactions")
+				.withIndex("by_user", (q) => q.eq("userId", user._id))
+				.collect();
+		});
+
+		expect(transactions).toHaveLength(1);
+		expect(transactions[0]).toMatchObject({
+			type: "signup_bonus",
+			amount: SIGNUP_BONUS,
+		});
 
 		const user = await t.run(async (ctx) => {
 			return await ctx.db
@@ -148,14 +166,13 @@ describe("User Signup Flow", () => {
 				.withIndex("by_chat_id", (q) => q.eq("telegramChatId", chatId))
 				.first();
 		});
-		expect(user).toBeNull();
+
+		expect(user?.coins).toBe(SIGNUP_BONUS);
 	});
 
-
-	test("new user can join without invite code when REQUIRE_INVITE_CODE is false", async () => {
-		vi.stubEnv("REQUIRE_INVITE_CODE", "false");
+	test("onboarding step is set after signup", async () => {
 		const t = convexTest(schema, modules);
-		const chatId = "999888777";
+		const chatId = "333444555";
 
 		await t.action(internal.telegram.handleTelegramMessage, {
 			message: createTelegramMessage({ text: "/start", chatId }),
@@ -168,15 +185,57 @@ describe("User Signup Flow", () => {
 				.first();
 		});
 
-		expect(user).toBeDefined();
-		expect(user?.isBanned).toBe(false);
-		expect(user?.inviteCode).toBeUndefined();
+		expect(user?.onboardingStep).toBe(1);
+	});
 
-		const welcomeMsg = sentMessages.find(
-			(m) =>
-				m.chatId === chatId &&
-				m.text?.includes("Welcome to Dunnes Voucher Bot!"),
+	test("multiple new users can sign up independently", async () => {
+		const t = convexTest(schema, modules);
+
+		await t.action(internal.telegram.handleTelegramMessage, {
+			message: createTelegramMessage({ text: "/start", chatId: "user1" }),
+		});
+
+		await t.action(internal.telegram.handleTelegramMessage, {
+			message: createTelegramMessage({ text: "/start", chatId: "user2" }),
+		});
+
+		const users = await t.run(async (ctx) => {
+			return await ctx.db.query("users").collect();
+		});
+
+		expect(users).toHaveLength(2);
+
+		const welcomeMessages = sentMessages.filter((m) =>
+			m.text?.includes("Welcome to Dunnes Voucher Bot!"),
 		);
-		expect(welcomeMsg).toBeDefined();
+		expect(welcomeMessages).toHaveLength(2);
+	});
+
+	test("returns existing user data when creating duplicate user", async () => {
+		const t = convexTest(schema, modules);
+		const chatId = "duplicate123";
+
+		const result1 = await t.mutation(internal.users.createUser, {
+			telegramChatId: chatId,
+			firstName: "First",
+		});
+
+		const result2 = await t.mutation(internal.users.createUser, {
+			telegramChatId: chatId,
+			firstName: "Second",
+		});
+
+		// Verify user has correct coins
+		expect(result1._id).toBe(result2._id);
+
+		const users = await t.run(async (ctx) => {
+			return await ctx.db
+				.query("users")
+				.withIndex("by_chat_id", (q) => q.eq("telegramChatId", chatId))
+				.collect();
+		});
+
+		expect(users).toHaveLength(1);
+		expect(users[0].firstName).toBe("First");
 	});
 });

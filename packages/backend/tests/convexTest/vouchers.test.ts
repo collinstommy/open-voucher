@@ -523,9 +523,8 @@ describe("OCR Flow with Mocked Gemini", () => {
 		vi.setSystemTime(mockNow);
 
 		// Create user
-		await t.mutation(internal.users.createUserWithInvite, {
+		await t.mutation(internal.users.createUser, {
 			telegramChatId: chatId,
-			inviteCode: "TEST",
 		});
 
 		// Mock response with expiration date set to today
