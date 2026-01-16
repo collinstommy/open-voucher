@@ -199,27 +199,6 @@ export async function createVoucher(
 	});
 }
 
-export interface CreateInviteCodeParams {
-	code: string;
-	maxUses?: number;
-	usedCount?: number;
-	createdAt?: number;
-}
-
-export async function createInviteCode(
-	t: any,
-	params: CreateInviteCodeParams,
-): Promise<void> {
-	await t.run(async (ctx: any) => {
-		await ctx.db.insert("inviteCodes", {
-			code: params.code,
-			maxUses: params.maxUses ?? 100,
-			usedCount: params.usedCount ?? 0,
-			createdAt: params.createdAt ?? Date.now(),
-		});
-	});
-}
-
 // ============================================================================
 // OCR Scenarios (for reference in tests)
 // ============================================================================

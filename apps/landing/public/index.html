@@ -28,11 +28,6 @@
 </head>
 <body class="bg-gray-50 text-gray-800 flex flex-col min-h-screen">
 
-    <!-- Beta Banner -->
-    <div class="bg-indigo-600 text-white px-4 py-3 text-center text-sm font-medium shadow-sm relative z-50">
-        <p>🚧 <strong>Private Beta:</strong> Open Vouchers is currently invite-only. We will open to the public soon.</p>
-    </div>
-
     <!-- Navbar -->
     <nav class="bg-white border-b border-gray-100 py-4">
         <div class="container mx-auto px-6 flex justify-between items-center">
@@ -202,29 +197,11 @@
     <!-- JavaScript for Dynamic Links -->
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            // 1. Get the URL parameters (e.g., "?invite=reddit")
-            const urlParams = new URLSearchParams(window.location.search);
-
-            // 2. Get the 'invite' value.
-            const inviteCode = urlParams.get('invite');
-
-            // 3. Construct the full Telegram deep link
-            let fullLink = 'https://t.me/DunnesVoucherBot';
-
-            if (inviteCode) {
-                // Encode the code to be safe
-                const encodedInviteCode = encodeURIComponent(inviteCode.toLowerCase());
-                fullLink += '?text=code%20' + encodedInviteCode;
-            }
-
-            // 4. Update the CTA button's href
+            // Update the CTA button to link directly to the bot
             const ctaButton = document.getElementById('telegram-cta');
             if (ctaButton) {
-                ctaButton.href = fullLink;
+                ctaButton.href = 'https://t.me/DunnesVoucherBot';
             }
-
-            // 5. Optional: Display debug info in footer (hidden from casual view usually, but kept for verification)
-            // console.log(`Dynamic Telegram link generated: ${fullLink}`);
         });
     </script>
 </body>
