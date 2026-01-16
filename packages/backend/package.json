@@ -1,5 +1,5 @@
 {
-	"name": "@open-router/backend",
+	"name": "@open-voucher/backend",
 	"version": "1.0.0",
 	"scripts": {
 		"dev": "convex dev",
@@ -7,6 +7,7 @@
 		"test": "vitest run",
 		"test:watch": "vitest",
 		"test:e2e": "bun test tests/convex-test/",
+		"check-types": "tsc --noEmit",
 		"deploy": "convex deploy",
 		"expiring": "convex run dashboard:getExpiringVouchers --prod",
 		"expiring:dev": "convex run dashboard:getExpiringVouchers"

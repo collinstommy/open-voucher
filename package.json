@@ -1,5 +1,5 @@
 {
-  "name": "openvouchers",
+  "name": "open-voucher",
   "private": true,
   "type": "module",
   "workspaces": {
@@ -16,11 +16,14 @@
     "build": "turbo build",
     "check-types": "turbo check-types",
     "dev:web": "turbo -F web dev",
-    "dev:server": "turbo -F @openvouchers/backend dev",
-    "dev:setup": "turbo -F @openvouchers/backend dev:setup"
+    "dev:server": "turbo -F @open-voucher/backend dev",
+    "dev:setup": "turbo -F @open-voucher/backend dev:setup",
+    "format": "biome format --write .",
+    "format:check": "biome format ."
   },
   "dependencies": {},
   "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
     "turbo": "^2.5.4"
   },
   "packageManager": "bun@1.2.19"

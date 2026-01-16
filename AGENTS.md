@@ -1,6 +1,6 @@
 # Project Overview
 
-This project, `open-router`, is a modern TypeScript monorepo built with Better-T-Stack. It combines React, TanStack Start, and Convex to provide a full-stack application development experience.
+This project, `open-voucher`, is a modern TypeScript monorepo built with Better-T-Stack. It combines React, TanStack Start, and Convex to provide a full-stack application development experience.
 
 ## Key Technologies
 
@@ -49,5 +49,46 @@ The following `bun run` scripts are available from the root directory:
 *   **Monorepo Management:** Turborepo is used for efficient management and building of different applications/packages within the monorepo.
 
 
-##  Coding guidlines
+## Coding guidlines
 - Use `import { useQuery, useMutation } from "convex/react";` for convex queries and mutations on the client
+
+## Running Tasks
+
+### Type Checking
+Run type checking for all packages:
+```bash
+bun run check-types
+```
+
+Run type checking for specific packages:
+```bash
+# Backend only
+cd packages/backend && bun tsc --noEmit
+
+# Web app only
+cd apps/web && bun tsc --noEmit
+```
+
+### Backend Tests
+```bash
+# Run all backend tests
+bun run test
+
+# Run in watch mode
+bun run test:watch
+
+# Run e2e tests (uses bun test)
+bun run test:e2e
+```
+
+### Formatting
+Format code with Biome:
+```bash
+bun run format
+```
+
+### After Completing a Task
+Always run:
+```bash
+bun run check-types && bun run test
+```

@@ -1,4 +1,4 @@
-import { api } from "@open-router/backend/convex/_generated/api";
+import { api } from "@open-voucher/backend/convex/_generated/api";
 import { useConvex } from "convex/react";
 import { useCallback, useEffect, useState } from "react";
 import { getDeployment } from "@/components/EnvironmentDropdown";

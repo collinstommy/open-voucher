@@ -1,6 +1,4 @@
-# open-router
-
-This project was created with [Better-T-Stack](https://github.com/AmanVarshney01/create-better-t-stack), a modern TypeScript stack that combines React, TanStack Start, Convex, and more.
+# Open Voucher
 
 ## Features
 
@@ -26,7 +24,7 @@ Your app will connect to the Convex cloud backend automatically.
 ## Project Structure
 
 ```
-open-router/
+open-voucher/
 ├── apps/
 │   ├── web/         # Frontend application (React + TanStack Start)
 ├── packages/
