@@ -742,13 +742,11 @@ export const clearUserData = internalMutation({
 export const getFailedUploads = adminQuery({
 	args: {},
 	handler: async (ctx) => {
-		// Get the 50 most recent failed uploads
 		const failedUploads = await ctx.db
 			.query("failedUploads")
 			.order("desc")
 			.take(50);
 
-		// Get failed uploads with user information and image URLs
 		const failedUploadsWithDetails = await Promise.all(
 			failedUploads.map(async (failedUpload) => {
 				const user = await ctx.db.get(failedUpload.userId);
@@ -765,7 +763,7 @@ export const getFailedUploads = adminQuery({
 					failureReason: failedUpload.failureReason,
 					errorMessage: failedUpload.errorMessage,
 					extractedType: failedUpload.extractedType,
-					createdAt: failedUpload._creationTime,
+					_creationTime: failedUpload._creationTime,
 				};
 			}),
 		);
