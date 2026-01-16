@@ -37,7 +37,7 @@ We've given you a welcome bonus of <b>${coins} coins</b> to get you started! �
 `;
 
 function getWelcomeMessage(coins: number): string {
-	return `🎉 <b>Welcome to Dunnes Voucher Bot!</b>`;
+	return "🎉 <b>Welcome to Dunnes Voucher Bot!</b>";
 }
 
 function getBetaMessage(): string {

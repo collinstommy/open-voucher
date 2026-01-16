@@ -1,32 +1,5 @@
 {
-	"$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
-	"vcs": {
-		"enabled": false,
-		"clientKind": "git",
-		"useIgnoreFile": false
-	},
-	"files": {
-		"ignoreUnknown": false,
-		"include": ["**"],
-		"ignore": [
-			".next",
-			"dist",
-			".turbo",
-			"dev-dist",
-			".zed",
-			".vscode",
-			"routeTree.gen.ts",
-			"src-tauri",
-			".nuxt",
-			"bts.jsonc",
-			".expo",
-			".wrangler",
-			".alchemy",
-			".svelte-kit",
-			"wrangler.jsonc",
-			".source"
-		]
-	},
+	"$schema": "https://biomejs.dev/schemas/2.3.11/schema.json",
 	"formatter": {
 		"enabled": true,
 		"indentStyle": "tab"
@@ -63,6 +36,11 @@
 	"javascript": {
 		"formatter": {
 			"quoteStyle": "double"
+		}
+	},
+	"css": {
+		"parser": {
+			"tailwindDirectives": true
 		}
 	}
 }

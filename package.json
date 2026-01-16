@@ -3,7 +3,10 @@
 	"private": true,
 	"type": "module",
 	"workspaces": {
-		"packages": ["apps/*", "packages/*"],
+		"packages": [
+			"apps/*",
+			"packages/*"
+		],
 		"catalog": {
 			"convex": "^1.29.3"
 		}
@@ -20,7 +23,7 @@
 	},
 	"dependencies": {},
 	"devDependencies": {
-		"@biomejs/biome": "^1.9.4",
+		"@biomejs/biome": "^2.3.11",
 		"turbo": "^2.5.4"
 	},
 	"packageManager": "bun@1.2.19"
