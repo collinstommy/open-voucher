@@ -113,7 +113,7 @@ function FailedUploadsPage() {
 			</div>
 			<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
 				{failedUploads.map((failedUpload) => (
-					<div key={failedUpload._id} className="rounded-lg border border-red-200 bg-red-50/30 p-4">
+					<div key={failedUpload._id} className="rounded-lg border border-red-200 p-4">
 						{failedUpload.imageUrl ? (
 							<img
 								src={failedUpload.imageUrl}
@@ -128,7 +128,7 @@ function FailedUploadsPage() {
 							</div>
 						)}
 						<div className="mb-3">
-							<div className="mb-2 font-medium text-red-700">
+							<div className="mb-2 font-medium text-white">
 								{failedUpload.extractedType ? `€${failedUpload.extractedType} Voucher (Failed)` : "Failed Upload"}
 							</div>
 							<div className="text-muted-foreground mb-1 text-xs font-mono">
