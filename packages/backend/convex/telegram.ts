@@ -1,4 +1,4 @@
-import type { v } from "convex/values";
+import { v } from "convex/values";
 import dayjs from "dayjs";
 import advancedFormat from "dayjs/plugin/advancedFormat";
 import { internal } from "./_generated/api";
