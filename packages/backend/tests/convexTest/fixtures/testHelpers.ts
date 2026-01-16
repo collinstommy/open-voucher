@@ -1,12 +1,4 @@
-/**
- * Test helpers and fixtures for convex-test
- */
-
 import type { Id } from "../../../convex/_generated/dataModel";
-
-// ============================================================================
-// Mock Response Helpers
-// ============================================================================
 
 export interface MockGeminiParams {
 	type: number;
@@ -43,9 +35,6 @@ export function mockTelegramResponse() {
 	return { ok: true, result: { message_id: 123 } };
 }
 
-// ============================================================================
-// Telegram Message Creators
-// ============================================================================
 
 export interface CreateTelegramMessageParams {
 	text: string;
@@ -74,7 +63,6 @@ export function createTelegramMessage(
 		username = usernameOrUndefined ?? "testuser";
 	}
 
-	// Parse chatId as number if it's numeric, otherwise use it as-is
 	const numericChatId = isNaN(Number(chatId)) ? chatId : Number(chatId);
 	return {
 		message_id: Math.floor(Math.random() * 100000),
@@ -138,12 +126,11 @@ export function createTelegramCallback(
 	};
 }
 
-// ============================================================================
-// Database Fixture Helpers
-// ============================================================================
 
 export interface CreateUserParams {
 	telegramChatId: string | number;
+	username?: string;
+	firstName?: string;
 	coins?: number;
 	isBanned?: boolean;
 	createdAt?: number;
@@ -158,6 +145,8 @@ export async function createUser(
 	return await t.run(async (ctx: any) => {
 		return await ctx.db.insert("users", {
 			telegramChatId: chatId,
+			username: params.username,
+			firstName: params.firstName,
 			coins: params.coins ?? 0,
 			isBanned: params.isBanned ?? false,
 			createdAt: params.createdAt ?? Date.now(),
@@ -199,9 +188,6 @@ export async function createVoucher(
 	});
 }
 
-// ============================================================================
-// OCR Scenarios (for reference in tests)
-// ============================================================================
 
 export type OCRScenario =
 	| "valid_10"
