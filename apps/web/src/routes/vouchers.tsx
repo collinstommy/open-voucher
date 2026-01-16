@@ -1,5 +1,5 @@
-import { Button } from '@/components/ui/button';
-import { useAdminAuth } from '@/hooks/useAdminAuth';
+import { Button } from "@/components/ui/button";
+import { useAdminAuth } from "@/hooks/useAdminAuth";
 
 import { api } from "@open-voucher/backend/convex/_generated/api";
 import { createFileRoute } from "@tanstack/react-router";
@@ -9,14 +9,13 @@ export const Route = createFileRoute("/vouchers")({
 	component: VouchersPage,
 });
 
-
 function VouchersPage() {
 	const { token } = useAdminAuth();
 
 	const { results, status, loadMore } = usePaginatedQuery(
 		api.admin.getAllVouchers,
 		token ? { token } : "skip",
-		{ initialNumItems: 50 }
+		{ initialNumItems: 50 },
 	);
 
 	const isLoading = status === "LoadingFirstPage";
@@ -64,15 +63,11 @@ function VouchersPage() {
 							/>
 						) : (
 							<div className="bg-muted mb-3 flex h-96 w-full items-center justify-center rounded">
-								<span className="text-muted-foreground text-xs">
-									No image
-								</span>
+								<span className="text-muted-foreground text-xs">No image</span>
 							</div>
 						)}
 						<div className="mb-3">
-							<div className="mb-2 font-medium">
-								€{voucher.type} Voucher
-							</div>
+							<div className="mb-2 font-medium">€{voucher.type} Voucher</div>
 							<div className="text-muted-foreground mb-1 text-xs font-mono">
 								Voucher ID: {voucher._id}
 							</div>

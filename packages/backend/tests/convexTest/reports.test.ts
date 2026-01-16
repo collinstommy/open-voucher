@@ -8,7 +8,11 @@ import { internal } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
 import schema from "../../convex/schema";
 import { modules } from "../test.setup";
-import { createUser, createVoucher, mockTelegramResponse } from "./fixtures/testHelpers";
+import {
+	createUser,
+	createVoucher,
+	mockTelegramResponse,
+} from "./fixtures/testHelpers";
 
 let sentMessages: { chatId: string; text?: string }[] = [];
 
@@ -76,10 +80,16 @@ describe("Report Flow", () => {
 		const t = convexTest(schema, modules);
 
 		// Create uploader
-		const uploaderId = await createUser(t, { telegramChatId: "uploader123", coins: 10 });
+		const uploaderId = await createUser(t, {
+			telegramChatId: "uploader123",
+			coins: 10,
+		});
 
 		// Create claimer
-		const claimerId = await createUser(t, { telegramChatId: "claimer456", coins: 10 });
+		const claimerId = await createUser(t, {
+			telegramChatId: "claimer456",
+			coins: 10,
+		});
 
 		// Create claimed voucher
 		const voucherId = await createVoucher(t, {
@@ -128,10 +138,16 @@ describe("Ban Flow", () => {
 		const reporterChatId = "reporter_test";
 
 		// Create uploader user (will be banned)
-		const uploaderId = await createUser(t, { telegramChatId: uploaderChatId, coins: 100 });
+		const uploaderId = await createUser(t, {
+			telegramChatId: uploaderChatId,
+			coins: 100,
+		});
 
 		// Create reporter user
-		const reporterId = await createUser(t, { telegramChatId: reporterChatId, coins: 50 });
+		const reporterId = await createUser(t, {
+			telegramChatId: reporterChatId,
+			coins: 50,
+		});
 
 		// Create 5 vouchers, all claimed by reporter
 		const voucherIds: Id<"vouchers">[] = [];
@@ -252,8 +268,14 @@ describe("Ban Flow Tests", () => {
 		const t = convexTest(schema, modules);
 		const now = Date.now();
 
-		const uploaderId = await createUser(t, { telegramChatId: "uploader123", coins: 0 });
-		const reporterId = await createUser(t, { telegramChatId: "reporter456", coins: 100 });
+		const uploaderId = await createUser(t, {
+			telegramChatId: "uploader123",
+			coins: 0,
+		});
+		const reporterId = await createUser(t, {
+			telegramChatId: "reporter456",
+			coins: 100,
+		});
 
 		// Create 5 vouchers and have reporter claim all of them
 		const voucherIds: Id<"vouchers">[] = [];
@@ -325,8 +347,14 @@ describe("Ban Flow Tests", () => {
 		const t = convexTest(schema, modules);
 		const now = Date.now();
 
-		const uploaderId = await createUser(t, { telegramChatId: "uploader789", coins: 0 });
-		const reporterId = await createUser(t, { telegramChatId: "reporter101", coins: 100 });
+		const uploaderId = await createUser(t, {
+			telegramChatId: "uploader789",
+			coins: 0,
+		});
+		const reporterId = await createUser(t, {
+			telegramChatId: "reporter101",
+			coins: 100,
+		});
 
 		// Create 5 vouchers uploaded by uploader, claimed by reporter
 		const voucherIds: Id<"vouchers">[] = [];
@@ -384,8 +412,14 @@ describe("Ban Flow Tests", () => {
 		const now = Date.now();
 
 		// Create uploader
-		const uploaderId = await createUser(t, { telegramChatId: "gooduploader", coins: 0 });
-		const goodReporterId = await createUser(t, { telegramChatId: "goodreporter", coins: 100 });
+		const uploaderId = await createUser(t, {
+			telegramChatId: "gooduploader",
+			coins: 0,
+		});
+		const goodReporterId = await createUser(t, {
+			telegramChatId: "goodreporter",
+			coins: 100,
+		});
 		const badReporterId = await createUser(t, {
 			telegramChatId: "badreporter",
 			coins: 100,

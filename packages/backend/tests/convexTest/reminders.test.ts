@@ -7,7 +7,11 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { internal } from "../../convex/_generated/api";
 import schema from "../../convex/schema";
 import { modules } from "../test.setup";
-import { createUser, createVoucher, mockTelegramResponse } from "./fixtures/testHelpers";
+import {
+	createUser,
+	createVoucher,
+	mockTelegramResponse,
+} from "./fixtures/testHelpers";
 
 let sentMessages: { chatId: string; text?: string }[] = [];
 
@@ -70,8 +74,14 @@ describe("Reminder Flow", () => {
 
 		const t = convexTest(schema, modules);
 
-		const claimerId = await createUser(t, { telegramChatId: "claimer123", coins: 100 });
-		const uploaderId = await createUser(t, { telegramChatId: "uploader456", coins: 50 });
+		const claimerId = await createUser(t, {
+			telegramChatId: "claimer123",
+			coins: 100,
+		});
+		const uploaderId = await createUser(t, {
+			telegramChatId: "uploader456",
+			coins: 50,
+		});
 
 		// Create voucher claimed yesterday (should trigger reminder)
 		await createVoucher(t, {

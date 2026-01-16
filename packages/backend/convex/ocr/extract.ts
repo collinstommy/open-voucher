@@ -120,18 +120,25 @@ If expiry is unknown: null.`;
 				.year(expiryYear)
 				.month(extracted.validFromMonth - 1) // dayjs months are 0-indexed
 				.date(extracted.validFromDay)
-				.startOf('day');
+				.startOf("day");
 
 			// If validFrom is chronologically after expiryDate, use previous year
 			if (validFromDate.isAfter(expiryDateParsed)) {
-				validFromDate = validFromDate.subtract(1, 'year');
-				console.log(`Adjusted validFrom year to ${validFromDate.year()} (crosses year boundary)`);
+				validFromDate = validFromDate.subtract(1, "year");
+				console.log(
+					`Adjusted validFrom year to ${validFromDate.year()} (crosses year boundary)`,
+				);
 			}
 
-			validFrom = validFromDate.format('YYYY-MM-DD');
+			validFrom = validFromDate.format("YYYY-MM-DD");
 		}
 
-		console.log("Extracted (final):", { type: extracted.type, validFrom, expiryDate, barcode: extracted.barcode });
+		console.log("Extracted (final):", {
+			type: extracted.type,
+			validFrom,
+			expiryDate,
+			barcode: extracted.barcode,
+		});
 
 		return {
 			type: extracted.type,

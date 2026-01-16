@@ -31,7 +31,10 @@ type OCRSenario =
 	| "too_late_today"
 	| "gemini_api_error";
 
-function setupFetchMock(scenario: OCRSenario = "valid_10", customExpiryDate?: string) {
+function setupFetchMock(
+	scenario: OCRSenario = "valid_10",
+	customExpiryDate?: string,
+) {
 	sentMessages = [];
 
 	const futureDate = new Date();
@@ -56,19 +59,79 @@ function setupFetchMock(scenario: OCRSenario = "valid_10", customExpiryDate?: st
 	const expiryForOldValidFrom = new Date();
 	expiryForOldValidFrom.setMonth(11);
 	expiryForOldValidFrom.setDate(31);
-	const expiryForOldValidFromStr = expiryForOldValidFrom.toISOString().split("T")[0];
+	const expiryForOldValidFromStr = expiryForOldValidFrom
+		.toISOString()
+		.split("T")[0];
 
 	const scenarios = {
-		valid_10: mockGeminiResponse({ type: 10, validFromDay, validFromMonth, expiryDate: customExpiryDate || futureDateStr, barcode: "1234567890002" }),
-		valid_5: mockGeminiResponse({ type: 5, expiryDate: customExpiryDate || futureDateStr, barcode: "1234567890001" }),
-		valid_20: mockGeminiResponse({ type: 20, validFromDay, validFromMonth, expiryDate: futureDateStr, barcode: "1234567890003" }),
-		expired: mockGeminiResponse({ type: 10, validFromDay, validFromMonth, expiryDate: pastDateStr, barcode: "1234567890004" }),
-		invalid_type: mockGeminiResponse({ type: 0, validFromDay, validFromMonth, expiryDate: futureDateStr, barcode: "1234567890005" }),
-		missing_valid_from: mockGeminiResponse({ type: 10, validFromDay: null, validFromMonth: null, expiryDate: futureDateStr, barcode: "1234567890006" }),
-		invalid_valid_from: mockGeminiResponse({ type: 10, validFromDay: veryOldDay, validFromMonth: veryOldMonth, expiryDate: expiryForOldValidFromStr, barcode: "1234567890007" }),
-		missing_expiry: mockGeminiResponse({ type: 10, validFromDay, validFromMonth, expiryDate: null, barcode: "1234567890008" }),
-		missing_barcode: mockGeminiResponse({ type: 10, validFromDay, validFromMonth, expiryDate: futureDateStr, barcode: null }),
-		too_late_today: mockGeminiResponse({ type: 10, validFromDay, validFromMonth, expiryDate: todayDateStr, barcode: "1234567890010" }),
+		valid_10: mockGeminiResponse({
+			type: 10,
+			validFromDay,
+			validFromMonth,
+			expiryDate: customExpiryDate || futureDateStr,
+			barcode: "1234567890002",
+		}),
+		valid_5: mockGeminiResponse({
+			type: 5,
+			expiryDate: customExpiryDate || futureDateStr,
+			barcode: "1234567890001",
+		}),
+		valid_20: mockGeminiResponse({
+			type: 20,
+			validFromDay,
+			validFromMonth,
+			expiryDate: futureDateStr,
+			barcode: "1234567890003",
+		}),
+		expired: mockGeminiResponse({
+			type: 10,
+			validFromDay,
+			validFromMonth,
+			expiryDate: pastDateStr,
+			barcode: "1234567890004",
+		}),
+		invalid_type: mockGeminiResponse({
+			type: 0,
+			validFromDay,
+			validFromMonth,
+			expiryDate: futureDateStr,
+			barcode: "1234567890005",
+		}),
+		missing_valid_from: mockGeminiResponse({
+			type: 10,
+			validFromDay: null,
+			validFromMonth: null,
+			expiryDate: futureDateStr,
+			barcode: "1234567890006",
+		}),
+		invalid_valid_from: mockGeminiResponse({
+			type: 10,
+			validFromDay: veryOldDay,
+			validFromMonth: veryOldMonth,
+			expiryDate: expiryForOldValidFromStr,
+			barcode: "1234567890007",
+		}),
+		missing_expiry: mockGeminiResponse({
+			type: 10,
+			validFromDay,
+			validFromMonth,
+			expiryDate: null,
+			barcode: "1234567890008",
+		}),
+		missing_barcode: mockGeminiResponse({
+			type: 10,
+			validFromDay,
+			validFromMonth,
+			expiryDate: futureDateStr,
+			barcode: null,
+		}),
+		too_late_today: mockGeminiResponse({
+			type: 10,
+			validFromDay,
+			validFromMonth,
+			expiryDate: todayDateStr,
+			barcode: "1234567890010",
+		}),
 		gemini_api_error: null,
 	};
 
@@ -239,7 +302,10 @@ describe("Voucher Claim Flow", () => {
 		const userId = await createUser(t, { telegramChatId: chatId, coins: 20 });
 
 		// Create another user (the uploader)
-		const uploaderId = await createUser(t, { telegramChatId: "uploader123", coins: 0 });
+		const uploaderId = await createUser(t, {
+			telegramChatId: "uploader123",
+			coins: 0,
+		});
 
 		// Create an available voucher
 		await createVoucher(t, {
@@ -275,7 +341,10 @@ describe("Voucher Claim Flow", () => {
 		const userId = await createUser(t, { telegramChatId: chatId, coins: 5 });
 
 		// Create another user (the uploader)
-		const uploaderId = await createUser(t, { telegramChatId: "uploader456", coins: 0 });
+		const uploaderId = await createUser(t, {
+			telegramChatId: "uploader456",
+			coins: 0,
+		});
 
 		// Create an available voucher
 		await createVoucher(t, {
@@ -326,7 +395,10 @@ describe("Voucher Expiration Flow", () => {
 		const t = convexTest(schema, modules);
 		const uploaderChatId = "222222";
 
-		const uploaderId = await createUser(t, { telegramChatId: uploaderChatId, coins: 0 });
+		const uploaderId = await createUser(t, {
+			telegramChatId: uploaderChatId,
+			coins: 0,
+		});
 
 		const now = Date.now();
 
@@ -368,8 +440,14 @@ describe("Voucher Expiration Flow", () => {
 		const uploaderChatId = "222222";
 		const claimerChatId = "333333";
 
-		const uploaderId = await createUser(t, { telegramChatId: uploaderChatId, coins: 0 });
-		const claimerId = await createUser(t, { telegramChatId: claimerChatId, coins: 100 });
+		const uploaderId = await createUser(t, {
+			telegramChatId: uploaderChatId,
+			coins: 0,
+		});
+		const claimerId = await createUser(t, {
+			telegramChatId: claimerChatId,
+			coins: 100,
+		});
 
 		const now = Date.now();
 
@@ -485,7 +563,9 @@ describe("OCR Flow with Mocked Gemini", () => {
 		});
 
 		// Simulate OCR with expired date
-		const pastDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+		const pastDate = new Date(
+			Date.now() - 7 * 24 * 60 * 60 * 1000,
+		).toISOString();
 		await t.mutation(internal.ocr.store.storeVoucherFromOcr, {
 			userId,
 			imageStorageId,
@@ -560,7 +640,9 @@ describe("OCR Flow with Mocked Gemini", () => {
 			(m) =>
 				m.chatId === chatId &&
 				m.text?.includes("Voucher Processing Failed") &&
-				m.text?.includes("Vouchers expiring today can only be uploaded before 9 PM"),
+				m.text?.includes(
+					"Vouchers expiring today can only be uploaded before 9 PM",
+				),
 		);
 
 		expect(failureMessage).toBeDefined();

@@ -16,8 +16,7 @@ const DEPLOYMENTS = {
 export function getRouter() {
 	const deployment = getDeployment();
 	const CONVEX_URL =
-		DEPLOYMENTS[deployment] ||
-		(import.meta as any).env.VITE_CONVEX_URL!;
+		DEPLOYMENTS[deployment] || (import.meta as any).env.VITE_CONVEX_URL!;
 	if (!CONVEX_URL) {
 		console.error("missing convex URL");
 	}

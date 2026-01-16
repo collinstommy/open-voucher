@@ -23,7 +23,9 @@ function SettingsComponent() {
 					/>
 				) : (
 					<div className="bg-muted flex h-96 w-full items-center justify-center rounded">
-						<span className="text-muted-foreground text-sm">No sample voucher image set</span>
+						<span className="text-muted-foreground text-sm">
+							No sample voucher image set
+						</span>
 					</div>
 				)}
 			</section>

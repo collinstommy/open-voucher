@@ -1,4 +1,4 @@
-import { useAdminAuth } from '@/hooks/useAdminAuth';
+import { useAdminAuth } from "@/hooks/useAdminAuth";
 
 import { convexQuery } from "@convex-dev/react-query";
 import { api } from "@open-voucher/backend/convex/_generated/api";
@@ -17,7 +17,9 @@ function FailedUploadsPage() {
 	);
 
 	if (isLoading) {
-		return <div className="text-muted-foreground">Loading failed uploads...</div>;
+		return (
+			<div className="text-muted-foreground">Loading failed uploads...</div>
+		);
 	}
 
 	if (error) {
@@ -30,9 +32,7 @@ function FailedUploadsPage() {
 		return (
 			<div>
 				<div className="mb-6 flex items-center justify-between">
-					<h1 className="text-xl font-semibold">
-						Failed Uploads (0)
-					</h1>
+					<h1 className="text-xl font-semibold">Failed Uploads (0)</h1>
 				</div>
 				<div className="text-muted-foreground py-12 text-center">
 					No failed uploads
@@ -50,7 +50,10 @@ function FailedUploadsPage() {
 			</div>
 			<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
 				{failedUploads.map((failedUpload) => (
-					<div key={failedUpload._id} className="rounded-lg border border-red-200 p-4">
+					<div
+						key={failedUpload._id}
+						className="rounded-lg border border-red-200 p-4"
+					>
 						{failedUpload.imageUrl ? (
 							<img
 								src={failedUpload.imageUrl}
@@ -59,14 +62,14 @@ function FailedUploadsPage() {
 							/>
 						) : (
 							<div className="bg-muted mb-3 flex h-96 w-full items-center justify-center rounded">
-								<span className="text-muted-foreground text-xs">
-									No image
-								</span>
+								<span className="text-muted-foreground text-xs">No image</span>
 							</div>
 						)}
 						<div className="mb-3">
 							<div className="mb-2 font-medium text-white">
-								{failedUpload.extractedType ? `€${failedUpload.extractedType} Voucher (Failed)` : "Failed Upload"}
+								{failedUpload.extractedType
+									? `€${failedUpload.extractedType} Voucher (Failed)`
+									: "Failed Upload"}
 							</div>
 							<div className="text-muted-foreground mb-1 text-xs font-mono">
 								User ID: {failedUpload.userId}
@@ -100,7 +103,8 @@ function FailedUploadsPage() {
 								</div>
 							)}
 							<div className="text-muted-foreground text-sm">
-								Failed at {new Date(failedUpload._creationTime).toLocaleString()}
+								Failed at{" "}
+								{new Date(failedUpload._creationTime).toLocaleString()}
 							</div>
 						</div>
 					</div>

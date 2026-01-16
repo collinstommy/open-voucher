@@ -106,7 +106,11 @@ describe("User Signup Flow", () => {
 		const chatId = "987654321";
 		const username = "existinguser";
 
-		await createUser(t, { telegramChatId: chatId, username, firstName: "Existing" });
+		await createUser(t, {
+			telegramChatId: chatId,
+			username,
+			firstName: "Existing",
+		});
 
 		sentMessages = [];
 

@@ -168,8 +168,14 @@ describe("Rate Limiting Flow", () => {
 		const claimerChatId = "55667788";
 		const uploaderChatId = "99887766";
 
-		const claimerId = await createUser(t, { telegramChatId: claimerChatId, coins: 500 });
-		const uploaderId = await createUser(t, { telegramChatId: uploaderChatId, coins: 0 });
+		const claimerId = await createUser(t, {
+			telegramChatId: claimerChatId,
+			coins: 500,
+		});
+		const uploaderId = await createUser(t, {
+			telegramChatId: uploaderChatId,
+			coins: 0,
+		});
 
 		// Simulate 5 existing claims in the last 24h
 		for (let i = 0; i < 5; i++) {
