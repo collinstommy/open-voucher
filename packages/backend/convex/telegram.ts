@@ -6,9 +6,16 @@ import { Id } from "./_generated/dataModel";
 import { internalAction } from "./_generated/server";
 dayjs.extend(advancedFormat);
 
-function getWelcomeMessage(coins: number): string {
-	return `🎉 <b>Welcome to Dunnes Voucher Bot!</b>
-You've been started with <b>${coins} coins</b> to get you going! 🚀
+const TUTORIAL_STEP_1_MESSAGE =
+	"Let's show you how to use the bot. Send the number <b>10</b> to get a voucher.";
+
+const TUTORIAL_STEP_1_RETRY_MESSAGE =
+	"Please send the number <b>0</b> to continue the tutorial.";
+
+const TUTORIAL_COMPLETE_MESSAGE = (coins: number) => `
+You are now ready to go!
+
+We've given you a welcome bonus of <b>${coins} coins</b> to get you started! 🚀
 
 <b>How it works:</b>
 • Upload a voucher → Earn coins
@@ -22,11 +29,28 @@ You've been started with <b>${coins} coins</b> to get you going! 🚀
 📤 <b>Got a voucher?</b> Upload a screenshot via the paperclip icon
 🙏 <b>Need a voucher?</b> Reply with just <b>5</b>, <b>10</b>, or <b>20</b>
 💰 <b>Check Balance:</b> Send <b>balance</b>
-❓ <b>Get Help:</b> Send <b>help</b>`;
+❓ <b>Get Help:</b> Send <b>help</b>
+
+<b>Important</b>
+• Please do not use vouchers you have already uploaded. Request a voucher through the bot instead.
+• Only report a voucher as not working, when it does not scan at the till. Please do not report a voucher for any other reason.
+`
+;
+
+function getWelcomeMessage(coins: number): string {
+	return `🎉 <b>Welcome to Dunnes Voucher Bot!</b>`
 }
 
 function getBetaMessage(): string {
-	return `👋 <b>We're in beta!</b>\nWe're keen to hear about bugs or general feedback.\n\n📝 To send feedback send <b>feedback [your message]</b>`;
+	return `<b>Beta Notice:</b> This is a work in progress. Please report any issues via the help menu.`;
+}
+
+async function getSampleVoucherImageUrl(ctx: any): Promise<string | null> {
+	const storageId = await ctx.runQuery(internal.settings.getSetting, {
+		key: "sample-voucher-image",
+	});
+	if (!storageId) return null;
+	return await ctx.storage.getUrl(storageId);
 }
 
 /**
@@ -81,6 +105,11 @@ export const handleTelegramMessage = internalAction({
 				);
 				await sendTelegramMessage(chatId, getWelcomeMessage(newUser.coins));
 				await sendTelegramMessage(chatId, getBetaMessage());
+				await ctx.runMutation(internal.users.setUserOnboardingStep, {
+					userId: newUser._id,
+					step: 1,
+				});
+				await sendTelegramMessage(chatId, TUTORIAL_STEP_1_MESSAGE);
 				return;
 			}
 
@@ -130,7 +159,6 @@ export const handleTelegramMessage = internalAction({
 
 		const lowerText = text.toLowerCase().trim();
 
-		// FSM: Handle user states first
 		if (user.telegramState === "waiting_for_support_message") {
 			await ctx.runMutation(internal.users.submitFeedback, {
 				userId: user._id,
@@ -178,6 +206,34 @@ export const handleTelegramMessage = internalAction({
 			);
 			return;
 		}
+
+		if (user.telegramState === "onboarding_tutorial") {
+			const step = user.onboardingStep ?? 1;
+
+			if (step === 1) {
+				const lowerText = text.toLowerCase().trim();
+				if (lowerText === "10") {
+					await ctx.runMutation(internal.users.setUserOnboardingStep, {
+						userId: user._id,
+						step: 2,
+					});
+					// Send sample image
+					const imageUrl = await getSampleVoucherImageUrl(ctx);
+					if (imageUrl) {
+						await sendTelegramPhoto(chatId, imageUrl, "Here is your sample voucher!");
+					} else {
+						await sendTelegramMessage(chatId, "Here is your sample voucher!");
+					}
+					await ctx.runMutation(internal.users.clearOnboardingTutorial, {
+						userId: user._id,
+					});
+					await sendTelegramMessage(chatId, TUTORIAL_COMPLETE_MESSAGE(user.coins));
+				} else {
+					await sendTelegramMessage(chatId, TUTORIAL_STEP_1_RETRY_MESSAGE);
+				}
+				return;
+		}
+	}
 
 		if (user.isBanned) {
 			await ctx.runMutation(internal.users.setUserTelegramState, {
@@ -274,6 +330,7 @@ export const handleTelegramMessage = internalAction({
 		// Handle Voucher Requests
 		const match = lowerText.match(/\b(5|10|20)\b/);
 		if (match) {
+		}
 			const type = match[1] as "5" | "10" | "20";
 			// We do a loose check: if message length is short (< 20 chars) and contains the number
 			if (lowerText.length < 10) {
@@ -304,8 +361,7 @@ export const handleTelegramMessage = internalAction({
 				}
 				return;
 			}
-		}
-	},
+	}
 });
 
 export const sendMessageAction = internalAction({
@@ -358,6 +414,12 @@ async function sendTelegramPhoto(
 ) {
 	const token = process.env.TELEGRAM_BOT_TOKEN;
 	if (!token) {
+		return;
+	}
+
+	// Handle placeholder "image" for tutorial
+	if (photoUrl === "image") {
+		await sendTelegramMessage(chatId, caption || "Sample image placeholder", replyMarkup);
 		return;
 	}
 
