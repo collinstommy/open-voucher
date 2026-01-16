@@ -12,7 +12,8 @@ type TelegramUserState =
 	| "waiting_for_support_message"
 	| "waiting_for_feedback_message"
 	| "waiting_for_ban_appeal"
-	| "onboarding_tutorial";
+	| "onboarding_tutorial"
+	| "waiting_for_report_confirmation";
 
 interface User {
 	_id: Id<"users">;
@@ -612,6 +613,11 @@ export const handleTelegramCallback = internalAction({
 		} else if (data.startsWith("report:cancel:")) {
 			await answerTelegramCallback(callbackQuery.id);
 			await sendTelegramMessage(chatId, "✅ Cancelled. No action taken.");
+			await editTelegramMessageText(
+				chatId,
+				callbackQuery.message.message_id,
+				callbackQuery.message.text,
+			);
 		} else if (data.startsWith("help:")) {
 			await answerTelegramCallback(callbackQuery.id);
 
@@ -686,6 +692,34 @@ export const handleTelegramCallback = internalAction({
 		}
 	},
 });
+
+async function editTelegramMessageText(
+	chatId: string,
+	messageId: number,
+	text: string,
+) {
+	const token = process.env.TELEGRAM_BOT_TOKEN;
+	if (!token) {
+		return;
+	}
+
+	const url = `https://api.telegram.org/bot${token}/editMessageText`;
+	try {
+		await fetch(url, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				chat_id: chatId,
+				message_id: messageId,
+				text,
+				parse_mode: "HTML",
+				reply_markup: { inline_keyboard: [] },
+			}),
+		});
+	} catch (error) {
+		console.error("Network error editing message text:", error);
+	}
+}
 
 async function answerTelegramCallback(callbackQueryId: string, text?: string) {
 	const token = process.env.TELEGRAM_BOT_TOKEN;
