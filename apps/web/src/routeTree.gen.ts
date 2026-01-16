@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as VouchersRouteImport } from './routes/vouchers'
 import { Route as FeedbackRouteImport } from './routes/feedback'
+import { Route as FailedUploadsRouteImport } from './routes/failed-uploads'
 import { Route as BannedRouteImport } from './routes/banned'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as UsersIndexRouteImport } from './routes/users/index'
@@ -24,6 +25,11 @@ const VouchersRoute = VouchersRouteImport.update({
 const FeedbackRoute = FeedbackRouteImport.update({
   id: '/feedback',
   path: '/feedback',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FailedUploadsRoute = FailedUploadsRouteImport.update({
+  id: '/failed-uploads',
+  path: '/failed-uploads',
   getParentRoute: () => rootRouteImport,
 } as any)
 const BannedRoute = BannedRouteImport.update({
@@ -50,6 +56,7 @@ const UsersUserIdRoute = UsersUserIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/banned': typeof BannedRoute
+  '/failed-uploads': typeof FailedUploadsRoute
   '/feedback': typeof FeedbackRoute
   '/vouchers': typeof VouchersRoute
   '/users/$userId': typeof UsersUserIdRoute
@@ -58,6 +65,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/banned': typeof BannedRoute
+  '/failed-uploads': typeof FailedUploadsRoute
   '/feedback': typeof FeedbackRoute
   '/vouchers': typeof VouchersRoute
   '/users/$userId': typeof UsersUserIdRoute
@@ -67,6 +75,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/banned': typeof BannedRoute
+  '/failed-uploads': typeof FailedUploadsRoute
   '/feedback': typeof FeedbackRoute
   '/vouchers': typeof VouchersRoute
   '/users/$userId': typeof UsersUserIdRoute
@@ -77,16 +86,25 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/banned'
+    | '/failed-uploads'
     | '/feedback'
     | '/vouchers'
     | '/users/$userId'
     | '/users'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/banned' | '/feedback' | '/vouchers' | '/users/$userId' | '/users'
+  to:
+    | '/'
+    | '/banned'
+    | '/failed-uploads'
+    | '/feedback'
+    | '/vouchers'
+    | '/users/$userId'
+    | '/users'
   id:
     | '__root__'
     | '/'
     | '/banned'
+    | '/failed-uploads'
     | '/feedback'
     | '/vouchers'
     | '/users/$userId'
@@ -96,6 +114,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   BannedRoute: typeof BannedRoute
+  FailedUploadsRoute: typeof FailedUploadsRoute
   FeedbackRoute: typeof FeedbackRoute
   VouchersRoute: typeof VouchersRoute
   UsersUserIdRoute: typeof UsersUserIdRoute
@@ -116,6 +135,13 @@ declare module '@tanstack/react-router' {
       path: '/feedback'
       fullPath: '/feedback'
       preLoaderRoute: typeof FeedbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/failed-uploads': {
+      id: '/failed-uploads'
+      path: '/failed-uploads'
+      fullPath: '/failed-uploads'
+      preLoaderRoute: typeof FailedUploadsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/banned': {
@@ -152,6 +178,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   BannedRoute: BannedRoute,
+  FailedUploadsRoute: FailedUploadsRoute,
   FeedbackRoute: FeedbackRoute,
   VouchersRoute: VouchersRoute,
   UsersUserIdRoute: UsersUserIdRoute,
