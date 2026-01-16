@@ -47,3 +47,7 @@ The following `bun run` scripts are available from the root directory:
 
 *   **TypeScript:** All code is written in TypeScript for strong typing.
 *   **Monorepo Management:** Turborepo is used for efficient management and building of different applications/packages within the monorepo.
+
+
+##  Coding guidlines
+- Use `import { useQuery, useMutation } from "convex/react";` for convex queries and mutations on the client

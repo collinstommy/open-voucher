@@ -18,6 +18,7 @@ import type * as ocr_extract from "../ocr/extract.js";
 import type * as ocr_process from "../ocr/process.js";
 import type * as ocr_store from "../ocr/store.js";
 import type * as reminders from "../reminders.js";
+import type * as settings from "../settings.js";
 import type * as telegram from "../telegram.js";
 import type * as users from "../users.js";
 import type * as vouchers from "../vouchers.js";
@@ -39,6 +40,7 @@ declare const fullApi: ApiFromModules<{
   "ocr/process": typeof ocr_process;
   "ocr/store": typeof ocr_store;
   reminders: typeof reminders;
+  settings: typeof settings;
   telegram: typeof telegram;
   users: typeof users;
   vouchers: typeof vouchers;

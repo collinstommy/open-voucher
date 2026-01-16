@@ -215,3 +215,54 @@ export const submitFeedback = internalMutation({
 		});
 	},
 });
+
+export const setUserTelegramState = internalMutation({
+	args: {
+		userId: v.id("users"),
+		state: v.optional(
+			v.union(
+				v.literal("waiting_for_support_message"),
+				v.literal("waiting_for_feedback_message"),
+				v.literal("waiting_for_ban_appeal"),
+				v.literal("onboarding_tutorial"),
+			),
+		),
+	},
+	handler: async (ctx, { userId, state }) => {
+		await ctx.db.patch(userId, { telegramState: state });
+	},
+});
+
+export const clearUserTelegramState = internalMutation({
+	args: {
+		userId: v.id("users"),
+	},
+	handler: async (ctx, { userId }) => {
+		await ctx.db.patch(userId, { telegramState: undefined });
+	},
+});
+
+export const setUserOnboardingStep = internalMutation({
+	args: {
+		userId: v.id("users"),
+		step: v.number(),
+	},
+	handler: async (ctx, { userId, step }) => {
+		await ctx.db.patch(userId, {
+			telegramState: "onboarding_tutorial",
+			onboardingStep: step,
+		});
+	},
+});
+
+export const clearOnboardingTutorial = internalMutation({
+	args: {
+		userId: v.id("users"),
+	},
+	handler: async (ctx, { userId }) => {
+		await ctx.db.patch(userId, {
+			telegramState: undefined,
+			onboardingStep: undefined,
+		});
+	},
+});

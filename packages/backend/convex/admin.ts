@@ -217,6 +217,42 @@ export const getTodaysVouchers = adminQuery({
 	},
 });
 
+export const getAllVouchers = adminQuery({
+	args: {
+		paginationOpts: v.object({
+			numItems: v.number(),
+			cursor: v.nullable(v.string()),
+			id: v.number(),
+		}),
+	},
+	handler: async (ctx, { paginationOpts }) => {
+		const { cursor, ...rest } = paginationOpts;
+		const results = await ctx.db
+			.query("vouchers")
+			.order("desc")
+			.paginate({ ...rest, cursor: cursor ?? null });
+
+		const vouchersWithImages = await Promise.all(
+			results.page.map(async (v) => ({
+				_id: v._id,
+				type: v.type,
+				status: v.status,
+				createdAt: v.createdAt,
+				expiryDate: v.expiryDate,
+				uploaderId: v.uploaderId,
+				claimerId: v.claimerId,
+				imageUrl: await ctx.storage.getUrl(v.imageStorageId),
+			})),
+		);
+
+		return {
+			page: vouchersWithImages,
+			continueCursor: results.continueCursor,
+			isDone: results.isDone,
+		};
+	},
+});
+
 export const getUsersWithStats = adminQuery({
 	args: {},
 	handler: async (ctx) => {

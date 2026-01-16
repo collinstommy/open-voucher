@@ -8,16 +8,16 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useAdminAuth } from '@/hooks/useAdminAuth';
 
-import { convexQuery } from "@convex-dev/react-query";
 import { api } from "@open-router/backend/convex/_generated/api";
-import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { ChevronDownIcon } from "lucide-react";
 import { useState } from "react";
+import { usePaginatedQuery } from "convex/react";
 
 export const Route = createFileRoute("/vouchers")({
 	component: VouchersPage,
 });
+
 
 function VouchersPage() {
 	const { token } = useAdminAuth();
@@ -33,33 +33,44 @@ function VouchersPage() {
 		window.location.reload();
 	};
 
-	const { data, isLoading, error } = useQuery(
-		convexQuery(api.admin.getTodaysVouchers, token ? { token } : "skip"),
+	const { results, status, loadMore } = usePaginatedQuery(
+		api.admin.getAllVouchers,
+		token ? { token } : "skip",
+		{ initialNumItems: 50 }
 	);
+
+	const isLoading = status === "LoadingFirstPage";
+	const canLoadMore = status === "CanLoadMore";
+	const isLoadingMore = status === "LoadingMore";
 
 	if (isLoading) {
 		return <div className="text-muted-foreground">Loading vouchers...</div>;
 	}
 
-	if (error) {
-		return <div className="text-red-500">Error loading vouchers</div>;
-	}
-
-	const vouchers = data?.vouchers ?? [];
-
-	if (vouchers.length === 0) {
+	if (!results || results.length === 0) {
 		return (
 			<div className="text-muted-foreground py-12 text-center">
-				No vouchers uploaded today
+				No vouchers found
 			</div>
 		);
 	}
+
+	const handleLoadMore = () => {
+		if (canLoadMore) {
+			loadMore(50);
+		}
+	};
 
 	return (
 		<div>
 			<div className="mb-6 flex items-center justify-between">
 				<h1 className="text-xl font-semibold">
-					Today's Vouchers ({vouchers.length})
+					All Vouchers
+					{results.length > 0 && (
+						<span className="text-muted-foreground text-base font-normal ml-2">
+							(Showing {results.length})
+						</span>
+					)}
 				</h1>
 				<DropdownMenu>
 					<DropdownMenuTrigger asChild>
@@ -84,7 +95,7 @@ function VouchersPage() {
 				</DropdownMenu>
 			</div>
 			<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-				{vouchers.map((voucher) => (
+				{results.map((voucher) => (
 					<div key={voucher._id} className="rounded-lg border p-4">
 						{voucher.imageUrl ? (
 							<img
@@ -142,6 +153,18 @@ function VouchersPage() {
 					</div>
 				))}
 			</div>
+			{(canLoadMore || isLoadingMore) && (
+				<div className="mt-6 flex justify-center">
+					<Button
+						onClick={handleLoadMore}
+						disabled={isLoadingMore}
+						variant="outline"
+						size="lg"
+					>
+						{isLoadingMore ? "Loading..." : "Load More"}
+					</Button>
+				</div>
+			)}
 		</div>
 	);
 }

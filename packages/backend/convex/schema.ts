@@ -27,6 +27,15 @@ export default defineSchema({
 		uploadReportCount: v.optional(v.number()),
 		claimReportCount: v.optional(v.number()),
 		lastReportAt: v.optional(v.number()),
+		onboardingStep: v.optional(v.number()),
+		telegramState: v.optional(
+			v.union(
+				v.literal("waiting_for_support_message"),
+				v.literal("waiting_for_feedback_message"),
+				v.literal("waiting_for_ban_appeal"),
+				v.literal("onboarding_tutorial"),
+			),
+		),
 	}).index("by_chat_id", ["telegramChatId"]),
 
 	messages: defineTable({
@@ -126,6 +135,11 @@ export default defineSchema({
 	})
 		.index("by_status", ["status"])
 		.index("by_type", ["type"]),
+
+	settings: defineTable({
+		key: v.string(),
+		value: v.string(),
+	}).index("by_key", ["key"]),
 
 	adminSessions: defineTable({
 		token: v.string(),
