@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { internalMutation, internalQuery } from "./_generated/server";
+import { internalMutation, internalQuery, query } from "./_generated/server";
 
 export const getSetting = internalQuery({
 	args: { key: v.string() },
@@ -27,5 +27,17 @@ export const setSampleVoucherImage = internalMutation({
 				value: imageStorageId,
 			});
 		}
+	},
+});
+
+export const getSampleVoucherImageUrl = query({
+	args: {},
+	handler: async (ctx) => {
+		const setting = await ctx.db
+			.query("settings")
+			.withIndex("by_key", (q) => q.eq("key", "sample-voucher-image"))
+			.first();
+		if (!setting?.value) return null;
+		return await ctx.storage.getUrl(setting.value);
 	},
 });

@@ -65,6 +65,12 @@ export function NavigationLayout() {
 				>
 					Banned
 				</Link>
+				<Link
+					to="/settings"
+					className="text-muted-foreground hover:text-foreground"
+				>
+					Settings
+				</Link>
 			</nav>
 			<div className="flex gap-2">
 				<Button variant="ghost" size="sm" onClick={handleLogout}>
