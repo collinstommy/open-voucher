@@ -3,8 +3,9 @@ import dayjs from "dayjs";
 import advancedFormat from "dayjs/plugin/advancedFormat";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
-import { internalAction } from "./_generated/server";
 import type { ActionCtx } from "./_generated/server";
+import { internalAction } from "./_generated/server";
+
 dayjs.extend(advancedFormat);
 
 type TelegramUserState =
@@ -298,6 +299,48 @@ async function handleCommand(
 				"⚠️ Please include a message, e.g., 'feedback fix this bug!'",
 			);
 		}
+		return true;
+	}
+
+	if (lowerText === "heartbeat") {
+		const result = await ctx.runQuery(internal.heartbeat.heartbeat);
+
+		const statusEmoji =
+			result.status === "healthy"
+				? "✅"
+				: result.status === "warning"
+					? "⚠️"
+					: "🔴";
+
+		const ocrStatus = result.checks.ocr.status;
+		const ocrEmoji =
+			ocrStatus === "healthy" ? "✅" : ocrStatus === "warning" ? "⚠️" : "🔴";
+
+		const telegramStatus = result.checks.telegram.status;
+		const telegramEmoji =
+			telegramStatus === "healthy"
+				? "✅"
+				: telegramStatus === "warning"
+					? "⚠️"
+					: "🔴";
+
+		const vouchersStatus = result.checks.vouchers.status;
+		const vouchersEmoji =
+			vouchersStatus === "healthy"
+				? "✅"
+				: vouchersStatus === "warning"
+					? "⚠️"
+					: "🔴";
+
+		const message = `<b>Heartbeat Status</b> ${statusEmoji}
+
+${ocrEmoji} <b>OCR System:</b> ${result.checks.ocr.message}
+${telegramEmoji} <b>Telegram:</b> ${result.checks.telegram.message}
+${vouchersEmoji} <b>Vouchers:</b> ${result.checks.vouchers.message}
+
+<i>Checked at: ${new Date(result.timestamp).toLocaleString()}</i>`;
+
+		await sendTelegramMessage(chatId, message);
 		return true;
 	}
 
