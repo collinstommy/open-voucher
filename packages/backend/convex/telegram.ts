@@ -547,6 +547,13 @@ export const handleTelegramCallback = internalAction({
 				return;
 			}
 
+			// Remove inline keyboard from confirmation message
+			await editTelegramMessageText(
+				chatId,
+				callbackQuery.message.message_id,
+				callbackQuery.message.text,
+			);
+
 			if (result.status === "rate_limited") {
 				await sendTelegramMessage(chatId, `⏰ ${result.message}`);
 			} else if (result.status === "already_reported") {
