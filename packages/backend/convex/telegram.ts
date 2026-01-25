@@ -12,8 +12,7 @@ type TelegramUserState =
 	| "waiting_for_support_message"
 	| "waiting_for_feedback_message"
 	| "waiting_for_ban_appeal"
-	| "onboarding_tutorial"
-	| "waiting_for_report_confirmation";
+	| "onboarding_tutorial";
 
 interface User {
 	_id: Id<"users">;

@@ -34,7 +34,6 @@ export default defineSchema({
 				v.literal("waiting_for_feedback_message"),
 				v.literal("waiting_for_ban_appeal"),
 				v.literal("onboarding_tutorial"),
-				v.literal("waiting_for_report_confirmation"),
 			),
 		),
 	}).index("by_chat_id", ["telegramChatId"]),
