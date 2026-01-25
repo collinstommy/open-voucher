@@ -9,7 +9,7 @@ export default defineSchema({
 		usedCount: v.number(),
 		expiresAt: v.optional(v.number()),
 		createdAt: v.number(),
-	}).index("by_code", ["code"]),
+	}),
 
 	// Users table - stores Telegram users
 	users: defineTable({
@@ -48,10 +48,7 @@ export default defineSchema({
 		imageStorageId: v.optional(v.id("_storage")),
 		isAdminMessage: v.optional(v.boolean()),
 		createdAt: v.number(),
-	})
-		.index("by_chat_id", ["telegramChatId"])
-		.index("by_message_id", ["telegramChatId", "telegramMessageId"])
-		.index("by_admin_message", ["isAdminMessage", "telegramChatId"]),
+	}).index("by_admin_message", ["isAdminMessage", "telegramChatId"]),
 
 	vouchers: defineTable({
 		type: v.union(
@@ -82,7 +79,6 @@ export default defineSchema({
 		.index("by_claimed_at", ["claimedAt"])
 		.index("by_uploader", ["uploaderId"])
 		.index("by_uploader_created", ["uploaderId", "createdAt"])
-		.index("by_claimer_status", ["claimerId", "status"])
 		.index("by_claimer_claimed_at", ["claimerId", "claimedAt"])
 		.index("by_barcode", ["barcodeNumber"]),
 
@@ -123,18 +119,14 @@ export default defineSchema({
 		extractedBarcode: v.optional(v.string()),
 		extractedExpiryDate: v.optional(v.string()),
 		extractedValidFrom: v.optional(v.string()),
-	})
-		.index("by_user", ["userId"])
-		.index("by_failure_reason", ["failureReason"]),
+	}),
 	feedback: defineTable({
 		userId: v.id("users"),
 		text: v.string(),
 		createdAt: v.number(),
 		status: v.string(), // "new", "read", "archived"
 		type: v.optional(v.string()), // "feedback", "support"
-	})
-		.index("by_status", ["status"])
-		.index("by_type", ["type"]),
+	}),
 
 	settings: defineTable({
 		key: v.string(),
