@@ -1,17 +1,31 @@
 import {
+	customAction,
 	customMutation,
 	customQuery,
 } from "convex-helpers/server/customFunctions";
 import { v } from "convex/values";
 import {
 	internalMutation,
+	internalQuery,
 	mutation,
 	query,
-	QueryCtx,
+	action,
 } from "./_generated/server";
 import { internal } from "./_generated/api";
+import type { ActionCtx, QueryCtx } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
 
 const SESSION_DURATION_MS = 24 * 60 * 60 * 1000;
+
+export const getSessionByToken = internalQuery({
+	args: { token: v.string() },
+	handler: async (ctx, { token }) => {
+		return await ctx.db
+			.query("adminSessions")
+			.withIndex("by_token", (q) => q.eq("token", token))
+			.first();
+	},
+});
 
 export const login = mutation({
 	args: {
@@ -67,13 +81,12 @@ export const logout = mutation({
 });
 
 export async function verifyAdminSession(
-	ctx: QueryCtx,
+	ctx: QueryCtx | ActionCtx,
 	token: string,
 ): Promise<void> {
-	const session = await ctx.db
-		.query("adminSessions")
-		.withIndex("by_token", (q) => q.eq("token", token))
-		.first();
+	const session = await ctx.runQuery(internal.admin.getSessionByToken, {
+		token,
+	});
 
 	if (!session) {
 		throw new Error("Unauthorized: Invalid session token");
@@ -98,6 +111,14 @@ export const adminMutation = customMutation(mutation, {
 	input: async (ctx, { token }) => {
 		await verifyAdminSession(ctx, token);
 		return { ctx: {}, args: {} };
+	},
+});
+
+export const adminAction = customAction(action, {
+	args: { token: v.string() },
+	input: async (ctx, { token }) => {
+		await verifyAdminSession(ctx, token);
+		return { ctx: {}, args: { token } };
 	},
 });
 
@@ -769,5 +790,121 @@ export const getFailedUploads = adminQuery({
 		);
 
 		return { failedUploads: failedUploadsWithDetails };
+	},
+});
+
+export const getHealthCheckData = internalQuery({
+	args: { token: v.string() },
+	handler: async (ctx, { token }) => {
+		const session = await ctx.db
+			.query("adminSessions")
+			.withIndex("by_token", (q) => q.eq("token", token))
+			.first();
+
+		if (!session) {
+			return { valid: false, error: "Invalid session" };
+		}
+
+		if (session.expiresAt < Date.now()) {
+			return { valid: false, error: "Session expired" };
+		}
+
+		const now = Date.now();
+		const vouchers = await ctx.db
+			.query("vouchers")
+			.withIndex("by_status_created", (q) => q.eq("status", "available"))
+			.collect();
+
+		const voucherCount = vouchers.filter(
+			(v) => (v.expiryDate as number) > now,
+		).length;
+
+		return { valid: true, voucherCount };
+	},
+});
+
+export const runHealthCheck = adminAction({
+	args: { token: v.string() },
+	handler: async (ctx, { token }) => {
+		const currentYear = new Date().getFullYear();
+		const expectedExpiry = `${currentYear}-01-09`;
+
+		type HealthData = { valid: boolean; error?: string; voucherCount?: number };
+		const healthData: HealthData = await ctx.runQuery(
+			internal.admin.getHealthCheckData,
+			{ token },
+		);
+
+		if (!healthData.valid) {
+			throw new Error(healthData.error ?? "Unknown error");
+		}
+
+		const setting = await ctx.runQuery(internal.settings.getSetting, {
+			key: "sample-voucher-image",
+		});
+
+		let ocrTest: { success: boolean; message: string };
+		if (!setting) {
+			ocrTest = {
+				success: false,
+				message: "No sample voucher image configured",
+			};
+		} else {
+			const ocrResult = await ctx.runAction(
+				internal.ocr.extract.extractFromImage,
+				{ imageStorageId: setting as Id<"_storage"> },
+			);
+
+			if (ocrResult.expiryDate === expectedExpiry) {
+				ocrTest = {
+					success: true,
+					message: `Expiry date ${ocrResult.expiryDate} matches expected ${expectedExpiry}`,
+				};
+			} else {
+				ocrTest = {
+					success: false,
+					message: `Expected expiry ${expectedExpiry}, got ${ocrResult.expiryDate ?? "null"}`,
+				};
+			}
+		}
+
+		const telegramToken = process.env.TELEGRAM_BOT_TOKEN;
+		let telegramTest: { success: boolean; message: string };
+		if (!telegramToken) {
+			telegramTest = {
+				success: false,
+				message: "TELEGRAM_BOT_TOKEN not configured",
+			};
+		} else {
+			const response = await fetch(
+				`https://api.telegram.org/bot${telegramToken}/getMe`,
+			);
+			if (response.ok) {
+				telegramTest = {
+					success: true,
+					message: "Telegram token is valid",
+				};
+			} else {
+				telegramTest = {
+					success: false,
+					message: `Telegram token invalid: ${response.status} ${response.statusText}`,
+				};
+			}
+		}
+
+		const voucherCount = healthData.voucherCount ?? 0;
+
+		return {
+			ocrTest,
+			voucherCount: {
+				success: voucherCount > 20,
+				count: voucherCount,
+				message:
+					voucherCount > 20
+						? `${voucherCount} available vouchers (threshold: 20)`
+						: `${voucherCount} available vouchers, need > 20`,
+			},
+			telegramToken: telegramTest,
+		};
 	},
 });

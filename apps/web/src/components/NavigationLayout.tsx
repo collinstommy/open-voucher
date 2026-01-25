@@ -22,6 +22,12 @@ export function NavigationLayout() {
 				<Link to="/" className="font-semibold">
 					Home
 				</Link>
+				<Link
+					to="/health-check"
+					className="text-muted-foreground hover:text-foreground"
+				>
+					Health Check
+				</Link>
 
 				<Link
 					to="/vouchers"

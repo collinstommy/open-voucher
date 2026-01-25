@@ -675,7 +675,7 @@ export const handleTelegramCallback = internalAction({
 
 					const getStatus = (count: number) => {
 						if (count === 0) return "🔴 none";
-						if (count < 5) return "🟡 low";
+						if (count < 10) return `🟡 low - ${count} vouchers`;
 						return "🟢 good availability";
 					};
 
