@@ -145,7 +145,9 @@ export const setUserTelegramState = internalMutation({
 		),
 	},
 	handler: async (ctx, { userId, state }) => {
-		await ctx.db.patch(userId, { telegramState: state });
+		await ctx.db.patch(userId, {
+			telegramState: state,
+		});
 	},
 });
 

@@ -388,12 +388,11 @@ export const reportVoucher = internalMutation({
 					expiryDate: replacement.expiryDate,
 				},
 			};
-		} else {
-			await ctx.db.patch(user._id, {
-				coins: user.coins + CLAIM_COSTS[voucher.type],
-			});
-			return { status: "refunded" };
 		}
+		await ctx.db.patch(user._id, {
+			coins: user.coins + CLAIM_COSTS[voucher.type],
+		});
+		return { status: "refunded" };
 	},
 });
 

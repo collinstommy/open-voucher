@@ -5,7 +5,7 @@
 import { convexTest } from "convex-test";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { internal } from "../../convex/_generated/api";
-import { Id } from "../../convex/_generated/dataModel";
+import type { Id } from "../../convex/_generated/dataModel";
 import schema from "../../convex/schema";
 import { modules } from "../test.setup";
 import {
@@ -15,9 +15,11 @@ import {
 } from "./fixtures/testHelpers";
 
 let sentMessages: { chatId: string; text?: string }[] = [];
+let editedMessages: { chatId: string; messageId: number; text?: string }[] = [];
 
 function setupFetchMock() {
 	sentMessages = [];
+	editedMessages = [];
 
 	vi.stubGlobal(
 		"fetch",
@@ -42,6 +44,26 @@ function setupFetchMock() {
 				url.includes("api.telegram.org") &&
 				url.includes("/answerCallbackQuery")
 			) {
+				return {
+					ok: true,
+					json: async () => ({ ok: true, result: true }),
+				} as Response;
+			}
+
+			// Mock Telegram editMessageText (for removing inline keyboards)
+			if (
+				url.includes("api.telegram.org") &&
+				url.includes("/editMessageText")
+			) {
+				let body: any = {};
+				if (typeof options?.body === "string") {
+					body = JSON.parse(options.body);
+				}
+				editedMessages.push({
+					chatId: body.chat_id,
+					messageId: body.message_id,
+					text: body.text,
+				});
 				return {
 					ok: true,
 					json: async () => ({ ok: true, result: true }),
@@ -467,5 +489,139 @@ describe("Ban Flow Tests", () => {
 		});
 		expect(uploader?.isBanned).toBe(false);
 		vi.useRealTimers();
+	});
+});
+
+describe("Report Confirmation Flow", () => {
+	beforeEach(() => {
+		setupFetchMock();
+		vi.stubEnv("TELEGRAM_BOT_TOKEN", "test-bot-token");
+	});
+
+	afterEach(() => {
+		vi.unstubAllGlobals();
+		vi.unstubAllEnvs();
+	});
+
+	test("clicking No cancels report and removes inline keyboard", async () => {
+		const t = convexTest(schema, modules);
+		const chatId = "123456789";
+		const messageId = 100;
+
+		const userId = await createUser(t, {
+			telegramChatId: chatId,
+			coins: 10,
+		});
+
+		const voucherId = await createVoucher(t, {
+			type: "10",
+			uploaderId: userId,
+			status: "claimed",
+			claimerId: userId,
+			claimedAt: Date.now(),
+		});
+
+		await t.action(internal.telegram.handleTelegramCallback, {
+			callbackQuery: {
+				id: "callback_1",
+				from: { id: chatId, is_bot: false, first_name: "TestUser" },
+				message: {
+					message_id: 99,
+					chat: { id: chatId, type: "private" },
+					text: "Here's your €10 voucher!",
+				},
+				data: `report:${voucherId}`,
+			},
+		});
+
+		const confirmationMsg = sentMessages.find((m) =>
+			m.text?.includes("Report this voucher as not working"),
+		);
+		expect(confirmationMsg).toBeDefined();
+		expect(confirmationMsg?.chatId).toBe(chatId);
+
+		// Simulate user clicking "No" to cancel
+		await t.action(internal.telegram.handleTelegramCallback, {
+			callbackQuery: {
+				id: "callback_2",
+				from: { id: chatId, is_bot: false, first_name: "TestUser" },
+				message: {
+					message_id: messageId,
+					chat: { id: chatId, type: "private" },
+					text: confirmationMsg?.text,
+				},
+				data: `report:cancel:${voucherId}`,
+			},
+		});
+
+		const editedMsg = editedMessages.find(
+			(m) => m.chatId === chatId && m.messageId === messageId,
+		);
+		expect(editedMsg?.text).toBe(confirmationMsg?.text);
+
+		// Verify "Cancelled" message was sent
+		const cancelMsg = sentMessages.find((m) => m.text?.includes("Cancelled"));
+		expect(cancelMsg?.chatId).toBe(chatId);
+	});
+
+	test("clicking Yes confirms report and removes inline keyboard", async () => {
+		const t = convexTest(schema, modules);
+		const chatId = "123456789";
+		const messageId = 100;
+
+		const uploaderId = await createUser(t, {
+			telegramChatId: "uploader",
+			coins: 0,
+		});
+		const claimerId = await createUser(t, {
+			telegramChatId: chatId,
+			coins: 10,
+		});
+
+		const voucherId = await createVoucher(t, {
+			type: "10",
+			uploaderId,
+			status: "claimed",
+			claimerId,
+			claimedAt: Date.now(),
+		});
+
+		await t.action(internal.telegram.handleTelegramCallback, {
+			callbackQuery: {
+				id: "callback_1",
+				from: { id: chatId, is_bot: false, first_name: "TestUser" },
+				message: {
+					message_id: 99,
+					chat: { id: chatId, type: "private" },
+					text: "Here's your €10 voucher!",
+				},
+				data: `report:${voucherId}`,
+			},
+		});
+
+		const confirmationMsg = sentMessages.find((m) =>
+			m.text?.includes("Report this voucher as not working"),
+		);
+		expect(confirmationMsg).toBeDefined();
+
+		await t.action(internal.telegram.handleTelegramCallback, {
+			callbackQuery: {
+				id: "callback_2",
+				from: { id: chatId, is_bot: false, first_name: "TestUser" },
+				message: {
+					message_id: messageId,
+					chat: { id: chatId, type: "private" },
+					text: confirmationMsg?.text,
+				},
+				data: `report:confirm:${voucherId}`,
+			},
+		});
+
+		const reportMsg = sentMessages.find(
+			(m) =>
+				m.text?.includes("Report received") ||
+				m.text?.includes("No replacement vouchers available"),
+		);
+		expect(reportMsg).toBeDefined();
 	});
 });
