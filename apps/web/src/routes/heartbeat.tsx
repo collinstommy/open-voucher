@@ -1,5 +1,6 @@
 import { convexQuery } from "@convex-dev/react-query";
 import { api } from "@open-voucher/backend/convex/_generated/api";
+import { useAdminAuth } from "@/hooks/useAdminAuth";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { RefreshCw } from "lucide-react";
@@ -10,7 +11,10 @@ export const Route = createFileRoute("/heartbeat")({
 });
 
 function HeartbeatComponent() {
-	const heartbeat = useQuery(convexQuery(api.heartbeat.getHeartbeat, {}));
+	const { token } = useAdminAuth();
+	const heartbeat = useQuery(
+		convexQuery(api.heartbeat.getHeartbeat, token ? { token } : "skip"),
+	);
 
 	const getStatusColor = (status: string) => {
 		switch (status) {
