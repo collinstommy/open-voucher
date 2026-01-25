@@ -525,42 +525,7 @@ export const handleTelegramCallback = internalAction({
 		const telegramUserId = String(callbackQuery.from.id);
 		const data = callbackQuery.data;
 
-		if (data.startsWith("report:")) {
-			const voucherId = data.split(":")[1];
-
-			await answerTelegramCallback(callbackQuery.id);
-
-			const user = await ctx.runQuery(internal.users.getUserByTelegramChatId, {
-				telegramChatId: telegramUserId,
-			});
-
-			if (!user) {
-				return;
-			}
-
-			if (user.isBanned) {
-				await ctx.runMutation(internal.users.setUserTelegramState, {
-					userId: user._id,
-					state: "waiting_for_ban_appeal",
-				});
-				await sendTelegramMessage(
-					chatId,
-					"🚫 Your account has been banned from this service.\n\nPlease reply with a message describing why you think this is an error.",
-				);
-				return;
-			}
-
-			await sendTelegramMessage(
-				chatId,
-				"⚠️ <b>Report this voucher as not working?</b>\n\nA replacement voucher will be sent if available. If not, your coins will be refunded.",
-				{
-					inline_keyboard: [
-						[{ text: "✅ Yes", callback_data: `report:confirm:${voucherId}` }],
-						[{ text: "❌ No", callback_data: `report:cancel:${voucherId}` }],
-					],
-				},
-			);
-		} else if (data.startsWith("report:confirm:")) {
+		if (data.startsWith("report:confirm:")) {
 			const voucherId = data.split(":")[2];
 
 			await answerTelegramCallback(callbackQuery.id);
@@ -605,18 +570,58 @@ export const handleTelegramCallback = internalAction({
 			} else if (result.status === "refunded") {
 				await sendTelegramMessage(
 					chatId,
-					"⚠️ No replacement vouchers available.",
+					"⚠️ No replacement vouchers available. Your coins have been refunded.",
 				);
 			} else if (result.status === "reported") {
 				await sendTelegramMessage(chatId, "✅ Report received.");
 			}
 		} else if (data.startsWith("report:cancel:")) {
-			await answerTelegramCallback(callbackQuery.id);
-			await sendTelegramMessage(chatId, "✅ Cancelled. No action taken.");
 			await editTelegramMessageText(
 				chatId,
 				callbackQuery.message.message_id,
 				callbackQuery.message.text,
+			);
+			await answerTelegramCallback(callbackQuery.id);
+			await sendTelegramMessage(chatId, "✅ Cancelled. No action taken.");
+		} else if (data.startsWith("report:")) {
+			// General report request (2 parts: report:id)
+			const voucherId = data.split(":")[1];
+			console.log(
+				"Processing initial report request for voucherId:",
+				voucherId,
+			);
+
+			await answerTelegramCallback(callbackQuery.id);
+
+			const user = await ctx.runQuery(internal.users.getUserByTelegramChatId, {
+				telegramChatId: telegramUserId,
+			});
+
+			if (!user) {
+				return;
+			}
+
+			if (user.isBanned) {
+				await ctx.runMutation(internal.users.setUserTelegramState, {
+					userId: user._id,
+					state: "waiting_for_ban_appeal",
+				});
+				await sendTelegramMessage(
+					chatId,
+					"🚫 Your account has been banned from this service.\n\nPlease reply with a message describing why you think this is an error.",
+				);
+				return;
+			}
+
+			await sendTelegramMessage(
+				chatId,
+				"⚠️ <b>Report this voucher as not working?</b>\n\nA replacement voucher will be sent if available. If not, your coins will be refunded.",
+				{
+					inline_keyboard: [
+						[{ text: "✅ Yes", callback_data: `report:confirm:${voucherId}` }],
+						[{ text: "❌ No", callback_data: `report:cancel:${voucherId}` }],
+					],
+				},
 			);
 		} else if (data.startsWith("help:")) {
 			await answerTelegramCallback(callbackQuery.id);
