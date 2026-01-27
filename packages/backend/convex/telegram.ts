@@ -5,6 +5,7 @@ import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import type { ActionCtx } from "./_generated/server";
 import { internalAction } from "./_generated/server";
+import { UPLOAD_REWARDS } from "./constants";
 
 dayjs.extend(advancedFormat);
 
@@ -422,6 +423,31 @@ export const sendMessageAction = internalAction({
 	},
 });
 
+export const sendUploaderReportMessage = internalAction({
+	args: {
+		uploaderChatId: v.string(),
+		voucherId: v.id("vouchers"),
+		voucherType: v.union(v.literal("5"), v.literal("10"), v.literal("20")),
+	},
+	handler: async (_ctx, { uploaderChatId, voucherId, voucherType }) => {
+		await sendTelegramMessage(
+			uploaderChatId,
+			"⚠️ <b>Someone has reported one of your vouchers as not working.</b>\n\nDid you use this voucher already?",
+			{
+				inline_keyboard: [
+					[
+						{
+							text: "I may have used this voucher already",
+							callback_data: `uploader_admitted:${voucherId}`,
+						},
+						{ text: "They're lying", callback_data: `uploader_denied:${voucherId}` },
+					],
+				],
+			},
+		);
+	},
+});
+
 async function sendTelegramMessage(
 	chatId: string,
 	text: string,
@@ -700,6 +726,48 @@ export const handleTelegramCallback = internalAction({
 					break;
 				}
 			}
+		} else if (data.startsWith("uploader_admitted:")) {
+			const voucherId = data.split(":")[1];
+			await answerTelegramCallback(callbackQuery.id);
+
+			await editTelegramMessageText(
+				chatId,
+				callbackQuery.message.message_id,
+				callbackQuery.message.text,
+			);
+
+			const voucher = await ctx.runQuery(internal.vouchers.getVoucherForUploaderConfirm, {
+				voucherId: voucherId as Id<"vouchers">,
+			});
+
+			if (!voucher) {
+				await sendTelegramMessage(chatId, "Voucher not found.");
+				return;
+			}
+
+			const reward = UPLOAD_REWARDS[voucher.type];
+
+			await ctx.runMutation(internal.vouchers.confirmUploaderUsedVoucher, {
+				uploaderId: voucher.uploaderId,
+				voucherId: voucher._id,
+				amount: reward,
+			});
+
+			await sendTelegramMessage(
+				chatId,
+				"Thanks for letting us know. We've removed these coins from your balance",
+			);
+		} else if (data.startsWith("uploader_denied:")) {
+			const voucherId = data.split(":")[1];
+			await answerTelegramCallback(callbackQuery.id);
+
+			await editTelegramMessageText(
+				chatId,
+				callbackQuery.message.message_id,
+				callbackQuery.message.text,
+			);
+
+			await sendTelegramMessage(chatId, "Thanks for the info. We've recorded this in the system");
 		}
 	},
 });

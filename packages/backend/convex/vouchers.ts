@@ -1,8 +1,8 @@
 import { v } from "convex/values";
-import { Id } from "./_generated/dataModel";
+import type { Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
 import { internalMutation, internalQuery } from "./_generated/server";
-import { CLAIM_COSTS } from "./constants";
+import { CLAIM_COSTS, UPLOAD_REWARDS, MIN_COINS } from "./constants";
 
 import dayjs from "dayjs";
 
@@ -269,9 +269,16 @@ export const reportVoucher = internalMutation({
 			});
 
 			const uploader = await ctx.db.get(voucher.uploaderId);
-			if (uploader) {
+			if (uploader && voucher.type !== "0") {
 				await ctx.db.patch(voucher.uploaderId, {
 					uploadReportCount: (uploader.uploadReportCount || 0) + 1,
+				});
+
+				// Send message to uploader asking if they used the voucher
+				await ctx.scheduler.runAfter(0, internal.telegram.sendUploaderReportMessage, {
+					uploaderChatId: uploader.telegramChatId,
+					voucherId: voucher._id,
+					voucherType: voucher.type as "5" | "10" | "20",
 				});
 			}
 		}
@@ -436,5 +443,37 @@ export const getAvailableVoucherCount = internalQuery({
 			counts[v.type] = (counts[v.type] || 0) + 1;
 		}
 		return counts;
+	},
+});
+
+export const getVoucherForUploaderConfirm = internalQuery({
+	args: { voucherId: v.id("vouchers") },
+	handler: async (ctx, { voucherId }) => {
+		return await ctx.db.get(voucherId);
+	},
+});
+
+export const confirmUploaderUsedVoucher = internalMutation({
+	args: {
+		uploaderId: v.id("users"),
+		voucherId: v.id("vouchers"),
+		amount: v.number(),
+	},
+	handler: async (ctx, { uploaderId, voucherId, amount }) => {
+		const uploader = await ctx.db.get(uploaderId);
+		if (!uploader) return;
+
+		const newCoins = Math.max(MIN_COINS, uploader.coins - amount);
+		await ctx.db.patch(uploaderId, { coins: newCoins });
+
+		await ctx.db.patch(voucherId, { status: "uploader_admitted_used" });
+
+		await ctx.db.insert("transactions", {
+			userId: uploaderId,
+			type: "uploader_refund",
+			amount: -amount,
+			voucherId,
+			createdAt: Date.now(),
+		});
 	},
 });
