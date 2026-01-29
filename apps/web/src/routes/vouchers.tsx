@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
 
 import { api } from "@open-voucher/backend/convex/_generated/api";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { usePaginatedQuery } from "convex/react";
 
 export const Route = createFileRoute("/vouchers")({
@@ -72,7 +72,14 @@ function VouchersPage() {
 								Voucher ID: {voucher._id}
 							</div>
 							<div className="text-muted-foreground mb-1 text-xs font-mono">
-								Uploader: {voucher.uploaderId}
+								Uploader:{" "}
+								<Link
+									to="/users/$userId"
+									params={{ userId: voucher.uploaderId }}
+									className="text-primary hover:underline"
+								>
+									{voucher.uploaderFirstName || voucher.uploaderId}
+								</Link>
 							</div>
 							{voucher.claimerId && (
 								<div className="text-muted-foreground mb-1 text-xs font-mono">

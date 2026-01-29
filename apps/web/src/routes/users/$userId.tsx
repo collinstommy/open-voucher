@@ -90,6 +90,7 @@ function UserDetailPage() {
 	const reportsAgainstUploads = data?.reportsAgainstUploads ?? [];
 	const feedbackAndSupport = data?.feedbackAndSupport ?? [];
 	const adminMessages = data?.adminMessages ?? [];
+	const transactions = data?.transactions ?? [];
 
 	if (!user) {
 		return <div className="text-red-500">User not found</div>;
@@ -165,6 +166,60 @@ function UserDetailPage() {
 						</div>
 					</div>
 				</div>
+			</div>
+
+			<div>
+				<h2 className="mb-4 text-xl font-semibold">
+					Transactions ({transactions.length})
+				</h2>
+
+				{transactions.length === 0 ? (
+					<div className="text-muted-foreground rounded-lg border p-12 text-center">
+						No transactions
+					</div>
+				) : (
+					<div className="rounded-lg border">
+						<table className="w-full text-sm">
+							<thead className="bg-muted/50 border-b">
+								<tr>
+									<th className="text-left p-3 font-medium">Type</th>
+									<th className="text-left p-3 font-medium">Amount</th>
+									<th className="text-left p-3 font-medium">Date</th>
+								</tr>
+							</thead>
+							<tbody>
+								{transactions.map((tx) => (
+									<tr key={tx._id} className="border-b last:border-0">
+										<td className="p-3">
+											<span
+												className={`px-2 py-1 rounded-full text-xs font-medium ${
+													tx.type === "signup_bonus"
+														? "bg-green-100 text-green-800"
+														: tx.type === "upload_reward"
+														? "bg-blue-100 text-blue-800"
+														: tx.type === "claim_spend"
+														? "bg-red-100 text-red-800"
+														: "bg-amber-100 text-amber-800"
+												}`}
+											>
+												{tx.type.replace(/_/g, " ")}
+											</span>
+										</td>
+										<td className="p-3">
+											<span className={tx.amount > 0 ? "text-green-600" : "text-red-600"}>
+												{tx.amount > 0 ? "+" : ""}
+												{tx.amount}
+											</span>
+										</td>
+										<td className="p-3 text-muted-foreground">
+											{new Date(tx.createdAt).toLocaleString()}
+										</td>
+									</tr>
+								))}
+							</tbody>
+						</table>
+					</div>
+				)}
 			</div>
 
 			<div>

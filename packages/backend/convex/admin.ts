@@ -254,16 +254,20 @@ export const getAllVouchers = adminQuery({
 			.paginate({ ...rest, cursor: cursor ?? null });
 
 		const vouchersWithImages = await Promise.all(
-			results.page.map(async (v) => ({
-				_id: v._id,
-				type: v.type,
-				status: v.status,
-				createdAt: v.createdAt,
-				expiryDate: v.expiryDate,
-				uploaderId: v.uploaderId,
-				claimerId: v.claimerId,
-				imageUrl: await ctx.storage.getUrl(v.imageStorageId),
-			})),
+			results.page.map(async (v) => {
+				const uploader = await ctx.db.get(v.uploaderId);
+				return {
+					_id: v._id,
+					type: v.type,
+					status: v.status,
+					createdAt: v.createdAt,
+					expiryDate: v.expiryDate,
+					uploaderId: v.uploaderId,
+					uploaderFirstName: uploader?.firstName,
+					claimerId: v.claimerId,
+					imageUrl: await ctx.storage.getUrl(v.imageStorageId),
+				};
+			}),
 		);
 
 		return {
@@ -478,6 +482,13 @@ export const getUserDetails = adminQuery({
 			.order("desc")
 			.collect();
 
+		// Get all transactions for this user
+		const transactions = await ctx.db
+			.query("transactions")
+			.withIndex("by_user", (q) => q.eq("userId", userId))
+			.order("desc")
+			.collect();
+
 		return {
 			user: {
 				_id: user._id,
@@ -501,6 +512,7 @@ export const getUserDetails = adminQuery({
 			reportsAgainstUploads: reportsAgainstUserUploads,
 			feedbackAndSupport,
 			adminMessages,
+			transactions,
 		};
 	},
 });
