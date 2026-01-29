@@ -12,7 +12,6 @@ import type * as admin from "../admin.js";
 import type * as constants from "../constants.js";
 import type * as crons from "../crons.js";
 import type * as dashboard from "../dashboard.js";
-import type * as healthCheck from "../healthCheck.js";
 import type * as http from "../http.js";
 import type * as ocr_extract from "../ocr/extract.js";
 import type * as ocr_process from "../ocr/process.js";
@@ -34,7 +33,6 @@ declare const fullApi: ApiFromModules<{
   constants: typeof constants;
   crons: typeof crons;
   dashboard: typeof dashboard;
-  healthCheck: typeof healthCheck;
   http: typeof http;
   "ocr/extract": typeof ocr_extract;
   "ocr/process": typeof ocr_process;

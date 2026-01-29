@@ -839,7 +839,7 @@ export const runHealthCheck = adminAction({
 	args: { token: v.string() },
 	handler: async (ctx, { token }) => {
 		const currentYear = new Date().getFullYear();
-		const expectedExpiry = `${currentYear}-01-09`;
+		const expectedExpiry = `${currentYear}-01-29`;
 
 		type HealthData = { valid: boolean; error?: string; voucherCount?: number };
 		const healthData: HealthData = await ctx.runQuery(
@@ -852,14 +852,14 @@ export const runHealthCheck = adminAction({
 		}
 
 		const setting = await ctx.runQuery(internal.settings.getSetting, {
-			key: "sample-voucher-image",
+			key: "test-voucher-image",
 		});
 
 		let ocrTest: { success: boolean; message: string };
 		if (!setting) {
 			ocrTest = {
 				success: false,
-				message: "No sample voucher image configured",
+				message: "No test voucher image configured",
 			};
 		} else {
 			const ocrResult = await ctx.runAction(

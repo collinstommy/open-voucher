@@ -139,12 +139,12 @@ upload_sample_voucher() {
 
     if [ ! -z "$storage_id" ]; then
         echo "Storage ID: $storage_id"
-        echo "Setting sample-voucher-image in settings table..."
+        echo "Setting test-voucher-image in settings table..."
         local prod_flag=""
         if [ "$env_name" = "PROD" ]; then
             prod_flag="--prod"
         fi
-        (cd packages/backend && npx convex run $prod_flag settings.setSampleVoucherImage "{\"imageStorageId\": \"$storage_id\"}")
+        (cd packages/backend && npx convex run $prod_flag settings.setSetting "{\"key\": \"test-voucher-image\", \"value\": \"$storage_id\"}")
     else
         echo "Warning: Failed to upload sample voucher image"
     fi
@@ -164,7 +164,7 @@ set_webhook "$DEV_TOKEN" "$DEV_URL_WEBHOOK" "DEV" "$DEV_TELEGRAM_WEBHOOK_SECRET"
 # Set Convex environment variables
 echo "=== Step 3: Setting Convex environment variables ==="
 
-# Upload sample voucher images for dev and prod
+# Upload test voucher images for dev and prod
 upload_sample_voucher "DEV"
 upload_sample_voucher "PROD"
 

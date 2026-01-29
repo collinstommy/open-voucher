@@ -76,8 +76,8 @@ function HealthCheckPage() {
 
 	const allPassed = results
 		? results.ocrTest.success &&
-		  results.voucherCount.success &&
-		  results.telegramToken.success
+			results.voucherCount.success &&
+			results.telegramToken.success
 		: false;
 
 	return (

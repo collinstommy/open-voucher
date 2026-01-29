@@ -1,6 +1,6 @@
 import { v } from "convex/values";
+import type { Id } from "./_generated/dataModel";
 import { internalMutation, internalQuery, query } from "./_generated/server";
-import { Id } from "./_generated/dataModel";
 
 export const getSetting = internalQuery({
 	args: { key: v.string() },
@@ -13,20 +13,17 @@ export const getSetting = internalQuery({
 	},
 });
 
-export const setSampleVoucherImage = internalMutation({
-	args: { imageStorageId: v.id("_storage") },
-	handler: async (ctx, { imageStorageId }) => {
+export const setSetting = internalMutation({
+	args: { key: v.string(), value: v.string() },
+	handler: async (ctx, { key, value }) => {
 		const existing = await ctx.db
 			.query("settings")
-			.withIndex("by_key", (q) => q.eq("key", "sample-voucher-image"))
+			.withIndex("by_key", (q) => q.eq("key", key))
 			.first();
 		if (existing) {
-			await ctx.db.patch(existing._id, { value: imageStorageId });
+			await ctx.db.patch(existing._id, { value });
 		} else {
-			await ctx.db.insert("settings", {
-				key: "sample-voucher-image",
-				value: imageStorageId,
-			});
+			await ctx.db.insert("settings", { key, value });
 		}
 	},
 });
