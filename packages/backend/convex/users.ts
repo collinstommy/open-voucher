@@ -184,3 +184,14 @@ export const clearOnboardingTutorial = internalMutation({
 		});
 	},
 });
+
+export const getUserTransactions = internalQuery({
+	args: { userId: v.id("users") },
+	handler: async (ctx, { userId }) => {
+		const transactions = await ctx.db
+			.query("transactions")
+			.withIndex("by_user", (q) => q.eq("userId", userId))
+			.collect();
+		return transactions.sort((a, b) => b.createdAt - a.createdAt).slice(0, 25);
+	},
+});
