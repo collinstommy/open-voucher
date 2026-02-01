@@ -303,48 +303,6 @@ async function handleCommand(
 		return true;
 	}
 
-	if (lowerText === "transactions") {
-		const transactions = await ctx.runQuery(
-			internal.users.getUserTransactions,
-			{
-				userId: user._id,
-			},
-		);
-
-		if (transactions.length === 0) {
-			await sendTelegramMessage(chatId, "📋 No transactions yet.");
-			return true;
-		}
-
-		const formatType = (type: string) => {
-			switch (type) {
-				case "signup_bonus":
-					return "🎁 Signup Bonus";
-				case "upload_reward":
-					return "📤 Upload Reward";
-				case "claim_spend":
-					return "💳 Claim Spent";
-				case "report_refund":
-					return "↩️ Refund";
-				default:
-					return type;
-			}
-		};
-
-		const transactionList = transactions.map((t) => {
-			const date = dayjs(t.createdAt).format("MMM D, YYYY");
-			const formattedType = formatType(t.type);
-			const amountPrefix = t.type === "claim_spend" ? "-" : "+";
-			return `${formattedType}: ${amountPrefix}${t.amount} (${date})`;
-		});
-
-		await sendTelegramMessage(
-			chatId,
-			`📋 <b>Your Last 25 Transactions:</b>\n\n${transactionList.join("\n")}`,
-		);
-		return true;
-	}
-
 	return false;
 }
 
