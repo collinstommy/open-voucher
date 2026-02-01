@@ -277,6 +277,7 @@ async function handleCommand(
 					{ text: "How to upload?", callback_data: "help:upload" },
 					{ text: "How to claim?", callback_data: "help:claim" },
 				],
+				[{ text: "View Transactions", callback_data: "help:transactions" }],
 			],
 		});
 		return true;
@@ -696,6 +697,45 @@ export const handleTelegramCallback = internalAction({
 					await sendTelegramMessage(
 						chatId,
 						"💳 To claim a voucher, send <b>5</b>, <b>10</b>, or <b>20</b> depending on the voucher value you want.",
+					);
+					break;
+				}
+				case "transactions": {
+					const transactions = await ctx.runQuery(
+						internal.users.getUserTransactions,
+						{ userId: user._id },
+					);
+
+					if (transactions.length === 0) {
+						await sendTelegramMessage(chatId, "📋 No transactions yet.");
+						break;
+					}
+
+					const formatType = (type: string) => {
+						switch (type) {
+							case "signup_bonus":
+								return "🎁 Signup Bonus";
+							case "upload_reward":
+								return "📤 Upload Reward";
+							case "claim_spend":
+								return "💳 Claim Spent";
+							case "report_refund":
+								return "↩️ Refund";
+							default:
+								return type;
+						}
+					};
+
+					const transactionList = transactions.map((t) => {
+						const date = dayjs(t.createdAt).format("MMM D, YYYY");
+						const formattedType = formatType(t.type);
+						const amountPrefix = t.type === "claim_spend" ? "-" : "+";
+						return `${formattedType}: ${amountPrefix}${t.amount} (${date})`;
+					});
+
+					await sendTelegramMessage(
+						chatId,
+						`📋 <b>Your Last 25 Transactions:</b>\n\n${transactionList.join("\n")}`,
 					);
 					break;
 				}
