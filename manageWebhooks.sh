@@ -14,6 +14,7 @@
 #   - CONVEX_WEBHOOK_URL
 #   - TELEGRAM_WEBHOOK_SECRET
 #   - GOOGLE_GENERATIVE_AI_API_KEY
+#   - ADMIN_PASSWORD
 
 # Check if environment argument is provided
 ENV=${1:-dev}
@@ -70,6 +71,7 @@ TELEGRAM_TOKEN=$(doppler secrets get TELEGRAM_TOKEN --plain -c $ENV 2>/dev/null)
 CONVEX_WEBHOOK_URL=$(doppler secrets get CONVEX_WEBHOOK_URL --plain -c $ENV 2>/dev/null)
 TELEGRAM_WEBHOOK_SECRET=$(doppler secrets get TELEGRAM_WEBHOOK_SECRET --plain -c $ENV 2>/dev/null)
 GOOGLE_GENERATIVE_AI_API_KEY=$(doppler secrets get GOOGLE_GENERATIVE_AI_API_KEY --plain -c $ENV 2>/dev/null)
+ADMIN_PASSWORD=$(doppler secrets get ADMIN_PASSWORD --plain -c $ENV 2>/dev/null)
 
 # Check required variables
 MISSING_SECRETS=""
@@ -87,6 +89,10 @@ if [ -z "$TELEGRAM_WEBHOOK_SECRET" ]; then
 fi
 if [ -z "$GOOGLE_GENERATIVE_AI_API_KEY" ]; then
     MISSING_SECRETS="${MISSING_SECRETS}  - GOOGLE_GENERATIVE_AI_API_KEY
+"
+fi
+if [ -z "$ADMIN_PASSWORD" ]; then
+    MISSING_SECRETS="${MISSING_SECRETS}  - ADMIN_PASSWORD
 "
 fi
 
@@ -145,6 +151,7 @@ set_convex_vars() {
     local telegram_token=$2
     local gemini_token=$3
     local webhook_secret=$4
+    local admin_password=$5
 
     echo "Setting Convex environment variables for ${env_name}..."
 
@@ -175,6 +182,10 @@ set_convex_vars() {
     # Set Gemini token
     echo "Setting GOOGLE_GENERATIVE_AI_API_KEY..."
     (cd packages/backend && npx convex env set GOOGLE_GENERATIVE_AI_API_KEY "$gemini_token" $prod_flag)
+
+    # Set Admin password
+    echo "Setting ADMIN_PASSWORD..."
+    (cd packages/backend && npx convex env set ADMIN_PASSWORD "$admin_password" $prod_flag)
     echo ""
 }
 
@@ -188,6 +199,6 @@ set_webhook "$TELEGRAM_TOKEN" "$CONVEX_WEBHOOK_URL" "$ENV" "$TELEGRAM_WEBHOOK_SE
 
 # Set Convex environment variables
 echo "=== Step 3: Setting Convex environment variables ==="
-set_convex_vars "$ENV" "$TELEGRAM_TOKEN" "$GOOGLE_GENERATIVE_AI_API_KEY" "$TELEGRAM_WEBHOOK_SECRET"
+set_convex_vars "$ENV" "$TELEGRAM_TOKEN" "$GOOGLE_GENERATIVE_AI_API_KEY" "$TELEGRAM_WEBHOOK_SECRET" "$ADMIN_PASSWORD"
 
 echo "=== Complete webhook and environment setup for $ENV ==="
