@@ -94,6 +94,16 @@ This script will:
 - Set new webhooks to point to your Convex deployments
 - Configure environment variables (`TELEGRAM_BOT_TOKEN` and `GOOGLE_GENERATIVE_AI_API_KEY`) in both environments
 
+### Sample Voucher Setup
+
+To set up the sample voucher image shown to users:
+
+1. Go to your [Convex Dashboard](https://dashboard.convex.dev)
+2. Navigate to: **Functions**
+3. Run the function: `settings.setSetting`
+4. Arguments: `{"key": "test-voucher-image", "value": "<storage-id>"}`
+   - To get the storage ID: Go to **Storage > Files**, upload `config/sample-voucher.png`, then copy the ID
+
 ### Manual Webhook Commands
 
 If you prefer to set up webhooks manually:
