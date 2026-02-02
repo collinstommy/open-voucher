@@ -3,7 +3,7 @@
   "configVersion": 0,
   "workspaces": {
     "": {
-      "name": "open-router",
+      "name": "open-voucher",
       "devDependencies": {
         "@biomejs/biome": "^2.3.11",
         "turbo": "^2.5.4",

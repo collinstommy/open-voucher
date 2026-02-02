@@ -16,10 +16,9 @@ Then, run the development server:
 ```bash
 bun run dev
 ```
-
-Open [http://localhost:3001](http://localhost:3001) in your browser to see the web application.
-Your app will connect to the Convex cloud backend automatically.
-
+This will start
+- Admin dashboard at [http://localhost:3001](http://localhost:3001)
+- Convex backend for the bot.
 
 ## Project Structure
 
@@ -41,107 +40,60 @@ open-voucher/
 
 ## Environment Setup
 
-### Required API Keys
+Secrets are managed in [Doppler](https://www.doppler.com/) and deployed to Convex using the webhook management script.
 
-1. **Telegram Bot Token**
-   - Chat with [@BotFather](https://t.me/botfather) on Telegram
-   - Create a new bot and copy the token
+### Prerequisites
 
-2. **Gemini API Key**
-   - Visit [Google AI Studio](https://aistudio.google.com/app/apikey)
-   - Create a new API key
-
-### Environment Configuration
-
-1. **Copy the sample environment file:**
+1. **Install Doppler CLI** - See [Doppler CLI documentation](https://docs.doppler.com/docs/install-cli)
+2. **Login to Doppler:**
    ```bash
-   cp .env.sample .env
+   doppler login
+   doppler setup
    ```
+3. A Google AI API key from [Google AI Studio](https://aistudio.google.com/app/apikey)
+4. A telegram bot token from [@BotFather](https://t.me/botfather)
+5. A convex account and project.
 
-2. **Edit `.env` with your actual values:**
-   ```bash
-   # Required for local development
-   TELEGRAM_BOT_TOKEN=your-telegram-bot-token
-   GOOGLE_GENERATIVE_AI_API_KEY=your-gemini-api-key
+### Required Secrets (in Doppler)
 
-   # Production deployment
-   PROD_TOKEN=your-prod-telegram-bot-token
-   PROD_URL_WEBHOOK=https://your-prod-deployment-url.com/telegram/webhook
-   PROD_GOOGLE_GENERATIVE_AI_API_KEY=your-prod-gemini-api-key
+| Secret | Description | Get From |
+|--------|-------------|----------|
+| `TELEGRAM_TOKEN` | Telegram bot authentication | [@BotFather](https://t.me/botfather) |
+| `GOOGLE_GENERATIVE_AI_API_KEY` | Gemini API access | [Google AI Studio](https://aistudio.google.com/app/apikey) |
+| `TELEGRAM_WEBHOOK_SECRET` | Webhook verification | Generate a random string |
+| `ADMIN_PASSWORD` | Admin panel access | Set your own secure password |
+| `CONVEX_WEBHOOK_URL` | Your Convex webhook URL | From Convex dashboard |
 
-   # Development deployment
-   DEV_TOKEN=your-dev-telegram-bot-token
-   DEV_URL_WEBHOOK=https://your-dev-convex-deployment.convex.site/telegram/webhook
-   DEV_GOOGLE_GENERATIVE_AI_API_KEY=your-dev-gemini-api-key
-   ```
+### Setup Script
 
-### Webhook Setup
+Run the webhook management script to configure everything at once:
 
-The project includes a script to configure Telegram webhooks and set environment variables in Convex:
+```bash
+# For development
+./manageWebhooks.sh dev
 
-1. **Install Convex CLI:**
-   ```bash
-   npm install -g convex
-   ```
-
-2. **Run the webhook setup script:**
-   ```bash
-   ./manageWebhooks.sh
-   ```
+# For production
+./manageWebhooks.sh prd
+```
 
 This script will:
-- Delete existing webhooks for both dev and prod environments
-- Set new webhooks to point to your Convex deployments
-- Configure environment variables (`TELEGRAM_BOT_TOKEN` and `GOOGLE_GENERATIVE_AI_API_KEY`) in both environments
+- Fetch secrets from Doppler
+- Delete and set the Telegram webhook
+- Configure all environment variables in Convex
 
-### Sample Voucher Setup
+### Sample/Test Voucher Setup
 
 To set up the sample voucher image shown to users:
 
 1. Go to your [Convex Dashboard](https://dashboard.convex.dev)
-2. Navigate to: **Functions**
-3. Run the function: `settings.setSetting`
-4. Arguments: `{"key": "test-voucher-image", "value": "<storage-id>"}`
-   - To get the storage ID: Go to **Storage > Files**, upload `config/sample-voucher.png`, then copy the ID
-
-### Manual Webhook Commands
-
-If you prefer to set up webhooks manually:
-
-**Development:**
-```bash
-curl -X POST "https://api.telegram.org/bot{DEV_TOKEN}/setWebhook" \
-     -H "Content-Type: application/json" \
-     -d "{\"url\": \"{DEV_URL_WEBHOOK}\"}"
-```
-
-**Production:**
-```bash
-curl -X POST "https://api.telegram.org/bot{PROD_TOKEN}/setWebhook" \
-     -H "Content-Type: application/json" \
-     -d "{\"url\": \"{PROD_URL_WEBHOOK}\"}"
-```
+2. Upload `config/sample-voucher.png` and `config/test-voucher.png` to the Storage. Note the storage IDs.
+3. Navigate to: **Functions**
+4. Run the function: `settings.setSetting`
+5. Arguments: `{"key": "sample-voucher-image", "value": "<storage-id>"}`
+6. Run the function: `settings.setSetting`
+7. Arguments: `{"key": "test-voucher-image", "value": "<storage-id>"}`
 
 ## Admin CLI Tools
-
-### Create User Accounts
-
-To create user accounts for testing, use the Convex dashboard or CLI to insert records directly into the database.
-
-## Admin Authentication
-
-Session-based authentication for admin endpoints.
-
-**Setup:**
-Dev
-```bash
-bunx convex env set ADMIN_PASSWORD "your-secure-password-here"
-```
-
-Prod`
-```bash
-bunx convex env set ADMIN_PASSWORD "your-secure-password-here" --prod
-```
 
 ## Ban Rules
 
@@ -159,29 +111,17 @@ If **3 or more of an uploader's last 5 uploads** are reported as not working, th
 | Uploads | 10 per 24 hours |
 | Claims | 5 per 24 hours |
 
-## ToDo
-- [x] ban messages should be clearer - review this flow
-- [x] double check ban logic from both sides
-- [x] define rules of the system in docs
-- [x] remove invite code flow
-- [ ] onboarding flow for devs
 
-## Later
-- [x] fix users query
+## Todo
 - [ ] seed dev data - https://docs.convex.dev/database/import-export/import
-- [ ] failed uploads dashboard
-- [ ] vouchers admin page should be paginated and show all vouchers
-- [ ] refactor help to be a series of buttons. use buttons for everything
-   - [ ] support/feedback/faq links/balance/availability
-- [x] start date for vouchers
-- [x] unify the validation, we do this in two places right now
-- [x] return vouchers that are expires soonest
-- [x] restrict uploads for expiring today to before 9pm
-- [ ] if voucher are not Available right now, send message once Available
 - [ ] update landing page with faq
-- [x] allow banners users to message the bot
-- [x] send message to single telegram user from bot
 - [ ] cron job to clean up old vouchers and failed uploads
 
-### Tests
--[ ] message from admin to user
+## Community
+
+This project is open source under the AGPL-3.0 license. Contributions are welcome!
+
+- [Contributing Guide](./CONTRIBUTING.md)
+- [License](./LICENSE)
+
+Please open an issue for bug reports or feature requests.
