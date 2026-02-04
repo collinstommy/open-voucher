@@ -106,6 +106,7 @@ If expiry is unknown: null.`;
 			throw new Error("No text in Gemini response");
 		}
 
+		console.log("Text content:", textContent);
 		const extracted: ExtractedData = JSON.parse(textContent);
 		console.log("Extracted (raw):", extracted);
 
