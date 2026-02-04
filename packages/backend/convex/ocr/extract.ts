@@ -11,27 +11,22 @@ type ExtractedData = {
 	barcode?: string;
 };
 
-/**
- * Extract voucher data from an image using Gemini OCR.
- * Pure extraction - no side effects except logging.
- */
-export const extractFromImage = internalAction({
-	args: { imageStorageId: v.id("_storage") },
-	handler: async (ctx, { imageStorageId }) => {
-		const imageUrl = await ctx.storage.getUrl(imageStorageId);
-		if (!imageUrl) {
-			throw new Error("Could not get image URL");
-		}
+async function extractVoucherData(
+	imageBase64: string,
+	currentYear: number,
+): Promise<{
+	type: number;
+	validFrom: string | undefined;
+	expiryDate: string | undefined;
+	barcode: string | undefined;
+	rawResponse: string;
+}> {
+	const geminiApiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+	if (!geminiApiKey) {
+		throw new Error("Gemini API key not configured");
+	}
 
-		const imageBase64 = await fetchImageAsBase64(imageUrl);
-
-		const geminiApiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
-		if (!geminiApiKey) {
-			throw new Error("Gemini API key not configured");
-		}
-
-		const currentYear = new Date().getFullYear();
-		const prompt = `You are analyzing an image of a voucher.
+	const prompt = `You are analyzing an image of a voucher.
 We are ONLY looking for specific Dunnes Stores vouchers (Ireland) of these exact types:
 - €5 off €25
 - €10 off €40
@@ -65,88 +60,135 @@ If type is unknown or invalid: "0".
 If validFromDay or validFromMonth is unknown: null.
 If expiry is unknown: null.`;
 
-		const response = await fetch(
-			`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${geminiApiKey}`,
-			{
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({
-					contents: [
-						{
-							parts: [
-								{ text: prompt },
-								{
-									inlineData: {
-										mimeType: "image/jpeg",
-										data: imageBase64,
-									},
+	const response = await fetch(
+		`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${geminiApiKey}`,
+		{
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				contents: [
+					{
+						parts: [
+							{ text: prompt },
+							{
+								inlineData: {
+									mimeType: "image/jpeg",
+									data: imageBase64,
 								},
-							],
-						},
-					],
-					generationConfig: {
-						temperature: 0.0,
-						maxOutputTokens: 256,
-						responseMimeType: "application/json",
+							},
+						],
 					},
-				}),
-			},
-		);
+				],
+				generationConfig: {
+					temperature: 0.0,
+					maxOutputTokens: 256,
+					responseMimeType: "application/json",
+				},
+			}),
+		},
+	);
 
-		if (!response.ok) {
-			const error = await response.text();
-			throw new Error(`Gemini API error: ${error}`);
+	if (!response.ok) {
+		const error = await response.text();
+		throw new Error(`Gemini API error: ${error}`);
+	}
+
+	const result = await response.json();
+	const rawResponse = JSON.stringify(result);
+
+	const textContent = result.candidates?.[0]?.content?.parts?.[0]?.text;
+	if (!textContent) {
+		throw new Error("No text in Gemini response");
+	}
+
+	const extracted: ExtractedData = JSON.parse(textContent);
+	console.log("Extracted (raw):", extracted);
+
+	let validFrom: string | undefined;
+	const expiryDate = extracted.expiryDate;
+
+	if (extracted.validFromDay && extracted.validFromMonth && expiryDate) {
+		const expiryDateParsed = dayjs(expiryDate);
+		const expiryYear = expiryDateParsed.year();
+
+		let validFromDate = dayjs()
+			.year(expiryYear)
+			.month(extracted.validFromMonth - 1) // dayjs months are 0-indexed
+			.date(extracted.validFromDay)
+			.startOf("day");
+
+		// If validFrom is chronologically after expiryDate, use previous year
+		if (validFromDate.isAfter(expiryDateParsed)) {
+			validFromDate = validFromDate.subtract(1, "year");
+			console.log(
+				`Adjusted validFrom year to ${validFromDate.year()} (crosses year boundary)`,
+			);
 		}
 
-		const result = await response.json();
-		const rawResponse = JSON.stringify(result);
+		validFrom = validFromDate.format("YYYY-MM-DD");
+	}
 
-		const textContent = result.candidates?.[0]?.content?.parts?.[0]?.text;
-		if (!textContent) {
-			throw new Error("No text in Gemini response");
+	console.log("Extracted (final):", {
+		type: extracted.type,
+		validFrom,
+		expiryDate,
+		barcode: extracted.barcode,
+	});
+
+	return {
+		type: extracted.type,
+		validFrom,
+		expiryDate,
+		barcode: extracted.barcode,
+		rawResponse,
+	};
+}
+
+/**
+ * Extract voucher data from an image using Gemini OCR.
+ * Pure extraction - no side effects except logging.
+ */
+export const extractFromImage = internalAction({
+	args: { imageStorageId: v.id("_storage") },
+	handler: async (ctx, { imageStorageId }) => {
+		const imageUrl = await ctx.storage.getUrl(imageStorageId);
+		if (!imageUrl) {
+			throw new Error("Could not get image URL");
 		}
 
-		const extracted: ExtractedData = JSON.parse(textContent);
-		console.log("Extracted (raw):", extracted);
+		const imageBase64 = await fetchImageAsBase64(imageUrl);
+		const currentYear = new Date().getFullYear();
+		return extractVoucherData(imageBase64, currentYear);
+	},
+});
 
-		let validFrom: string | undefined;
-		const expiryDate = extracted.expiryDate;
+/**
+ * Extract voucher data from an external URL.
+ * Accepts currentYear override for testing year boundary scenarios.
+ */
+export const extractFromUrl = internalAction({
+	args: {
+		imageUrl: v.string(),
+		currentYear: v.optional(v.number()),
+	},
+	handler: async (_ctx, { imageUrl, currentYear }) => {
+		const imageBase64 = await fetchImageAsBase64(imageUrl);
+		const yearToUse = currentYear ?? new Date().getFullYear();
+		return extractVoucherData(imageBase64, yearToUse);
+	},
+});
 
-		if (extracted.validFromDay && extracted.validFromMonth && expiryDate) {
-			const expiryDateParsed = dayjs(expiryDate);
-			const expiryYear = expiryDateParsed.year();
-
-			let validFromDate = dayjs()
-				.year(expiryYear)
-				.month(extracted.validFromMonth - 1) // dayjs months are 0-indexed
-				.date(extracted.validFromDay)
-				.startOf("day");
-
-			// If validFrom is chronologically after expiryDate, use previous year
-			if (validFromDate.isAfter(expiryDateParsed)) {
-				validFromDate = validFromDate.subtract(1, "year");
-				console.log(
-					`Adjusted validFrom year to ${validFromDate.year()} (crosses year boundary)`,
-				);
-			}
-
-			validFrom = validFromDate.format("YYYY-MM-DD");
-		}
-
-		console.log("Extracted (final):", {
-			type: extracted.type,
-			validFrom,
-			expiryDate,
-			barcode: extracted.barcode,
-		});
-
-		return {
-			type: extracted.type,
-			validFrom,
-			expiryDate,
-			barcode: extracted.barcode,
-			rawResponse,
-		};
+/**
+ * Extract voucher data from base64 image data.
+ * Used for OCR evaluations where frontend sends image data directly.
+ */
+export const extractFromBase64 = internalAction({
+	args: {
+		imageBase64: v.string(),
+		currentYear: v.number(),
+	},
+	handler: async (_ctx, { imageBase64, currentYear }) => {
+		return extractVoucherData(imageBase64, currentYear);
 	},
 });
 
