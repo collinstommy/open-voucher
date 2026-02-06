@@ -1,19 +1,20 @@
+import { v } from "convex/values";
 import {
 	customAction,
 	customMutation,
 	customQuery,
 } from "convex-helpers/server/customFunctions";
-import { v } from "convex/values";
+import { internal } from "./_generated/api";
+import type { Id } from "./_generated/dataModel";
+import type { ActionCtx, QueryCtx } from "./_generated/server";
 import {
+	action,
 	internalMutation,
 	internalQuery,
+	internalAction,
 	mutation,
 	query,
-	action,
 } from "./_generated/server";
-import { internal } from "./_generated/api";
-import type { ActionCtx, QueryCtx } from "./_generated/server";
-import type { Id } from "./_generated/dataModel";
 
 const SESSION_DURATION_MS = 24 * 60 * 60 * 1000;
 
@@ -835,88 +836,112 @@ export const getHealthCheckData = internalQuery({
 	},
 });
 
+type HealthCheckResult = {
+	ocrTest: { success: boolean; message: string };
+	voucherCount: { success: boolean; count: number; message: string };
+	telegramToken: { success: boolean; message: string };
+};
+
+async function performHealthCheck(ctx: ActionCtx): Promise<HealthCheckResult> {
+	const currentYear = new Date().getFullYear();
+	const expectedExpiry = `${currentYear}-01-29`;
+
+	const now = Date.now();
+	const vouchers: { expiryDate: number }[] = await ctx.runQuery(
+		internal.admin.getAvailableVouchersCount,
+	);
+	const voucherCount = vouchers.filter(
+		(v: { expiryDate: number }) => v.expiryDate > now,
+	).length;
+
+	const setting = await ctx.runQuery(internal.settings.getSetting, {
+		key: "test-voucher-image",
+	});
+
+	let ocrTest: { success: boolean; message: string };
+	if (!setting) {
+		ocrTest = {
+			success: false,
+			message: "No test voucher image configured",
+		};
+	} else {
+		const ocrResult = await ctx.runAction(
+			internal.ocr.extract.extractFromImage,
+			{ imageStorageId: setting as Id<"_storage"> },
+		);
+
+		if (ocrResult.expiryDate === expectedExpiry) {
+			ocrTest = {
+				success: true,
+				message: `Expiry date ${ocrResult.expiryDate} matches expected ${expectedExpiry}`,
+			};
+		} else {
+			ocrTest = {
+				success: false,
+				message: `Expected expiry ${expectedExpiry}, got ${ocrResult.expiryDate ?? "null"}`,
+			};
+		}
+	}
+
+	const telegramToken = process.env.TELEGRAM_BOT_TOKEN;
+	let telegramTest: { success: boolean; message: string };
+	if (!telegramToken) {
+		telegramTest = {
+			success: false,
+			message: "TELEGRAM_BOT_TOKEN not configured",
+		};
+	} else {
+		const response = await fetch(
+			`https://api.telegram.org/bot${telegramToken}/getMe`,
+		);
+		if (response.ok) {
+			telegramTest = {
+				success: true,
+				message: "Telegram token is valid",
+			};
+		} else {
+			telegramTest = {
+				success: false,
+				message: `Telegram token invalid: ${response.status} ${response.statusText}`,
+			};
+		}
+	}
+
+	return {
+		ocrTest,
+		voucherCount: {
+			success: voucherCount > 20,
+			count: voucherCount,
+			message:
+				voucherCount > 20
+					? `${voucherCount} available vouchers (threshold: 20)`
+					: `${voucherCount} available vouchers, need > 20`,
+		},
+		telegramToken: telegramTest,
+	};
+}
+
+export const getAvailableVouchersCount = internalQuery({
+	args: {},
+	handler: async (ctx) => {
+		return await ctx.db
+			.query("vouchers")
+			.withIndex("by_status_created", (q) => q.eq("status", "available"))
+			.collect();
+	},
+});
+
 export const runHealthCheck = adminAction({
 	args: { token: v.string() },
 	handler: async (ctx, { token }) => {
-		const currentYear = new Date().getFullYear();
-		const expectedExpiry = `${currentYear}-01-29`;
+		await verifyAdminSession(ctx, token);
+		return performHealthCheck(ctx);
+	},
+});
 
-		type HealthData = { valid: boolean; error?: string; voucherCount?: number };
-		const healthData: HealthData = await ctx.runQuery(
-			internal.admin.getHealthCheckData,
-			{ token },
-		);
-
-		if (!healthData.valid) {
-			throw new Error(healthData.error ?? "Unknown error");
-		}
-
-		const setting = await ctx.runQuery(internal.settings.getSetting, {
-			key: "test-voucher-image",
-		});
-
-		let ocrTest: { success: boolean; message: string };
-		if (!setting) {
-			ocrTest = {
-				success: false,
-				message: "No test voucher image configured",
-			};
-		} else {
-			const ocrResult = await ctx.runAction(
-				internal.ocr.extract.extractFromImage,
-				{ imageStorageId: setting as Id<"_storage"> },
-			);
-
-			if (ocrResult.expiryDate === expectedExpiry) {
-				ocrTest = {
-					success: true,
-					message: `Expiry date ${ocrResult.expiryDate} matches expected ${expectedExpiry}`,
-				};
-			} else {
-				ocrTest = {
-					success: false,
-					message: `Expected expiry ${expectedExpiry}, got ${ocrResult.expiryDate ?? "null"}`,
-				};
-			}
-		}
-
-		const telegramToken = process.env.TELEGRAM_BOT_TOKEN;
-		let telegramTest: { success: boolean; message: string };
-		if (!telegramToken) {
-			telegramTest = {
-				success: false,
-				message: "TELEGRAM_BOT_TOKEN not configured",
-			};
-		} else {
-			const response = await fetch(
-				`https://api.telegram.org/bot${telegramToken}/getMe`,
-			);
-			if (response.ok) {
-				telegramTest = {
-					success: true,
-					message: "Telegram token is valid",
-				};
-			} else {
-				telegramTest = {
-					success: false,
-					message: `Telegram token invalid: ${response.status} ${response.statusText}`,
-				};
-			}
-		}
-
-		const voucherCount = healthData.voucherCount ?? 0;
-
-		return {
-			ocrTest,
-			voucherCount: {
-				success: voucherCount > 20,
-				count: voucherCount,
-				message:
-					voucherCount > 20
-						? `${voucherCount} available vouchers (threshold: 20)`
-						: `${voucherCount} available vouchers, need > 20`,
-			},
-			telegramToken: telegramTest,
-		};
+export const runHealthCheckInternal = internalAction({
+	args: {},
+	handler: async (ctx) => {
+		return performHealthCheck(ctx);
 	},
 });
