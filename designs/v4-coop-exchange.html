@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Open Vouchers — Community Exchange</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=DM+Serif+Display:ital@0;1&family=Permanent+Marker&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --paper: #f5f1e8;
+            --paper-dark: #e8e0d0;
+            --ink: #2a2622;
+            --ink-light: #5a5248;
+            --rust: #c45c26;
+            --rust-light: #e07a45;
+            --avocado: #6b8e23;
+            --avocado-light: #8ab84a;
+            --tape: rgba(255, 255, 235, 0.6);
+            --stamp-red: #c41e3a;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background-color: var(--paper);
+            background-image: 
+                url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E"),
+                linear-gradient(to bottom, rgba(245,241,232,0.95), rgba(245,241,232,0.95)),
+                repeating-linear-gradient(
+                    0deg,
+                    transparent,
+                    transparent 28px,
+                    rgba(139, 69, 19, 0.03) 28px,
+                    rgba(139, 69, 19, 0.03) 29px
+                );
+            background-blend-mode: overlay, normal, normal;
+            color: var(--ink);
+            min-height: 100vh;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        /* Coffee stain decoration */
+        .coffee-stain {
+            position: fixed;
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            border: 3px solid rgba(101, 67, 33, 0.08);
+            box-shadow: 
+                inset 0 0 20px rgba(101, 67, 33, 0.1),
+                0 0 0 8px rgba(101, 67, 33, 0.04),
+                0 0 0 16px rgba(101, 67, 33, 0.02);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .coffee-stain-1 { top: 10%; right: -30px; transform: rotate(45deg); }
+        .coffee-stain-2 { bottom: 20%; left: -40px; width: 200px; height: 200px; }
+
+        /* Typography */
+        .font-display { font-family: 'DM Serif Display', serif; }
+        .font-mono { font-family: 'DM Mono', monospace; }
+        .font-marker { font-family: 'Permanent Marker', cursive; }
+
+        /* Paper card effect */
+        .paper-card {
+            background: linear-gradient(135deg, #faf8f3 0%, #f5f1e8 100%);
+            box-shadow: 
+                1px 1px 0 rgba(0,0,0,0.1),
+                3px 3px 0 rgba(0,0,0,0.05),
+                0 4px 12px rgba(0,0,0,0.08);
+            position: relative;
+        }
+
+        .paper-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.4'/%3E%3C/svg%3E");
+            opacity: 0.4;
+            pointer-events: none;
+        }
+
+        /* Masking tape effect */
+        .tape {
+            background: var(--tape);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            position: relative;
+        }
+
+        .tape::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-image: repeating-linear-gradient(
+                90deg,
+                transparent,
+                transparent 2px,
+                rgba(0,0,0,0.02) 2px,
+                rgba(0,0,0,0.02) 4px
+            );
+            pointer-events: none;
+        }
+
+        /* Rubber stamp effect */
+        .stamp {
+            border: 3px solid var(--stamp-red);
+            color: var(--stamp-red);
+            border-radius: 4px;
+            position: relative;
+            box-shadow: 0 0 0 1px rgba(196, 30, 58, 0.3);
+        }
+
+        .stamp::before {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            right: 2px;
+            bottom: 2px;
+            border: 1px solid var(--stamp-red);
+            opacity: 0.5;
+        }
+
+        /* Typewriter input style */
+        .typewriter-line {
+            border-bottom: 2px solid var(--ink);
+            position: relative;
+        }
+
+        .typewriter-line::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            width: 100%;
+            height: 1px;
+            background: repeating-linear-gradient(
+                90deg,
+                var(--ink),
+                var(--ink) 4px,
+                transparent 4px,
+                transparent 8px
+            );
+            opacity: 0.3;
+        }
+
+        /* Ledger lines */
+        .ledger-bg {
+            background-image: repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 31px,
+                rgba(139, 69, 19, 0.06) 31px,
+                rgba(139, 69, 19, 0.06) 32px
+            );
+            background-size: 100% 32px;
+        }
+
+        /* Handwritten annotation */
+        .handwritten {
+            font-family: 'Permanent Marker', cursive;
+            color: var(--rust);
+        }
+
+        /* Animations */
+        @keyframes stamp-in {
+            0% { transform: scale(2); opacity: 0; }
+            50% { transform: scale(0.9); }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        @keyframes slide-in-right {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        @keyframes typewriter {
+            from { width: 0; }
+            to { width: 100%; }
+        }
+
+        @keyframes wiggle {
+            0%, 100% { transform: rotate(0deg); }
+            25% { transform: rotate(-3deg); }
+            75% { transform: rotate(3deg); }
+        }
+
+        @keyframes fade-in-up {
+            from { 
+                opacity: 0; 
+                transform: translateY(20px);
+            }
+            to { 
+                opacity: 1; 
+                transform: translateY(0);
+            }
+        }
+
+        .animate-stamp { animation: stamp-in 0.4s ease-out forwards; }
+        .animate-slide { animation: slide-in-right 0.3s ease-out; }
+        .animate-fade-up { animation: fade-in-up 0.5s ease-out; }
+        .hover-wiggle:hover { animation: wiggle 0.5s ease-in-out; }
+
+        /* Page transition overlay */
+        .page-transition {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: var(--paper);
+            z-index: 9999;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .page-transition.active {
+            opacity: 1;
+        }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: var(--paper-dark); }
+        ::-webkit-scrollbar-thumb { background: var(--ink-light); border-radius: 4px; }
+
+        /* Receipt style */
+        .receipt {
+            background: white;
+            position: relative;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .receipt::before,
+        .receipt::after {
+            content: '';
+            position: absolute;
+            left: 0;
+            right: 0;
+            height: 8px;
+            background-image: radial-gradient(circle, transparent 5px, white 5px);
+            background-size: 16px 16px;
+            background-position: -8px 0;
+        }
+
+        .receipt::before { top: -4px; transform: rotate(180deg); }
+        .receipt::after { bottom: -4px; }
+
+        /* Punch card holes */
+        .punch-holes {
+            position: relative;
+        }
+
+        .punch-holes::before {
+            content: '';
+            position: absolute;
+            left: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 8px;
+            height: 8px;
+            background: var(--paper);
+            border-radius: 50%;
+            box-shadow: inset 1px 1px 2px rgba(0,0,0,0.2);
+        }
+    </style>
+</head>
+<body class="antialiased">
+    <!-- Coffee stains -->
+    <div class="coffee-stain coffee-stain-1"></div>
+    <div class="coffee-stain coffee-stain-2"></div>
+
+    <!-- Page transition overlay -->
+    <div id="page-transition" class="page-transition"></div>
+
+    <!-- Header -->
+    <header class="relative z-10 px-4 py-4 border-b-2" style="border-color: var(--ink-light);">
+        <div class="max-w-md mx-auto flex justify-between items-center">
+            <button onclick="navigate('landing')" class="hover-wiggle transition-transform">
+                <div class="flex items-center gap-2">
+                    <div class="w-10 h-10 stamp flex items-center justify-center text-xs font-mono font-bold" style="color: var(--stamp-red); border-color: var(--stamp-red);">
+                        OV
+                    </div>
+                    <div class="text-left">
+                        <div class="font-display text-lg leading-none" style="color: var(--ink);">Open Vouchers</div>
+                        <div class="font-mono text-xs" style="color: var(--ink-light);">EST. 2024</div>
+                    </div>
+                </div>
+            </button>
+            
+            <div class="flex items-center gap-3">
+                <div class="tape px-3 py-1.5 rounded-sm">
+                    <div class="flex items-center gap-2">
+                        <span class="font-mono text-sm font-medium" style="color: var(--rust);">¢</span>
+                        <span id="nav-coins" class="font-mono text-lg font-bold" style="color: var(--ink);">10</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="relative z-10 max-w-md mx-auto px-4 py-6 pb-24">
+        
+        <!-- Landing Page -->
+        <section id="page-landing" class="animate-fade-up">
+            <!-- Hero -->
+            <div class="paper-card p-6 mb-6">
+                <div class="handwritten text-sm mb-2">Community Exchange</div>
+                <h1 class="font-display text-4xl mb-3 leading-tight" style="color: var(--ink);">
+                    Trade Your<br/>
+                    <span style="color: var(--rust);">Dunnes Vouchers</span>
+                </h1>
+                <p class="font-mono text-sm mb-6" style="color: var(--ink-light);">
+                    Upload vouchers you won't use. Collect coins. Claim what you need.
+                </p>
+                <button onclick="navigate('dashboard')" class="w-full py-4 font-bold text-lg relative overflow-hidden group" style="background: var(--rust); color: white;">
+                    <span class="relative z-10">ENTER EXCHANGE →</span>
+                    <div class="absolute inset-0 bg-black opacity-0 group-hover:opacity-10 transition-opacity"></div>
+                </button>
+                <div class="mt-3 text-center">
+                    <span class="font-mono text-xs" style="color: var(--ink-light);">New members get 10 coins free</span>
+                </div>
+            </div>
+
+            <!-- How it works -->
+            <div class="mb-6">
+                <div class="flex items-center gap-2 mb-4">
+                    <div class="h-px flex-1" style="background: var(--ink-light); opacity: 0.3;"></div>
+                    <span class="font-mono text-xs uppercase tracking-widest" style="color: var(--ink-light);">How It Works</span>
+                    <div class="h-px flex-1" style="background: var(--ink-light); opacity: 0.3;"></div>
+                </div>
+
+                <div class="space-y-4">
+                    <!-- Step 1 -->
+                    <div class="paper-card p-4 pl-6 punch-holes">
+                        <div class="flex gap-4">
+                            <div class="font-display text-3xl" style="color: var(--rust); opacity: 0.6;">01</div>
+                            <div>
+                                <h3 class="font-bold mb-1" style="color: var(--ink);">Upload</h3>
+                                <p class="font-mono text-xs" style="color: var(--ink-light);">Take a photo of your voucher. We'll verify and credit your account.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Step 2 -->
+                    <div class="paper-card p-4 pl-6 punch-holes">
+                        <div class="flex gap-4">
+                            <div class="font-display text-3xl" style="color: var(--avocado); opacity: 0.6;">02</div>
+                            <div>
+                                <h3 class="font-bold mb-1" style="color: var(--ink);">Collect</h3>
+                                <p class="font-mono text-xs" style="color: var(--ink-light);">Earn coins for every voucher. €5 vouchers worth most (15 coins).</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Step 3 -->
+                    <div class="paper-card p-4 pl-6 punch-holes">
+                        <div class="flex gap-4">
+                            <div class="font-display text-3xl" style="color: var(--rust); opacity: 0.6;">03</div>
+                            <div>
+                                <h3 class="font-bold mb-1" style="color: var(--ink);">Claim</h3>
+                                <p class="font-mono text-xs" style="color: var(--ink-light);">Spend coins on vouchers you actually need. Use them or trade again.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Rates -->
+            <div class="paper-card p-5 mb-6">
+                <h2 class="font-display text-xl mb-4" style="color: var(--ink);">Exchange Rates</h2>
+                <div class="ledger-bg space-y-0 font-mono text-sm">
+                    <div class="flex justify-between py-2 border-b" style="border-color: rgba(42,38,34,0.1);">
+                        <span>€5 Voucher</span>
+                        <span class="font-bold" style="color: var(--rust);">15 coins</span>
+                    </div>
+                    <div class="flex justify-between py-2 border-b" style="border-color: rgba(42,38,34,0.1);">
+                        <span>€10 Voucher</span>
+                        <span class="font-bold" style="color: var(--rust);">10 coins</span>
+                    </div>
+                    <div class="flex justify-between py-2">
+                        <span>€20 Voucher</span>
+                        <span class="font-bold" style="color: var(--rust);">5 coins</span>
+                    </div>
+                </div>
+                <div class="handwritten text-xs mt-3" style="color: var(--ink-light);">
+                    * Smaller vouchers cost more to claim but earn more when uploaded
+                </div>
+            </div>
+
+            <!-- FAQ teaser -->
+            <div class="text-center">
+                <button onclick="navigate('help')" class="font-mono text-sm underline" style="color: var(--ink-light);">
+                    Questions? Read our FAQ →
+                </button>
+            </div>
+        </section>
+
+        <!-- Dashboard -->
+        <section id="page-dashboard" class="hidden">
+            <!-- Balance card -->
+            <div class="paper-card p-6 mb-6 relative overflow-hidden">
+                <div class="absolute top-2 right-2 stamp px-3 py-1 text-xs font-mono font-bold" id="balance-stamp">
+                    ACTIVE
+                </div>
+                <div class="relative z-10">
+                    <p class="font-mono text-xs uppercase tracking-widest mb-1" style="color: var(--ink-light);">Member Balance</p>
+                    <div class="flex items-baseline gap-2">
+                        <span class="font-display text-5xl" id="dashboard-coins" style="color: var(--rust);">10</span>
+                        <span class="font-mono text-sm" style="color: var(--ink-light);">coins</span>
+                    </div>
+                    <div class="mt-4 pt-4 border-t" style="border-color: rgba(42,38,34,0.1);">
+                        <div class="flex justify-between font-mono text-xs" style="color: var(--ink-light);">
+                            <span>Daily uploads: 0/10</span>
+                            <span>Daily claims: 0/5</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Upload section -->
+            <div class="paper-card p-5 mb-4">
+                <div class="flex items-center gap-2 mb-4">
+                    <div class="w-8 h-8 rounded-full flex items-center justify-center font-bold" style="background: var(--rust); color: white;">+</div>
+                    <h2 class="font-display text-xl" style="color: var(--ink);">Upload Voucher</h2>
+                </div>
+                
+                <div 
+                    onclick="simulateUpload()"
+                    class="border-2 border-dashed p-8 text-center cursor-pointer transition-all hover:border-solid"
+                    style="border-color: var(--ink-light); background: rgba(255,255,255,0.5);"
+                >
+                    <div class="font-mono text-4xl mb-2" style="color: var(--ink-light);">📷</div>
+                    <p class="font-mono text-sm mb-1" style="color: var(--ink);">Tap to photograph</p>
+                    <p class="font-mono text-xs" style="color: var(--ink-light);">Barcode must be visible</p>
+                </div>
+
+                <div id="upload-status" class="hidden mt-4 p-3 border-l-4" style="border-color: var(--avocado); background: rgba(107,142,35,0.1);">
+                    <p class="font-mono text-sm" style="color: var(--avocado);">✓ UPLOADED — PROCESSING</p>
+                    <p class="font-mono text-xs mt-1" style="color: var(--ink-light);">Check back in a moment</p>
+                </div>
+            </div>
+
+            <!-- Claim section -->
+            <div class="paper-card p-5 mb-4">
+                <div class="flex items-center gap-2 mb-4">
+                    <div class="w-8 h-8 rounded-full flex items-center justify-center font-bold" style="background: var(--avocado); color: white;">▼</div>
+                    <h2 class="font-display text-xl" style="color: var(--ink);">Claim Voucher</h2>
+                </div>
+
+                <div class="space-y-3">
+                    <button onclick="claimVoucher('5')" class="w-full paper-card p-4 flex items-center justify-between group hover:scale-[1.02] transition-transform">
+                        <div class="flex items-center gap-3">
+                            <div class="w-12 h-12 flex items-center justify-center font-display text-2xl" style="background: var(--paper-dark); color: var(--ink);">€5</div>
+                            <div class="text-left">
+                                <p class="font-bold" style="color: var(--ink);">€5 off €25</p>
+                                <p class="font-mono text-xs" style="color: var(--ink-light);">Most popular</p>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <p class="font-mono font-bold" style="color: var(--rust);">15</p>
+                            <p class="font-mono text-xs" style="color: var(--ink-light);">coins</p>
+                        </div>
+                    </button>
+
+                    <button onclick="claimVoucher('10')" class="w-full paper-card p-4 flex items-center justify-between group hover:scale-[1.02] transition-transform">
+                        <div class="flex items-center gap-3">
+                            <div class="w-12 h-12 flex items-center justify-center font-display text-2xl" style="background: var(--paper-dark); color: var(--ink);">€10</div>
+                            <div class="text-left">
+                                <p class="font-bold" style="color: var(--ink);">€10 off €50</p>
+                                <p class="font-mono text-xs" style="color: var(--ink-light);">Great value</p>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <p class="font-mono font-bold" style="color: var(--rust);">10</p>
+                            <p class="font-mono text-xs" style="color: var(--ink-light);">coins</p>
+                        </div>
+                    </button>
+
+                    <button onclick="claimVoucher('20')" class="w-full paper-card p-4 flex items-center justify-between group hover:scale-[1.02] transition-transform">
+                        <div class="flex items-center gap-3">
+                            <div class="w-12 h-12 flex items-center justify-center font-display text-2xl" style="background: var(--paper-dark); color: var(--ink);">€20</div>
+                            <div class="text-left">
+                                <p class="font-bold" style="color: var(--ink);">€20 off €100</p>
+                                <p class="font-mono text-xs" style="color: var(--ink-light);">Big spender</p>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <p class="font-mono font-bold" style="color: var(--rust);">5</p>
+                            <p class="font-mono text-xs" style="color: var(--ink-light);">coins</p>
+                        </div>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Recent activity -->
+            <div class="paper-card p-5">
+                <h2 class="font-display text-lg mb-3" style="color: var(--ink);">Recent Transactions</h2>
+                <div id="activity-list" class="space-y-2">
+                    <div class="receipt p-3">
+                        <div class="flex justify-between items-center font-mono text-sm">
+                            <div>
+                                <p class="font-bold" style="color: var(--ink);">SIGNUP BONUS</p>
+                                <p class="text-xs" style="color: var(--ink-light);">Member welcome</p>
+                            </div>
+                            <span class="font-bold" style="color: var(--avocado);">+10</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Voucher Detail -->
+        <section id="page-voucher" class="hidden">
+            <button onclick="navigate('dashboard')" class="font-mono text-sm mb-4 flex items-center gap-1" style="color: var(--ink-light);">
+                ← BACK TO EXCHANGE
+            </button>
+
+            <div class="paper-card p-6 mb-4">
+                <div class="stamp px-4 py-2 inline-block mb-4 font-mono font-bold text-sm">
+                    CLAIMED
+                </div>
+
+                <div class="text-center mb-6">
+                    <div class="font-display text-6xl mb-2" style="color: var(--rust);">€10</div>
+                    <p class="font-mono text-sm" style="color: var(--ink-light);">Off €50 purchase</p>
+                </div>
+
+                <div class="border-2 p-4 mb-4 text-center" style="border-color: var(--ink-light); background: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(0,0,0,0.02) 10px, rgba(0,0,0,0.02) 20px);">
+                    <p class="font-mono text-xs mb-2" style="color: var(--ink-light);">VOUCHER IMAGE</p>
+                    <div class="text-6xl opacity-30">📷</div>
+                </div>
+
+                <div class="typewriter-line py-2 mb-2">
+                    <p class="font-mono text-xs mb-1" style="color: var(--ink-light);">BARCODE</p>
+                    <p class="font-mono text-xl" style="color: var(--ink);">1234 5678 9012 3456</p>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4 mt-4 font-mono text-sm">
+                    <div>
+                        <p class="text-xs" style="color: var(--ink-light);">EXPIRES</p>
+                        <p style="color: var(--ink);">Dec 15, 2026</p>
+                    </div>
+                    <div>
+                        <p class="text-xs" style="color: var(--ink-light);">CLAIMED</p>
+                        <p style="color: var(--ink);">Just now</p>
+                    </div>
+                </div>
+            </div>
+
+            <button onclick="reportVoucher()" class="w-full py-4 border-2 font-mono font-bold text-sm transition-all hover:scale-[1.02]" style="border-color: var(--stamp-red); color: var(--stamp-red);">
+                ⚠ REPORT ISSUE
+            </button>
+            <p class="font-mono text-xs text-center mt-2" style="color: var(--ink-light);">
+                Only report if voucher doesn't scan
+            </p>
+        </section>
+
+        <!-- Help Page -->
+        <section id="page-help" class="hidden">
+            <h1 class="font-display text-3xl mb-6" style="color: var(--ink);">Member Services</h1>
+
+            <div class="paper-card p-5 mb-6">
+                <h2 class="font-bold mb-3" style="color: var(--ink);">Contact Support</h2>
+                <p class="font-mono text-sm mb-4" style="color: var(--ink-light);">
+                    Having trouble? Our community moderators are here to help.
+                </p>
+                <button class="w-full py-3 font-bold" style="background: var(--paper-dark); color: var(--ink);">
+                    OPEN SUPPORT TICKET
+                </button>
+            </div>
+
+            <h2 class="font-mono text-xs uppercase tracking-widest mb-4" style="color: var(--ink-light);">Frequently Asked</h2>
+
+            <div class="space-y-3">
+                <details class="paper-card group">
+                    <summary class="p-4 font-bold cursor-pointer list-none flex justify-between items-center" style="color: var(--ink);">
+                        Why do €5 vouchers cost more?
+                        <span class="font-mono text-xs transition-transform group-open:rotate-180">▼</span>
+                    </summary>
+                    <div class="px-4 pb-4 font-mono text-sm" style="color: var(--ink-light);">
+                        Smaller vouchers are more flexible. More members want €5 off €25 than €20 off €100. We price them higher to encourage uploads of the most useful denominations.
+                    </div>
+                </details>
+
+                <details class="paper-card group">
+                    <summary class="p-4 font-bold cursor-pointer list-none flex justify-between items-center" style="color: var(--ink);">
+                        What are the daily limits?
+                        <span class="font-mono text-xs transition-transform group-open:rotate-180">▼</span>
+                    </summary>
+                    <div class="px-4 pb-4 font-mono text-sm" style="color: var(--ink-light);">
+                        10 uploads per day. 5 claims per day. 1 report per day. These keep the system fair for everyone.
+                    </div>
+                </details>
+
+                <details class="paper-card group">
+                    <summary class="p-4 font-bold cursor-pointer list-none flex justify-between items-center" style="color: var(--ink);">
+                        How do I upload vouchers?
+                        <span class="font-mono text-xs transition-transform group-open:rotate-180">▼</span>
+                    </summary>
+                    <div class="px-4 pb-4 font-mono text-sm" style="color: var(--ink-light);">
+                        Tap the upload button and photograph your voucher. Make sure the barcode is clearly visible. Our system will verify it automatically.
+                    </div>
+                </details>
+
+                <details class="paper-card group">
+                    <summary class="p-4 font-bold cursor-pointer list-none flex justify-between items-center" style="color: var(--ink);">
+                        What if a voucher doesn't work?
+                        <span class="font-mono text-xs transition-transform group-open:rotate-180">▼</span>
+                    </summary>
+                    <div class="px-4 pb-4 font-mono text-sm" style="color: var(--ink-light);">
+                        Use the report button on any claimed voucher. You'll get a replacement if available, or a full coin refund.
+                    </div>
+                </details>
+            </div>
+
+            <div class="mt-8 text-center">
+                <p class="handwritten text-sm" style="color: var(--rust);">
+                    Built by the community, for the community
+                </p>
+            </div>
+        </section>
+    </main>
+
+    <!-- Bottom Navigation -->
+    <nav class="fixed bottom-0 left-0 right-0 z-50 px-4 py-3" style="background: linear-gradient(to top, var(--paper) 70%, transparent);">
+        <div class="max-w-md mx-auto flex justify-around">
+            <button onclick="navigate('dashboard')" class="flex flex-col items-center gap-1 p-2">
+                <div class="w-10 h-10 rounded-full flex items-center justify-center" style="background: var(--paper-dark);">
+                    <span class="font-mono text-lg">⌂</span>
+                </div>
+                <span class="font-mono text-xs" style="color: var(--ink-light);">EXCHANGE</span>
+            </button>
+            <button onclick="navigate('dashboard')" class="flex flex-col items-center gap-1 p-2">
+                <div class="w-10 h-10 rounded-full flex items-center justify-center" style="background: var(--paper-dark);">
+                    <span class="font-mono text-lg">+</span>
+                </div>
+                <span class="font-mono text-xs" style="color: var(--ink-light);">UPLOAD</span>
+            </button>
+            <button onclick="navigate('help')" class="flex flex-col items-center gap-1 p-2">
+                <div class="w-10 h-10 rounded-full flex items-center justify-center" style="background: var(--paper-dark);">
+                    <span class="font-mono text-lg">?</span>
+                </div>
+                <span class="font-mono text-xs" style="color: var(--ink-light);">HELP</span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="hidden fixed bottom-24 left-1/2 transform -translate-x-1/2 z-50">
+        <div class="paper-card px-6 py-3 font-mono text-sm" style="background: var(--ink); color: var(--paper);">
+            <span id="toast-message">Notification</span>
+        </div>
+    </div>
+
+    <script>
+        let currentPage = 'landing';
+        let userCoins = 10;
+
+        function navigate(page) {
+            const transition = document.getElementById('page-transition');
+            transition.classList.add('active');
+            
+            setTimeout(() => {
+                document.querySelectorAll('section').forEach((s) => { s.classList.add('hidden'); });
+                const targetPage = document.getElementById(`page-${page}`);
+                targetPage.classList.remove('hidden');
+                targetPage.classList.add('animate-fade-up');
+                
+                updateDisplay();
+                
+                currentPage = page;
+                window.scrollTo(0, 0);
+                
+                transition.classList.remove('active');
+            }, 150);
+        }
+
+        function updateDisplay() {
+            document.getElementById('nav-coins').textContent = userCoins;
+            document.getElementById('dashboard-coins').textContent = userCoins;
+            
+            // Animate stamp on dashboard
+            const stamp = document.getElementById('balance-stamp');
+            if (stamp && currentPage === 'dashboard') {
+                stamp.classList.remove('animate-stamp');
+                void stamp.offsetWidth; // Trigger reflow
+                stamp.classList.add('animate-stamp');
+            }
+        }
+
+        function simulateUpload() {
+            showToast('Processing voucher...');
+            setTimeout(() => {
+                document.getElementById('upload-status').classList.remove('hidden');
+                userCoins += 10;
+                updateDisplay();
+                showToast('Voucher accepted! +10 coins');
+                
+                // Add to activity
+                const activityList = document.getElementById('activity-list');
+                const newActivity = document.createElement('div');
+                newActivity.className = 'receipt p-3 animate-fade-up';
+                newActivity.innerHTML = `
+                    <div class="flex justify-between items-center font-mono text-sm">
+                        <div>
+                            <p class="font-bold" style="color: var(--ink);">VOUCHER UPLOAD</p>
+                            <p class="text-xs" style="color: var(--ink-light);">€10 voucher</p>
+                        </div>
+                        <span class="font-bold" style="color: var(--avocado);">+10</span>
+                    </div>
+                `;
+                activityList.insertBefore(newActivity, activityList.firstChild);
+            }, 1500);
+        }
+
+        function claimVoucher(type) {
+            const costs = { '5': 15, '10': 10, '20': 5 };
+            const cost = costs[type];
+            
+            if (userCoins < cost) {
+                showToast(`Need ${cost} coins. You have ${userCoins}.`);
+                return;
+            }
+            
+            userCoins -= cost;
+            updateDisplay();
+            showToast(`Claimed €${type} voucher!`);
+            
+            setTimeout(() => {
+                navigate('voucher');
+            }, 800);
+        }
+
+        function reportVoucher() {
+            showToast('Issue reported. Refund processed.');
+            userCoins += 10;
+            updateDisplay();
+            
+            // Add to activity
+            const activityList = document.getElementById('activity-list');
+            if (activityList) {
+                const newActivity = document.createElement('div');
+                newActivity.className = 'receipt p-3 animate-fade-up';
+                newActivity.innerHTML = `
+                    <div class="flex justify-between items-center font-mono text-sm">
+                        <div>
+                            <p class="font-bold" style="color: var(--ink);">REFUND PROCESSED</p>
+                            <p class="text-xs" style="color: var(--ink-light);">Voucher report</p>
+                        </div>
+                        <span class="font-bold" style="color: var(--avocado);">+10</span>
+                    </div>
+                `;
+                activityList.insertBefore(newActivity, activityList.firstChild);
+            }
+            
+            setTimeout(() => {
+                navigate('dashboard');
+            }, 1500);
+        }
+
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            const toastMessage = document.getElementById('toast-message');
+            toastMessage.textContent = message;
+            toast.classList.remove('hidden');
+            toast.classList.add('animate-fade-up');
+            
+            setTimeout(() => {
+                toast.classList.add('hidden');
+            }, 3000);
+        }
+
+        // Initialize
+        navigate('landing');
+    </script>
+</body>
+</html>
