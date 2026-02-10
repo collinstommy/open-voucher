@@ -7,10 +7,10 @@ import { internal } from "../../convex/_generated/api";
 import schema from "../../convex/schema";
 import { modules } from "../test.setup";
 import {
-	createUser,
-	createVoucher,
 	createTelegramCallback,
 	createTelegramMessage,
+	createUser,
+	createVoucher,
 	mockTelegramResponse,
 } from "./fixtures/testHelpers";
 
@@ -183,7 +183,7 @@ describe("Help Callback Responses", () => {
 			uploaderId: userId,
 			status: "available",
 		});
-		for (let i = 0; i < 6; i++) {
+		for (let i = 0; i < 10; i++) {
 			await createVoucher(t, {
 				type: "20",
 				uploaderId: userId,
