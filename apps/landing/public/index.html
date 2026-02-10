@@ -169,16 +169,114 @@
                     </div>
                 </div>
 
-                <!-- Rationale Box -->
-                <div class="bg-blue-50 border border-blue-100 rounded-xl p-6 md:p-8">
-                    <h3 class="text-lg font-bold text-gray-900 mb-3">Why are smaller vouchers worth more?</h3>
-                    <p class="text-gray-700 leading-relaxed mb-4">
-                        You might notice that a <strong>€10 off €50</strong> voucher is worth more coins than a <strong>€20 off €100</strong> voucher, and a <strong>€5 off €25</strong> voucher is worth even more. This is intentional!
-                    </p>
-                    <ul class="list-disc list-inside text-gray-600 space-y-2">
-                        <li><strong>More Flexible:</strong> It's easier to spend €50 than €100. Two €10 vouchers (split over two shops) are often more useful than one single €20 voucher.</li>
-                        <li><strong>Higher Demand:</strong> Smaller vouchers are requested more often, so we reward you more for supplying them.</li>
-                    </ul>
+            </div>
+        </div>
+    </section>
+
+    <!-- FAQ Section -->
+    <section class="py-16 bg-white border-t border-gray-200">
+        <div class="container mx-auto px-6">
+            <div class="max-w-3xl mx-auto">
+                <div class="text-center mb-12">
+                    <h2 class="text-3xl font-bold text-gray-900">Frequently Asked Questions</h2>
+                    <p class="text-gray-500 mt-2">Everything you need to know about Open Vouchers.</p>
+                </div>
+
+                <div class="space-y-4">
+                    <details class="group bg-gray-50 rounded-xl border border-gray-200 open:bg-white open:shadow-md transition-all">
+                        <summary class="flex justify-between items-center cursor-pointer p-6 list-none">
+                            <h3 class="text-lg font-semibold text-gray-900">Why are smaller vouchers worth more?</h3>
+                            <span class="ml-4 text-gray-400 group-open:rotate-180 transition-transform">▼</span>
+                        </summary>
+                        <div class="px-6 pb-6 text-gray-600 leading-relaxed">
+                            <p class="mb-4">You might notice that a <strong>€10 off €50</strong> voucher is worth more coins than a <strong>€20 off €100</strong> voucher, and a <strong>€5 off €25</strong> voucher is worth even more. This is intentional!</p>
+                            <ul class="list-disc list-inside space-y-2">
+                                <li><strong>More Flexible:</strong> It's easier to spend €50 than €100. Two €10 vouchers (split over two shops) are often more useful than one single €20 voucher.</li>
+                                <li><strong>Higher Demand:</strong> Smaller vouchers are requested more often, so we reward you more for supplying them.</li>
+                            </ul>
+                        </div>
+                    </details>
+
+                    <details class="group bg-gray-50 rounded-xl border border-gray-200 open:bg-white open:shadow-md transition-all">
+                        <summary class="flex justify-between items-center cursor-pointer p-6 list-none">
+                            <h3 class="text-lg font-semibold text-gray-900">Is this really free?</h3>
+                            <span class="ml-4 text-gray-400 group-open:rotate-180 transition-transform">▼</span>
+                        </summary>
+                        <div class="px-6 pb-6 text-gray-600 leading-relaxed">
+                            Yes. The project is open-source and community-run. We have no intention of charging fees.
+                        </div>
+                    </details>
+
+                    <details class="group bg-gray-50 rounded-xl border border-gray-200 open:bg-white open:shadow-md transition-all">
+                        <summary class="flex justify-between items-center cursor-pointer p-6 list-none">
+                            <h3 class="text-lg font-semibold text-gray-900">Can I use online or app vouchers?</h3>
+                            <span class="ml-4 text-gray-400 group-open:rotate-180 transition-transform">▼</span>
+                        </summary>
+                        <div class="px-6 pb-6 text-gray-600 leading-relaxed">
+                            Yes! You can upload screenshots of vouchers from the Dunnes Stores app or from your email. They work exactly the same as paper vouchers.
+                        </div>
+                    </details>
+
+
+                    <details class="group bg-gray-50 rounded-xl border border-gray-200 open:bg-white open:shadow-md transition-all">
+                        <summary class="flex justify-between items-center cursor-pointer p-6 list-none">
+                            <h3 class="text-lg font-semibold text-gray-900">What if the voucher I receive has already been used?</h3>
+                            <span class="ml-4 text-gray-400 group-open:rotate-180 transition-transform">▼</span>
+                        </summary>
+                        <div class="px-6 pb-6 text-gray-600 leading-relaxed">
+                            You can mark it as "already used" in the bot. Users who upload multiple used vouchers will be banned from the system. When you report a voucher as used, you will get a replacement voucher when available.
+                        </div>
+                    </details>
+
+                    <details class="group bg-gray-50 rounded-xl border border-gray-200 open:bg-white open:shadow-md transition-all">
+                        <summary class="flex justify-between items-center cursor-pointer p-6 list-none">
+                            <h3 class="text-lg font-semibold text-gray-900">How do I know if there are enough vouchers in the pool?</h3>
+                            <span class="ml-4 text-gray-400 group-open:rotate-180 transition-transform">▼</span>
+                        </summary>
+                        <div class="px-6 pb-6 text-gray-600 leading-relaxed">
+                            Use the <code class="bg-gray-100 px-2 py-1 rounded text-sm font-mono">availability</code> button in the bot <code class="bg-gray-100 px-2 py-1 rounded text-sm font-mono">help</code> menu to see current pool levels before uploading. The pool typically has plenty of €5 and €10 vouchers available.
+                        </div>
+                    </details>
+
+                    <details class="group bg-gray-50 rounded-xl border border-gray-200 open:bg-white open:shadow-md transition-all">
+                        <summary class="flex justify-between items-center cursor-pointer p-6 list-none">
+                            <h3 class="text-lg font-semibold text-gray-900">Can I upload vouchers that expire today?</h3>
+                            <span class="ml-4 text-gray-400 group-open:rotate-180 transition-transform">▼</span>
+                        </summary>
+                        <div class="px-6 pb-6 text-gray-600 leading-relaxed">
+                            Yes, but uploads after 9pm for same-day expiring vouchers won't earn coins. This ensures vouchers have enough time to be used before shops close.
+                        </div>
+                    </details>
+
+                    <details class="group bg-gray-50 rounded-xl border border-gray-200 open:bg-white open:shadow-md transition-all">
+                        <summary class="flex justify-between items-center cursor-pointer p-6 list-none">
+                            <h3 class="text-lg font-semibold text-gray-900">Is there a limit on how many vouchers I can swap?</h3>
+                            <span class="ml-4 text-gray-400 group-open:rotate-180 transition-transform">▼</span>
+                        </summary>
+                        <div class="px-6 pb-6 text-gray-600 leading-relaxed">
+                            No limits! You can swap as many vouchers as you need, completely free.
+                        </div>
+                    </details>
+
+                    <details class="group bg-gray-50 rounded-xl border border-gray-200 open:bg-white open:shadow-md transition-all">
+                        <summary class="flex justify-between items-center cursor-pointer p-6 list-none">
+                            <h3 class="text-lg font-semibold text-gray-900">What happens if I upload a voucher and accidentally use it?</h3>
+                            <span class="ml-4 text-gray-400 group-open:rotate-180 transition-transform">▼</span>
+                        </summary>
+                        <div class="px-6 pb-6 text-gray-600 leading-relaxed">
+                            The claimer can mark the voucher as "already used" in the bot. You will get a message to confirm it's already been used.
+                        </div>
+                    </details>
+
+                    <details class="group bg-gray-50 rounded-xl border border-gray-200 open:bg-white open:shadow-md transition-all">
+                        <summary class="flex justify-between items-center cursor-pointer p-6 list-none">
+                            <h3 class="text-lg font-semibold text-gray-900">Is this a cryptocurrency? Can I buy coins?</h3>
+                            <span class="ml-4 text-gray-400 group-open:rotate-180 transition-transform">▼</span>
+                        </summary>
+                        <div class="px-6 pb-6 text-gray-600 leading-relaxed">
+                            No. "Coins" are simply community points used to ensure the system is fair. They have no monetary value and cannot be bought or sold. The only way to earn coins is by helping others (uploading vouchers).
+                        </div>
+                    </details>
                 </div>
             </div>
         </div>

@@ -1,5 +1,3 @@
-import { Button } from "@/components/ui/button";
-import { useAdminAuth } from "@/hooks/useAdminAuth";
 import { convexQuery } from "@convex-dev/react-query";
 import { api } from "@open-voucher/backend/convex/_generated/api";
 import type { Id } from "@open-voucher/backend/convex/_generated/dataModel";
@@ -7,6 +5,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useConvex } from "convex/react";
 import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { useAdminAuth } from "@/hooks/useAdminAuth";
 
 export const Route = createFileRoute("/feedback")({
 	component: FeedbackPage,
@@ -17,9 +17,10 @@ function FeedbackPage() {
 	const convex = useConvex();
 	const queryClient = useQueryClient();
 
-	const [typeFilter, setTypeFilter] = useState<"all" | "feedback" | "support">(
-		"all",
+	const [typeFilter, setTypeFilter] = useState<"feedback" | "support">(
+		"feedback",
 	);
+	const [statusFilter, setStatusFilter] = useState<"open" | "archived">("open");
 
 	const { data, isLoading, error } = useQuery(
 		convexQuery(api.admin.getAllFeedback, token ? { token } : "skip"),
@@ -50,39 +51,28 @@ function FeedbackPage() {
 	}
 
 	const allFeedback = data?.feedback ?? [];
+	const filteredByType = allFeedback.filter((f) => f.type === typeFilter);
 	const feedback =
-		typeFilter === "all"
-			? allFeedback
-			: allFeedback.filter((f) => f.type === typeFilter);
+		statusFilter === "open"
+			? filteredByType.filter((f) => f.status !== "archived")
+			: filteredByType.filter((f) => f.status === "archived");
 
 	const newCount = feedback.filter((f) => f.status === "new").length;
-	const supportCount = allFeedback.filter((f) => f.type === "support").length;
 
 	return (
 		<div>
-			<div className="mb-6 flex items-center justify-between">
-				<h1 className="text-xl font-semibold">
-					Feedback ({feedback.length})
-					{newCount > 0 && (
+			<div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+				<h1 className="font-semibold text-xl">
+					{typeFilter === "feedback" ? "Feedback" : "Support"} (
+					{feedback.length})
+					{statusFilter === "open" && newCount > 0 && (
 						<span className="ml-2 rounded bg-blue-500 px-2 py-1 text-sm text-white">
 							{newCount} new
 						</span>
 					)}
-					{supportCount > 0 && typeFilter !== "feedback" && (
-						<span className="ml-2 rounded bg-amber-500 px-2 py-1 text-sm text-white">
-							{supportCount} support
-						</span>
-					)}
 				</h1>
-				<div className="flex items-center gap-4">
-					<div className="flex gap-2">
-						<Button
-							variant={typeFilter === "all" ? "default" : "outline"}
-							size="sm"
-							onClick={() => setTypeFilter("all")}
-						>
-							All
-						</Button>
+				<div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+					<div className="flex items-center gap-2">
 						<Button
 							variant={typeFilter === "feedback" ? "default" : "outline"}
 							size="sm"
@@ -98,14 +88,24 @@ function FeedbackPage() {
 							Support
 						</Button>
 					</div>
+					<select
+						value={statusFilter}
+						onChange={(e) =>
+							setStatusFilter(e.target.value as "open" | "archived")
+						}
+						className="rounded border px-3 py-1.5 text-sm"
+					>
+						<option value="open">Open</option>
+						<option value="archived">Archived</option>
+					</select>
 				</div>
 			</div>
 
 			{feedback.length === 0 ? (
-				<div className="text-muted-foreground py-12 text-center">
-					{typeFilter === "all"
+				<div className="py-12 text-center text-muted-foreground">
+					{typeFilter === "feedback"
 						? "No feedback yet"
-						: `No ${typeFilter} messages yet`}
+						: "No support messages yet"}
 				</div>
 			) : (
 				<div className="space-y-4">
@@ -143,7 +143,7 @@ function FeedbackPage() {
 											</span>
 										)}
 										{item.type === "support" && (
-											<span className="rounded bg-amber-500 px-2 py-1 text-xs text-white">
+											<span className="rounded bg-amber-500 px-2 py-1 text-white text-xs">
 												Support
 											</span>
 										)}
