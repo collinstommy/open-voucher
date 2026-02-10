@@ -1,10 +1,9 @@
 import { v } from "convex/values";
-import { Id } from "./_generated/dataModel";
+import dayjs from "dayjs";
 import { internal } from "./_generated/api";
+import type { Id } from "./_generated/dataModel";
 import { internalMutation, internalQuery } from "./_generated/server";
 import { CLAIM_COSTS } from "./constants";
-
-import dayjs from "dayjs";
 
 export const getVoucherByBarcode = internalQuery({
 	args: { barcodeNumber: v.string() },
@@ -276,15 +275,30 @@ export const reportVoucher = internalMutation({
 			}
 		}
 
-		const last5Uploads = await ctx.db
+		const totalUploads = await ctx.db
+			.query("vouchers")
+			.withIndex("by_uploader_created", (q) =>
+				q.eq("uploaderId", voucher.uploaderId),
+			)
+			.collect();
+
+		const totalUploadCount = totalUploads.length;
+
+		// For accounts with 20+ uploads: check 5+ of last 10
+		// For accounts with fewer uploads: check 3+ of last 5
+		const isHighVolumeUploader = totalUploadCount >= 20;
+		const uploadsToCheck = isHighVolumeUploader ? 10 : 5;
+		const reportsThreshold = isHighVolumeUploader ? 5 : 3;
+
+		const recentUploads = await ctx.db
 			.query("vouchers")
 			.withIndex("by_uploader_created", (q) =>
 				q.eq("uploaderId", voucher.uploaderId),
 			)
 			.order("desc")
-			.take(5);
+			.take(uploadsToCheck);
 
-		if (last5Uploads.length >= 5) {
+		if (recentUploads.length >= uploadsToCheck) {
 			const uploaderReports = await ctx.db
 				.query("reports")
 				.withIndex("by_uploader", (q) => q.eq("uploaderId", voucher.uploaderId))
@@ -298,28 +312,28 @@ export const reportVoucher = internalMutation({
 				}
 			}
 
-			// Check if 3+ of last 5 uploads were reported
-			const last5UploadIds = last5Uploads.map((v) => v._id);
-			const last5Reported = validReports.filter((r) =>
-				last5UploadIds.includes(r.voucherId),
+			// Check if threshold of recent uploads were reported
+			const recentUploadIds = recentUploads.map((v) => v._id);
+			const recentReported = validReports.filter((r) =>
+				recentUploadIds.includes(r.voucherId),
 			);
 
-			const threeOutOfFiveReported = last5Reported.length >= 3;
+			const shouldBan = recentReported.length >= reportsThreshold;
 
-			if (threeOutOfFiveReported) {
+			if (shouldBan) {
 				console.log(
 					`🚫 UPLOADER BAN: User ${voucher.uploaderId} banned for bad uploads. ` +
-						`${last5Reported.length} of last 5 uploads reported. ` +
-						`Total uploads: ${last5Uploads.length}, Valid reports (non-banned): ${validReports.length}`,
+						`${recentReported.length} of last ${uploadsToCheck} uploads reported. ` +
+						`Total uploads: ${totalUploadCount}, Valid reports (non-banned): ${validReports.length}`,
 				);
 				console.log(
-					"Last 5 uploads:",
-					last5Uploads.map((v) => ({
+					`Last ${uploadsToCheck} uploads:`,
+					recentUploads.map((v) => ({
 						voucherId: v._id,
 						type: v.type,
 						status: v.status,
 						createdAt: new Date(v.createdAt).toISOString(),
-						wasReported: last5Reported.some((r) => r.voucherId === v._id),
+						wasReported: recentReported.some((r) => r.voucherId === v._id),
 					})),
 				);
 				await ctx.db.patch(voucher.uploaderId, {
@@ -331,7 +345,7 @@ export const reportVoucher = internalMutation({
 				if (uploader) {
 					await ctx.scheduler.runAfter(0, internal.telegram.sendMessageAction, {
 						chatId: uploader.telegramChatId,
-						text: "🚫 <b>Account Banned</b>\n\nYour account has been banned because 3 or more of your last 5 uploads were reported as not working.",
+						text: `🚫 <b>Account Banned</b>\n\nYour account has been banned because ${reportsThreshold} or more of your last ${uploadsToCheck} uploads were reported as not working.`,
 					});
 				}
 			}

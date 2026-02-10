@@ -428,6 +428,66 @@ describe("Ban Flow Tests", () => {
 		vi.useRealTimers();
 	});
 
+	test("high volume uploader (20+ uploads) banned when 5+ of last 10 uploads are reported", async () => {
+		vi.useFakeTimers();
+		const t = convexTest(schema, modules);
+		const now = Date.now();
+
+		const uploaderId = await createUser(t, {
+			telegramChatId: "highvolume_uploader",
+			coins: 0,
+		});
+		const reporterId = await createUser(t, {
+			telegramChatId: "reporter_highvol",
+			coins: 100,
+		});
+
+		const voucherIds: Id<"vouchers">[] = [];
+		for (let i = 0; i < 22; i++) {
+			const voucherId = await createVoucher(t, {
+				type: "5",
+				uploaderId,
+				status: "claimed",
+				claimerId: reporterId,
+				expiryDate: now + 7 * 24 * 60 * 60 * 1000,
+				claimedAt: now - (22 - i) * 1000,
+				createdAt: now - (22 - i) * 2000, // Most recent upload last
+			});
+			voucherIds.push(voucherId);
+		}
+
+		// Report vouchers within the most recent 10 (vouchers 12-21 are the last 10)
+		// Report first 4 of the last 10 - should NOT trigger ban yet (need 5 of last 10)
+		for (let i = 12; i < 16; i++) {
+			vi.advanceTimersByTime(24 * 60 * 60 * 1000); // 1 day between reports
+			await t.mutation(internal.vouchers.reportVoucher, {
+				userId: reporterId,
+				voucherId: voucherIds[i],
+			});
+		}
+
+		let uploader = await t.run(async (ctx) => {
+			return await ctx.db.get(uploaderId);
+		});
+		expect(uploader?.isBanned).toBe(false);
+
+		// Report 5th voucher of the last 10 - this should trigger ban (5 of last 10)
+		vi.advanceTimersByTime(24 * 60 * 60 * 1000); // 1 day
+		await t.mutation(internal.vouchers.reportVoucher, {
+			userId: reporterId,
+			voucherId: voucherIds[16],
+		});
+
+		await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+		uploader = await t.run(async (ctx) => {
+			return await ctx.db.get(uploaderId);
+		});
+		expect(uploader?.isBanned).toBe(true);
+		expect(uploader?.bannedAt).toBeDefined();
+		vi.useRealTimers();
+	});
+
 	test("uploader NOT banned when reports come from banned users", async () => {
 		vi.useFakeTimers();
 		const t = convexTest(schema, modules);
