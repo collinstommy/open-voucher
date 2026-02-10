@@ -9,9 +9,9 @@ import type { Id } from "./_generated/dataModel";
 import type { ActionCtx, QueryCtx } from "./_generated/server";
 import {
 	action,
+	internalAction,
 	internalMutation,
 	internalQuery,
-	internalAction,
 	mutation,
 	query,
 } from "./_generated/server";
@@ -943,5 +943,65 @@ export const runHealthCheckInternal = internalAction({
 	args: {},
 	handler: async (ctx) => {
 		return performHealthCheck(ctx);
+	},
+});
+
+export const getUserGrowth = adminQuery({
+	args: {
+		range: v.union(v.literal("all"), v.literal("30days")),
+	},
+	handler: async (ctx, { range }) => {
+		const now = Date.now();
+		const thirtyDaysAgo = now - 30 * 24 * 60 * 60 * 1000;
+
+		// Fetch all users
+		const users = await ctx.db.query("users").collect();
+
+		// Filter users based on range
+		const filteredUsers =
+			range === "30days"
+				? users.filter((u) => u.createdAt >= thirtyDaysAgo)
+				: users;
+
+		if (filteredUsers.length === 0) {
+			return { data: [] };
+		}
+
+		// Group users by creation date (YYYY-MM-DD)
+		const dateMap = new Map<string, number>();
+
+		for (const user of filteredUsers) {
+			const date = new Date(user.createdAt);
+			const dateKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+			dateMap.set(dateKey, (dateMap.get(dateKey) || 0) + 1);
+		}
+
+		// Sort dates and calculate cumulative counts
+		const sortedDates = Array.from(dateMap.entries()).sort(
+			(a, b) => new Date(a[0]).getTime() - new Date(b[0]).getTime(),
+		);
+
+		// For 30days range, we need to fill in missing dates and start from day 0
+		const data: { date: string; cumulative: number }[] = [];
+		let cumulative = 0;
+
+		if (range === "30days") {
+			// Generate all dates in the last 30 days
+			for (let i = 29; i >= 0; i--) {
+				const d = new Date(now - i * 24 * 60 * 60 * 1000);
+				const dateKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+				const count = dateMap.get(dateKey) || 0;
+				cumulative += count;
+				data.push({ date: dateKey, cumulative });
+			}
+		} else {
+			// All time - just show dates where users were created
+			for (const [date, count] of sortedDates) {
+				cumulative += count;
+				data.push({ date, cumulative });
+			}
+		}
+
+		return { data };
 	},
 });
