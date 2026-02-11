@@ -518,24 +518,34 @@ export const getUserDetails = adminQuery({
 	},
 });
 
+async function getBannedUsersData(ctx: QueryCtx) {
+	const bannedUsers = await ctx.db
+		.query("users")
+		.filter((q) => q.eq(q.field("isBanned"), true))
+		.collect();
+
+	return bannedUsers.sort((a, b) => (b.bannedAt || 0) - (a.bannedAt || 0));
+}
+
+export const getBannedUsersInternal = internalQuery({
+	args: {},
+	handler: async (ctx) => {
+		return getBannedUsersData(ctx);
+	},
+});
+
 export const getBannedUsers = adminQuery({
 	args: {},
 	handler: async (ctx) => {
-		const bannedUsers = await ctx.db
-			.query("users")
-			.filter((q) => q.eq(q.field("isBanned"), true))
-			.collect();
+		const bannedUsers = await getBannedUsersData(ctx as unknown as QueryCtx);
 
-		// Sort by most recently banned
-		return bannedUsers
-			.sort((a, b) => (b.bannedAt || 0) - (a.bannedAt || 0))
-			.map((user) => ({
-				_id: user._id,
-				telegramChatId: user.telegramChatId,
-				username: user.username,
-				firstName: user.firstName,
-				bannedAt: user.bannedAt,
-			}));
+		return bannedUsers.map((user) => ({
+			_id: user._id,
+			telegramChatId: user.telegramChatId,
+			username: user.username,
+			firstName: user.firstName,
+			bannedAt: user.bannedAt,
+		}));
 	},
 });
 

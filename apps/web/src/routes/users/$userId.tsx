@@ -192,16 +192,17 @@ function UserDetailPage() {
 									<tr key={tx._id} className="border-b last:border-0">
 										<td className="p-3">
 											<span
-												className={`rounded-full px-2 py-1 font-medium text-xs ${tx.type === "signup_bonus"
-													? "bg-green-100 text-green-800"
-													: tx.type === "upload_reward"
-														? "bg-blue-100 text-blue-800"
-														: tx.type === "claim_spend"
-															? "bg-red-100 text-red-800"
-															: tx.type === "report_refund"
-																? "bg-purple-100 text-purple-800"
-																: "bg-amber-100 text-amber-800"
-													}`}
+												className={`rounded-full px-2 py-1 font-medium text-xs ${
+													tx.type === "signup_bonus"
+														? "bg-green-100 text-green-800"
+														: tx.type === "upload_reward"
+															? "bg-blue-100 text-blue-800"
+															: tx.type === "claim_spend"
+																? "bg-red-100 text-red-800"
+																: tx.type === "report_refund"
+																	? "bg-purple-100 text-purple-800"
+																	: "bg-amber-100 text-amber-800"
+												}`}
 											>
 												{tx.type.replace(/_/g, " ")}
 											</span>
@@ -263,16 +264,17 @@ function UserDetailPage() {
 									<div className="mb-1 text-muted-foreground text-sm">
 										Status:{" "}
 										<span
-											className={`inline-flex rounded-full px-2 py-1 font-medium text-xs ${voucher.status === "available"
-												? "bg-green-100 text-green-800"
-												: voucher.status === "claimed"
-													? "bg-blue-100 text-blue-800"
-													: voucher.status === "reported"
-														? "bg-red-100 text-red-800"
-														: voucher.status === "expired"
-															? "bg-gray-100 text-gray-800"
-															: "bg-yellow-100 text-yellow-800"
-												}`}
+											className={`inline-flex rounded-full px-2 py-1 font-medium text-xs ${
+												voucher.status === "available"
+													? "bg-green-100 text-green-800"
+													: voucher.status === "claimed"
+														? "bg-blue-100 text-blue-800"
+														: voucher.status === "reported"
+															? "bg-red-100 text-red-800"
+															: voucher.status === "expired"
+																? "bg-gray-100 text-gray-800"
+																: "bg-yellow-100 text-yellow-800"
+											}`}
 										>
 											{voucher.status}
 										</span>
@@ -326,12 +328,13 @@ function UserDetailPage() {
 									<div className="mb-1 text-muted-foreground text-sm">
 										Status:{" "}
 										<span
-											className={`inline-flex rounded-full px-2 py-1 font-medium text-xs ${voucher.status === "claimed"
-												? "bg-green-100 text-green-800"
-												: voucher.status === "reported"
-													? "bg-red-100 text-red-800"
-													: "bg-gray-100 text-gray-800"
-												}`}
+											className={`inline-flex rounded-full px-2 py-1 font-medium text-xs ${
+												voucher.status === "claimed"
+													? "bg-green-100 text-green-800"
+													: voucher.status === "reported"
+														? "bg-red-100 text-red-800"
+														: "bg-gray-100 text-gray-800"
+											}`}
 										>
 											{voucher.status}
 										</span>
@@ -546,13 +549,15 @@ function UserDetailPage() {
 						{feedbackAndSupport.map((item: any) => (
 							<div
 								key={item._id}
-								className={`rounded-lg border p-4 ${item.status === "new"
-									? "border-blue-500 bg-blue-50 dark:bg-blue-950"
-									: ""
-									} ${item.type === "support"
+								className={`rounded-lg border p-4 ${
+									item.status === "new"
+										? "border-blue-500 bg-blue-50 dark:bg-blue-950"
+										: ""
+								} ${
+									item.type === "support"
 										? "border-amber-200 bg-amber-50 dark:bg-amber-950/30"
 										: ""
-									}`}
+								}`}
 							>
 								<div className="mb-3 flex items-start justify-between">
 									<div>
@@ -571,12 +576,13 @@ function UserDetailPage() {
 										</div>
 									</div>
 									<span
-										className={`rounded-full px-2 py-1 font-medium text-xs ${item.status === "new"
-											? "bg-blue-100 text-blue-800"
-											: item.status === "read"
-												? "bg-green-100 text-green-800"
-												: "bg-gray-100 text-gray-800"
-											}`}
+										className={`rounded-full px-2 py-1 font-medium text-xs ${
+											item.status === "new"
+												? "bg-blue-100 text-blue-800"
+												: item.status === "read"
+													? "bg-green-100 text-green-800"
+													: "bg-gray-100 text-gray-800"
+										}`}
 									>
 										{item.status}
 									</span>
