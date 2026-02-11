@@ -550,6 +550,89 @@ describe("Ban Flow Tests", () => {
 		expect(uploader?.isBanned).toBe(false);
 		vi.useRealTimers();
 	});
+
+	test("uploader admission removes report and prevents ban", async () => {
+		vi.useFakeTimers();
+		const t = convexTest(schema, modules);
+		const now = Date.now();
+
+		const uploaderId = await createUser(t, {
+			telegramChatId: "admit_uploader",
+			coins: 100,
+		});
+		const reporterId = await createUser(t, {
+			telegramChatId: "reporter_admit",
+			coins: 100,
+		});
+
+		const voucherIds: Id<"vouchers">[] = [];
+		for (let i = 0; i < 5; i++) {
+			const voucherId = await createVoucher(t, {
+				type: "10",
+				uploaderId,
+				status: "claimed",
+				claimerId: reporterId,
+				expiryDate: now + 7 * 24 * 60 * 60 * 1000,
+				claimedAt: now - (5 - i) * 1000,
+				createdAt: now - (5 - i) * 2000,
+			});
+			voucherIds.push(voucherId);
+		}
+
+		// Report 2 vouchers first
+		await t.mutation(internal.vouchers.reportVoucher, {
+			userId: reporterId,
+			voucherId: voucherIds[0],
+		});
+		await t.mutation(internal.vouchers.reportVoucher, {
+			userId: reporterId,
+			voucherId: voucherIds[1],
+		});
+
+		let report = await t.run(async (ctx) => {
+			return await ctx.db
+				.query("reports")
+				.withIndex("by_voucher", (q) => q.eq("voucherId", voucherIds[0]))
+				.first();
+		});
+		expect(report).toBeDefined();
+
+		await t.mutation(internal.vouchers.confirmUploaderUsedVoucher, {
+			uploaderId,
+			voucherId: voucherIds[0],
+			amount: 5,
+		});
+
+		// Verify report is deleted after admission
+		report = await t.run(async (ctx) => {
+			return await ctx.db
+				.query("reports")
+				.withIndex("by_voucher", (q) => q.eq("voucherId", voucherIds[0]))
+				.first();
+		});
+		expect(report).toBeNull();
+
+		// Report 2 more vouchers (would be 4th report if first wasn't deleted)
+		vi.advanceTimersByTime(24 * 60 * 60 * 1000);
+		await t.mutation(internal.vouchers.reportVoucher, {
+			userId: reporterId,
+			voucherId: voucherIds[2],
+		});
+
+		vi.advanceTimersByTime(24 * 60 * 60 * 1000);
+		await t.mutation(internal.vouchers.reportVoucher, {
+			userId: reporterId,
+			voucherId: voucherIds[3],
+		});
+
+		// Verify uploader is NOT banned (only 3 reports instead of 4)
+		const uploader = await t.run(async (ctx) => {
+			return await ctx.db.get(uploaderId);
+		});
+		expect(uploader?.isBanned).toBe(false);
+
+		vi.useRealTimers();
+	});
 });
 
 describe("Report Confirmation Flow", () => {

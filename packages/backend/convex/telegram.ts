@@ -438,7 +438,7 @@ export const sendUploaderReportMessage = internalAction({
 				inline_keyboard: [
 					[
 						{
-							text: "I may have used this voucher already",
+							text: "I've used this voucher",
 							callback_data: `uploader_admitted:${voucherId}`,
 						},
 						{ text: "They're lying", callback_data: `uploader_denied:${voucherId}` },
@@ -795,7 +795,7 @@ export const handleTelegramCallback = internalAction({
 
 			await sendTelegramMessage(
 				chatId,
-				"Thanks for letting us know. We've removed these coins from your balance",
+				"Thanks for letting us know. We've updated your coin balance",
 			);
 		} else if (data.startsWith("uploader_denied:")) {
 			const voucherId = data.split(":")[1];

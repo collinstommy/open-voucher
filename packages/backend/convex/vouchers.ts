@@ -3,7 +3,7 @@ import dayjs from "dayjs";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { internalMutation, internalQuery } from "./_generated/server";
-import { CLAIM_COSTS, UPLOAD_REWARDS, MIN_COINS } from "./constants";
+import { CLAIM_COSTS, MIN_COINS, UPLOAD_REWARDS } from "./constants";
 
 export const getVoucherByBarcode = internalQuery({
 	args: { barcodeNumber: v.string() },
@@ -31,7 +31,6 @@ export const uploadVoucher = internalMutation({
 
 		const now = Date.now();
 		const oneDayAgo = now - 24 * 60 * 60 * 1000;
-		report - confirm
 		const MAX_DAILY_UPLOADS = 10;
 		const recentUploads = await ctx.db
 			.query("vouchers")
@@ -55,7 +54,7 @@ export const uploadVoucher = internalMutation({
 
 		return null;
 	},
-}); report - confirm
+});
 
 export const requestVoucher = internalMutation({
 	args: {
@@ -78,7 +77,6 @@ export const requestVoucher = internalMutation({
 
 		const now = Date.now();
 		const oneDayAgo = now - 24 * 60 * 60 * 1000;
-		report - confirm
 		const MAX_DAILY_CLAIMS = 5;
 		const recentClaims = await ctx.db
 			.query("vouchers")
@@ -102,7 +100,7 @@ export const requestVoucher = internalMutation({
 				q.eq("status", "available").eq("type", type),
 			)
 			.filter((q) =>
-				q.and(report - confirm
+				q.and(
 					q.gt(q.field("expiryDate"), now),
 					q.or(
 						q.eq(q.field("validFrom"), undefined),
@@ -126,7 +124,7 @@ export const requestVoucher = internalMutation({
 		if (!imageUrl) {
 			return {
 				success: false,
-				error: report - confirm
+				error:
 					"Failed to retrieve voucher image. No coins used. Please try again.",
 			};
 		}
@@ -149,7 +147,7 @@ export const requestVoucher = internalMutation({
 			voucherId: voucher._id,
 			createdAt: now,
 		});
-		report - confirm
+
 		return {
 			success: true,
 			voucherId: voucher._id,
@@ -274,11 +272,15 @@ export const reportVoucher = internalMutation({
 				});
 
 				// Send message to uploader asking if they used the voucher
-				await ctx.scheduler.runAfter(0, internal.telegram.sendUploaderReportMessage, {
-					uploaderChatId: uploader.telegramChatId,
-					voucherId: voucher._id,
-					voucherType: voucher.type as "5" | "10" | "20",
-				});
+				await ctx.scheduler.runAfter(
+					0,
+					internal.telegram.sendUploaderReportMessage,
+					{
+						uploaderChatId: uploader.telegramChatId,
+						voucherId: voucher._id,
+						voucherType: voucher.type as "5" | "10" | "20",
+					},
+				);
 			}
 		}
 
@@ -481,6 +483,16 @@ export const confirmUploaderUsedVoucher = internalMutation({
 		await ctx.db.patch(uploaderId, { coins: newCoins });
 
 		await ctx.db.patch(voucherId, { status: "uploader_admitted_used" });
+
+		// Remove the report since uploader admitted (honesty should not penalize ban status)
+		const report = await ctx.db
+			.query("reports")
+			.withIndex("by_voucher", (q) => q.eq("voucherId", voucherId))
+			.first();
+
+		if (report) {
+			await ctx.db.delete(report._id);
+		}
 
 		await ctx.db.insert("transactions", {
 			userId: uploaderId,
