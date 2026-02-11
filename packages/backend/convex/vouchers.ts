@@ -3,7 +3,7 @@ import dayjs from "dayjs";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { internalMutation, internalQuery } from "./_generated/server";
-import { CLAIM_COSTS } from "./constants";
+import { CLAIM_COSTS, MIN_COINS, UPLOAD_REWARDS } from "./constants";
 
 export const getVoucherByBarcode = internalQuery({
 	args: { barcodeNumber: v.string() },
@@ -31,7 +31,6 @@ export const uploadVoucher = internalMutation({
 
 		const now = Date.now();
 		const oneDayAgo = now - 24 * 60 * 60 * 1000;
-
 		const MAX_DAILY_UPLOADS = 10;
 		const recentUploads = await ctx.db
 			.query("vouchers")
@@ -78,7 +77,6 @@ export const requestVoucher = internalMutation({
 
 		const now = Date.now();
 		const oneDayAgo = now - 24 * 60 * 60 * 1000;
-
 		const MAX_DAILY_CLAIMS = 5;
 		const recentClaims = await ctx.db
 			.query("vouchers")
@@ -227,8 +225,8 @@ export const reportVoucher = internalMutation({
 			if (last5Reported.length >= 3) {
 				console.log(
 					`🚫 REPORTER BAN: User ${user._id} (${user.telegramChatId}) banned for excessive reporting. ` +
-						`Reported ${last5Reported.length} of last 5 claims. ` +
-						`Total claims: ${last5Claims.length}, Total reports: ${reporterReports.length}`,
+					`Reported ${last5Reported.length} of last 5 claims. ` +
+					`Total claims: ${last5Claims.length}, Total reports: ${reporterReports.length}`,
 				);
 				console.log(
 					"Last 5 claims:",
@@ -268,10 +266,21 @@ export const reportVoucher = internalMutation({
 			});
 
 			const uploader = await ctx.db.get(voucher.uploaderId);
-			if (uploader) {
+			if (uploader && voucher.type !== "0") {
 				await ctx.db.patch(voucher.uploaderId, {
 					uploadReportCount: (uploader.uploadReportCount || 0) + 1,
 				});
+
+				// Send message to uploader asking if they used the voucher
+				await ctx.scheduler.runAfter(
+					0,
+					internal.telegram.sendUploaderReportMessage,
+					{
+						uploaderChatId: uploader.telegramChatId,
+						voucherId: voucher._id,
+						voucherType: voucher.type as "5" | "10" | "20",
+					},
+				);
 			}
 		}
 
@@ -323,8 +332,8 @@ export const reportVoucher = internalMutation({
 			if (shouldBan) {
 				console.log(
 					`🚫 UPLOADER BAN: User ${voucher.uploaderId} banned for bad uploads. ` +
-						`${recentReported.length} of last ${uploadsToCheck} uploads reported. ` +
-						`Total uploads: ${totalUploadCount}, Valid reports (non-banned): ${validReports.length}`,
+					`${recentReported.length} of last ${uploadsToCheck} uploads reported. ` +
+					`Total uploads: ${totalUploadCount}, Valid reports (non-banned): ${validReports.length}`,
 				);
 				console.log(
 					`Last ${uploadsToCheck} uploads:`,
@@ -450,5 +459,47 @@ export const getAvailableVoucherCount = internalQuery({
 			counts[v.type] = (counts[v.type] || 0) + 1;
 		}
 		return counts;
+	},
+});
+
+export const getVoucherForUploaderConfirm = internalQuery({
+	args: { voucherId: v.id("vouchers") },
+	handler: async (ctx, { voucherId }) => {
+		return await ctx.db.get(voucherId);
+	},
+});
+
+export const confirmUploaderUsedVoucher = internalMutation({
+	args: {
+		uploaderId: v.id("users"),
+		voucherId: v.id("vouchers"),
+		amount: v.number(),
+	},
+	handler: async (ctx, { uploaderId, voucherId, amount }) => {
+		const uploader = await ctx.db.get(uploaderId);
+		if (!uploader) return;
+
+		const newCoins = Math.max(MIN_COINS, uploader.coins - amount);
+		await ctx.db.patch(uploaderId, { coins: newCoins });
+
+		await ctx.db.patch(voucherId, { status: "uploader_admitted_used" });
+
+		// Remove the report since uploader admitted (honesty should not penalize ban status)
+		const report = await ctx.db
+			.query("reports")
+			.withIndex("by_voucher", (q) => q.eq("voucherId", voucherId))
+			.first();
+
+		if (report) {
+			await ctx.db.delete(report._id);
+		}
+
+		await ctx.db.insert("transactions", {
+			userId: uploaderId,
+			type: "uploader_refund",
+			amount: -amount,
+			voucherId,
+			createdAt: Date.now(),
+		});
 	},
 });
