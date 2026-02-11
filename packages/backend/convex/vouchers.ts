@@ -177,11 +177,18 @@ export const reportVoucher = internalMutation({
 		const now = Date.now();
 		const startOfDay = dayjs(now).startOf("day").valueOf();
 
-		if (user.lastReportAt && user.lastReportAt >= startOfDay) {
+		// Check reports from today
+		const todayReports = await ctx.db
+			.query("reports")
+			.withIndex("by_reporterId", (q) => q.eq("reporterId", user._id))
+			.filter((q) => q.gte(q.field("createdAt"), startOfDay))
+			.collect();
+
+		if (todayReports.length >= 2) {
 			return {
 				status: "rate_limited",
 				message:
-					"You can only report 1 voucher per day. Please try again tomorrow.",
+					"You can only report 2 vouchers per day. Please try again tomorrow.",
 			};
 		}
 
@@ -225,8 +232,8 @@ export const reportVoucher = internalMutation({
 			if (last5Reported.length >= 3) {
 				console.log(
 					`🚫 REPORTER BAN: User ${user._id} (${user.telegramChatId}) banned for excessive reporting. ` +
-					`Reported ${last5Reported.length} of last 5 claims. ` +
-					`Total claims: ${last5Claims.length}, Total reports: ${reporterReports.length}`,
+						`Reported ${last5Reported.length} of last 5 claims. ` +
+						`Total claims: ${last5Claims.length}, Total reports: ${reporterReports.length}`,
 				);
 				console.log(
 					"Last 5 claims:",
@@ -332,8 +339,8 @@ export const reportVoucher = internalMutation({
 			if (shouldBan) {
 				console.log(
 					`🚫 UPLOADER BAN: User ${voucher.uploaderId} banned for bad uploads. ` +
-					`${recentReported.length} of last ${uploadsToCheck} uploads reported. ` +
-					`Total uploads: ${totalUploadCount}, Valid reports (non-banned): ${validReports.length}`,
+						`${recentReported.length} of last ${uploadsToCheck} uploads reported. ` +
+						`Total uploads: ${totalUploadCount}, Valid reports (non-banned): ${validReports.length}`,
 				);
 				console.log(
 					`Last ${uploadsToCheck} uploads:`,

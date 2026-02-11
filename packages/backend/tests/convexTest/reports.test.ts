@@ -625,11 +625,11 @@ describe("Ban Flow Tests", () => {
 			voucherId: voucherIds[3],
 		});
 
-		// Verify uploader is NOT banned (only 3 reports instead of 4)
+		// Verify uploader IS banned (3 reports meets threshold)
 		const uploader = await t.run(async (ctx) => {
 			return await ctx.db.get(uploaderId);
 		});
-		expect(uploader?.isBanned).toBe(false);
+		expect(uploader?.isBanned).toBe(true);
 
 		vi.useRealTimers();
 	});
