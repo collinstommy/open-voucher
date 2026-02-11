@@ -441,7 +441,12 @@ export const sendUploaderReportMessage = internalAction({
 							text: "I've used this voucher",
 							callback_data: `uploader_admitted:${voucherId}`,
 						},
-						{ text: "They're lying", callback_data: `uploader_denied:${voucherId}` },
+					],
+					[
+						{
+							text: "They're lying",
+							callback_data: `uploader_denied:${voucherId}`,
+						},
 					],
 				],
 			},
@@ -776,9 +781,12 @@ export const handleTelegramCallback = internalAction({
 				callbackQuery.message.text,
 			);
 
-			const voucher = await ctx.runQuery(internal.vouchers.getVoucherForUploaderConfirm, {
-				voucherId: voucherId as Id<"vouchers">,
-			});
+			const voucher = await ctx.runQuery(
+				internal.vouchers.getVoucherForUploaderConfirm,
+				{
+					voucherId: voucherId as Id<"vouchers">,
+				},
+			);
 
 			if (!voucher) {
 				await sendTelegramMessage(chatId, "Voucher not found.");
@@ -807,7 +815,10 @@ export const handleTelegramCallback = internalAction({
 				callbackQuery.message.text,
 			);
 
-			await sendTelegramMessage(chatId, "Thanks for the info. We've recorded this in the system");
+			await sendTelegramMessage(
+				chatId,
+				"Thanks for the info. We've recorded this in the system",
+			);
 		}
 	},
 });
