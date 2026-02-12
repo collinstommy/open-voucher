@@ -9,6 +9,7 @@ import type { Id } from "./_generated/dataModel";
 import type { ActionCtx, QueryCtx } from "./_generated/server";
 import {
 	action,
+	internalAction,
 	internalMutation,
 	internalQuery,
 	mutation,
@@ -317,12 +318,12 @@ export const getAllFeedback = adminQuery({
 					createdAt: f.createdAt,
 					user: user
 						? {
-								telegramChatId: user.telegramChatId,
-								username: user.username,
-								firstName: user.firstName,
-								isBanned: user.isBanned,
-								id: user._id,
-							}
+							telegramChatId: user.telegramChatId,
+							username: user.username,
+							firstName: user.firstName,
+							isBanned: user.isBanned,
+							id: user._id,
+						}
 						: null,
 				};
 			}),
@@ -418,18 +419,18 @@ export const getUserDetails = adminQuery({
 					createdAt: report.createdAt,
 					voucher: voucher
 						? {
-								type: voucher.type,
-								status: voucher.status,
-								imageUrl,
-								expiryDate: voucher.expiryDate,
-							}
+							type: voucher.type,
+							status: voucher.status,
+							imageUrl,
+							expiryDate: voucher.expiryDate,
+						}
 						: null,
 					uploader: uploader
 						? {
-								username: uploader.username,
-								firstName: uploader.firstName,
-								telegramChatId: uploader.telegramChatId,
-							}
+							username: uploader.username,
+							firstName: uploader.firstName,
+							telegramChatId: uploader.telegramChatId,
+						}
 						: null,
 				};
 			}),
@@ -449,18 +450,18 @@ export const getUserDetails = adminQuery({
 					createdAt: report.createdAt,
 					voucher: voucher
 						? {
-								type: voucher.type,
-								status: voucher.status,
-								imageUrl,
-								expiryDate: voucher.expiryDate,
-							}
+							type: voucher.type,
+							status: voucher.status,
+							imageUrl,
+							expiryDate: voucher.expiryDate,
+						}
 						: null,
 					reporter: reporter
 						? {
-								username: reporter.username,
-								firstName: reporter.firstName,
-								telegramChatId: reporter.telegramChatId,
-							}
+							username: reporter.username,
+							firstName: reporter.firstName,
+							telegramChatId: reporter.telegramChatId,
+						}
 						: null,
 				};
 			}),
@@ -517,24 +518,34 @@ export const getUserDetails = adminQuery({
 	},
 });
 
+async function getBannedUsersData(ctx: QueryCtx) {
+	const bannedUsers = await ctx.db
+		.query("users")
+		.filter((q) => q.eq(q.field("isBanned"), true))
+		.collect();
+
+	return bannedUsers.sort((a, b) => (b.bannedAt || 0) - (a.bannedAt || 0));
+}
+
+export const getBannedUsersInternal = internalQuery({
+	args: {},
+	handler: async (ctx) => {
+		return getBannedUsersData(ctx);
+	},
+});
+
 export const getBannedUsers = adminQuery({
 	args: {},
 	handler: async (ctx) => {
-		const bannedUsers = await ctx.db
-			.query("users")
-			.filter((q) => q.eq(q.field("isBanned"), true))
-			.collect();
+		const bannedUsers = await getBannedUsersData(ctx as unknown as QueryCtx);
 
-		// Sort by most recently banned
-		return bannedUsers
-			.sort((a, b) => (b.bannedAt || 0) - (a.bannedAt || 0))
-			.map((user) => ({
-				_id: user._id,
-				telegramChatId: user.telegramChatId,
-				username: user.username,
-				firstName: user.firstName,
-				bannedAt: user.bannedAt,
-			}));
+		return bannedUsers.map((user) => ({
+			_id: user._id,
+			telegramChatId: user.telegramChatId,
+			username: user.username,
+			firstName: user.firstName,
+			bannedAt: user.bannedAt,
+		}));
 	},
 });
 
@@ -755,6 +766,7 @@ export const clearUserData = internalMutation({
 			claimCount: 0,
 			uploadReportCount: 0,
 			claimReportCount: 0,
+			lastReportAt: undefined,
 		});
 
 		console.log(`Cleared all data for user ${userId} (${user.username})`);
@@ -835,89 +847,173 @@ export const getHealthCheckData = internalQuery({
 	},
 });
 
+type HealthCheckResult = {
+	ocrTest: { success: boolean; message: string };
+	voucherCount: { success: boolean; count: number; message: string };
+	telegramToken: { success: boolean; message: string };
+};
+
+async function performHealthCheck(ctx: ActionCtx): Promise<HealthCheckResult> {
+	const currentYear = new Date().getFullYear();
+	const expectedExpiry = `${currentYear}-01-29`;
+
+	const now = Date.now();
+	const vouchers: { expiryDate: number }[] = await ctx.runQuery(
+		internal.admin.getAvailableVouchersCount,
+	);
+	const voucherCount = vouchers.filter(
+		(v: { expiryDate: number }) => v.expiryDate > now,
+	).length;
+
+	const setting = await ctx.runQuery(internal.settings.getSetting, {
+		key: "test-voucher-image",
+	});
+
+	let ocrTest: { success: boolean; message: string };
+	if (!setting) {
+		ocrTest = {
+			success: false,
+			message: "No test voucher image configured",
+		};
+	} else {
+		const ocrResult = await ctx.runAction(
+			internal.ocr.extract.extractFromImage,
+			{ imageStorageId: setting as Id<"_storage"> },
+		);
+
+		if (ocrResult.expiryDate === expectedExpiry) {
+			ocrTest = {
+				success: true,
+				message: `Expiry date ${ocrResult.expiryDate} matches expected ${expectedExpiry}`,
+			};
+		} else {
+			ocrTest = {
+				success: false,
+				message: `Expected expiry ${expectedExpiry}, got ${ocrResult.expiryDate ?? "null"}`,
+			};
+		}
+	}
+
+	const telegramToken = process.env.TELEGRAM_BOT_TOKEN;
+	let telegramTest: { success: boolean; message: string };
+	if (!telegramToken) {
+		telegramTest = {
+			success: false,
+			message: "TELEGRAM_BOT_TOKEN not configured",
+		};
+	} else {
+		const response = await fetch(
+			`https://api.telegram.org/bot${telegramToken}/getMe`,
+		);
+		if (response.ok) {
+			telegramTest = {
+				success: true,
+				message: "Telegram token is valid",
+			};
+		} else {
+			telegramTest = {
+				success: false,
+				message: `Telegram token invalid: ${response.status} ${response.statusText}`,
+			};
+		}
+	}
+
+	return {
+		ocrTest,
+		voucherCount: {
+			success: voucherCount > 20,
+			count: voucherCount,
+			message:
+				voucherCount > 20
+					? `${voucherCount} available vouchers (threshold: 20)`
+					: `${voucherCount} available vouchers, need > 20`,
+		},
+		telegramToken: telegramTest,
+	};
+}
+
+export const getAvailableVouchersCount = internalQuery({
+	args: {},
+	handler: async (ctx) => {
+		return await ctx.db
+			.query("vouchers")
+			.withIndex("by_status_created", (q) => q.eq("status", "available"))
+			.collect();
+	},
+});
+
 export const runHealthCheck = adminAction({
 	args: { token: v.string() },
 	handler: async (ctx, { token }) => {
-		const currentYear = new Date().getFullYear();
-		const expectedExpiry = `${currentYear}-01-29`;
+		await verifyAdminSession(ctx, token);
+		return performHealthCheck(ctx);
+	},
+});
 
-		type HealthData = { valid: boolean; error?: string; voucherCount?: number };
-		const healthData: HealthData = await ctx.runQuery(
-			internal.admin.getHealthCheckData,
-			{ token },
+export const runHealthCheckInternal = internalAction({
+	args: {},
+	handler: async (ctx) => {
+		return performHealthCheck(ctx);
+	},
+});
+
+export const getUserGrowth = adminQuery({
+	args: {
+		range: v.union(v.literal("all"), v.literal("30days")),
+	},
+	handler: async (ctx, { range }) => {
+		const now = Date.now();
+		const thirtyDaysAgo = now - 30 * 24 * 60 * 60 * 1000;
+
+		// Fetch all users
+		const users = await ctx.db.query("users").collect();
+
+		// Filter users based on range
+		const filteredUsers =
+			range === "30days"
+				? users.filter((u) => u.createdAt >= thirtyDaysAgo)
+				: users;
+
+		if (filteredUsers.length === 0) {
+			return { data: [] };
+		}
+
+		// Group users by creation date (YYYY-MM-DD)
+		const dateMap = new Map<string, number>();
+
+		for (const user of filteredUsers) {
+			const date = new Date(user.createdAt);
+			const dateKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+			dateMap.set(dateKey, (dateMap.get(dateKey) || 0) + 1);
+		}
+
+		// Sort dates and calculate cumulative counts
+		const sortedDates = Array.from(dateMap.entries()).sort(
+			(a, b) => new Date(a[0]).getTime() - new Date(b[0]).getTime(),
 		);
 
-		if (!healthData.valid) {
-			throw new Error(healthData.error ?? "Unknown error");
-		}
+		// For 30days range, we need to fill in missing dates and start from day 0
+		const data: { date: string; cumulative: number }[] = [];
+		let cumulative = 0;
 
-		const setting = await ctx.runQuery(internal.settings.getSetting, {
-			key: "test-voucher-image",
-		});
-
-		let ocrTest: { success: boolean; message: string };
-		if (!setting) {
-			ocrTest = {
-				success: false,
-				message: "No test voucher image configured",
-			};
+		if (range === "30days") {
+			// Generate all dates in the last 30 days
+			for (let i = 29; i >= 0; i--) {
+				const d = new Date(now - i * 24 * 60 * 60 * 1000);
+				const dateKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+				const count = dateMap.get(dateKey) || 0;
+				cumulative += count;
+				data.push({ date: dateKey, cumulative });
+			}
 		} else {
-			const ocrResult = await ctx.runAction(
-				internal.ocr.extract.extractFromImage,
-				{ imageStorageId: setting as Id<"_storage"> },
-			);
-
-			if (ocrResult.expiryDate === expectedExpiry) {
-				ocrTest = {
-					success: true,
-					message: `Expiry date ${ocrResult.expiryDate} matches expected ${expectedExpiry}`,
-				};
-			} else {
-				ocrTest = {
-					success: false,
-					message: `Expected expiry ${expectedExpiry}, got ${ocrResult.expiryDate ?? "null"}`,
-				};
+			// All time - just show dates where users were created
+			for (const [date, count] of sortedDates) {
+				cumulative += count;
+				data.push({ date, cumulative });
 			}
 		}
 
-		const telegramToken = process.env.TELEGRAM_BOT_TOKEN;
-		let telegramTest: { success: boolean; message: string };
-		if (!telegramToken) {
-			telegramTest = {
-				success: false,
-				message: "TELEGRAM_BOT_TOKEN not configured",
-			};
-		} else {
-			const response = await fetch(
-				`https://api.telegram.org/bot${telegramToken}/getMe`,
-			);
-			if (response.ok) {
-				telegramTest = {
-					success: true,
-					message: "Telegram token is valid",
-				};
-			} else {
-				telegramTest = {
-					success: false,
-					message: `Telegram token invalid: ${response.status} ${response.statusText}`,
-				};
-			}
-		}
-
-		const voucherCount = healthData.voucherCount ?? 0;
-
-		return {
-			ocrTest,
-			voucherCount: {
-				success: voucherCount > 20,
-				count: voucherCount,
-				message:
-					voucherCount > 20
-						? `${voucherCount} available vouchers (threshold: 20)`
-						: `${voucherCount} available vouchers, need > 20`,
-			},
-			telegramToken: telegramTest,
-		};
+		return { data };
 	},
 });
 

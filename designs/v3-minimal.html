@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Open Vouchers - Minimal Style</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .fade-in { animation: fadeIn 0.2s ease-out; }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        .no-rounded { border-radius: 0; }
+        .border-thick { border-width: 2px; }
+        /* Only success/error use color */
+        .text-success { color: #16a34a; }
+        .bg-success { background-color: #16a34a; }
+        .text-error { color: #dc2626; }
+        .bg-error { background-color: #dc2626; }
+        .border-success { border-color: #16a34a; }
+        .border-error { border-color: #dc2626; }
+    </style>
+</head>
+<body class="bg-white text-black min-h-screen">
+    <!-- Header -->
+    <header class="border-b-2 border-black sticky top-0 bg-white z-50">
+        <div class="flex items-center justify-between px-4 py-4 max-w-md mx-auto">
+            <button onclick="navigate('landing')" class="font-bold text-lg tracking-widest">
+                OV
+            </button>
+            <div id="nav-coins" class="flex items-center gap-2 border-2 border-black px-3 py-1">
+                <span class="text-sm font-medium" id="coin-display">0</span>
+                <span class="text-xs text-gray-600">COINS</span>
+            </div>
+            <button onclick="navigate('help')" class="text-sm underline">
+                HELP
+            </button>
+        </div>
+    </header>
+
+    <!-- Main -->
+    <main id="app" class="max-w-md mx-auto">
+        <!-- Landing -->
+        <section id="page-landing" class="fade-in">
+            <!-- Hero -->
+            <div class="px-4 py-12 border-b-2 border-black">
+                <h1 class="text-4xl font-bold mb-4 leading-tight">
+                    VOUCHER<br>EXCHANGE
+                </h1>
+                <p class="text-gray-600 mb-8 text-lg">
+                    Upload. Earn. Claim.
+                </p>
+                <button onclick="navigate('dashboard')" class="w-full bg-black text-white py-4 text-lg font-medium hover:bg-gray-800 transition-colors">
+                    ENTER
+                </button>
+                <p class="text-center text-sm text-gray-500 mt-3">
+                    10 coins free for new members
+                </p>
+            </div>
+
+            <!-- Steps -->
+            <div class="border-b-2 border-black">
+                <div class="flex border-b border-gray-300">
+                    <div class="w-16 flex items-center justify-center border-r border-gray-300 py-6">
+                        <span class="text-2xl font-bold">01</span>
+                    </div>
+                    <div class="flex-1 p-4">
+                        <h3 class="font-bold text-lg">UPLOAD</h3>
+                        <p class="text-gray-600 text-sm">Photo of your voucher</p>
+                    </div>
+                </div>
+                <div class="flex border-b border-gray-300">
+                    <div class="w-16 flex items-center justify-center border-r border-gray-300 py-6">
+                        <span class="text-2xl font-bold">02</span>
+                    </div>
+                    <div class="flex-1 p-4">
+                        <h3 class="font-bold text-lg">EARN</h3>
+                        <p class="text-gray-600 text-sm">Get coins instantly</p>
+                    </div>
+                </div>
+                <div class="flex">
+                    <div class="w-16 flex items-center justify-center border-r border-gray-300 py-6">
+                        <span class="text-2xl font-bold">03</span>
+                    </div>
+                    <div class="flex-1 p-4">
+                        <h3 class="font-bold text-lg">CLAIM</h3>
+                        <p class="text-gray-600 text-sm">Get vouchers you need</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Rates -->
+            <div class="px-4 py-8">
+                <h2 class="font-bold text-lg mb-4">EXCHANGE RATES</h2>
+                <div class="border-2 border-black">
+                    <div class="flex border-b border-gray-300">
+                        <div class="flex-1 p-3 border-r border-gray-300">
+                            <span class="font-bold">€5 VOUCHER</span>
+                        </div>
+                        <div class="w-24 p-3 text-right">
+                            <span class="font-bold">15</span>
+                            <span class="text-sm text-gray-600">coins</span>
+                        </div>
+                    </div>
+                    <div class="flex border-b border-gray-300">
+                        <div class="flex-1 p-3 border-r border-gray-300">
+                            <span class="font-bold">€10 VOUCHER</span>
+                        </div>
+                        <div class="w-24 p-3 text-right">
+                            <span class="font-bold">10</span>
+                            <span class="text-sm text-gray-600">coins</span>
+                        </div>
+                    </div>
+                    <div class="flex">
+                        <div class="flex-1 p-3 border-r border-gray-300">
+                            <span class="font-bold">€20 VOUCHER</span>
+                        </div>
+                        <div class="w-24 p-3 text-right">
+                            <span class="font-bold">5</span>
+                            <span class="text-sm text-gray-600">coins</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- FAQ -->
+            <div class="px-4 pb-8">
+                <h2 class="font-bold text-lg mb-4">FAQ</h2>
+                <div class="space-y-2">
+                    <details class="border-2 border-black">
+                        <summary class="p-4 font-bold cursor-pointer">Is this free?</summary>
+                        <div class="px-4 pb-4 text-gray-600 border-t-2 border-black">
+                            Yes. Open source and community run.
+                        </div>
+                    </details>
+                    <details class="border-2 border-black">
+                        <summary class="p-4 font-bold cursor-pointer">Limits?</summary>
+                        <div class="px-4 pb-4 text-gray-600 border-t-2 border-black">
+                            10 uploads/day. 5 claims/day.
+                        </div>
+                    </details>
+                </div>
+            </div>
+        </section>
+
+        <!-- Login -->
+        <section id="page-login" class="hidden px-4 py-12">
+            <button onclick="navigate('landing')" class="text-sm underline mb-8">
+                ← BACK
+            </button>
+            
+            <h1 class="text-3xl font-bold mb-2">SIGN IN</h1>
+            <p class="text-gray-600 mb-8">Use Telegram to authenticate</p>
+
+            <div class="border-2 border-black p-6 mb-6">
+                <p class="text-sm text-gray-600 mb-4">Secure authentication via Telegram</p>
+                
+                <script async src="https://telegram.org/js/telegram-widget.js?22" 
+                    data-telegram-login="DunnesVoucherBot" 
+                    data-size="large" 
+                    data-onauth="onTelegramAuth(user)" 
+                    data-request-access="write">
+                </script>
+            </div>
+
+            <p class="text-sm text-gray-500">
+                Not a member? <button onclick="navigate('landing')" class="underline">Learn more</button>
+            </p>
+        </section>
+
+        <!-- Dashboard -->
+        <section id="page-dashboard" class="hidden">
+            <!-- Balance -->
+            <div class="border-b-2 border-black px-4 py-6">
+                <p class="text-sm text-gray-600 mb-1">BALANCE</p>
+                <div class="flex items-baseline gap-2">
+                    <span class="text-5xl font-bold" id="dashboard-coins">0</span>
+                    <span class="text-xl text-gray-600">COINS</span>
+                </div>
+            </div>
+
+            <!-- Upload -->
+            <div class="border-b-2 border-black px-4 py-6">
+                <h2 class="font-bold text-lg mb-4">UPLOAD VOUCHER</h2>
+                <div class="border-2 border-dashed border-gray-400 p-8 text-center cursor-pointer hover:border-black transition-colors" onclick="simulateUpload()">
+                    <p class="text-gray-600 mb-2">Tap to upload photo</p>
+                    <p class="text-sm text-gray-400">Barcode must be visible</p>
+                </div>
+                <div id="upload-status" class="hidden mt-4 p-4 border-2 border-success bg-gray-50">
+                    <p class="text-success font-medium">✓ UPLOADED - PROCESSING</p>
+                </div>
+            </div>
+
+            <!-- Claim -->
+            <div class="border-b-2 border-black px-4 py-6">
+                <h2 class="font-bold text-lg mb-4">CLAIM VOUCHER</h2>
+                <div class="space-y-2">
+                    <button onclick="claimVoucher('5')" class="w-full flex border-2 border-black hover:bg-gray-100 transition-colors">
+                        <div class="w-20 border-r-2 border-black p-4 flex items-center justify-center">
+                            <span class="text-2xl font-bold">€5</span>
+                        </div>
+                        <div class="flex-1 p-4 flex justify-between items-center">
+                            <span class="font-bold">VOUCHER</span>
+                            <span class="font-bold">15 COINS</span>
+                        </div>
+                    </button>
+                    <button onclick="claimVoucher('10')" class="w-full flex border-2 border-black hover:bg-gray-100 transition-colors">
+                        <div class="w-20 border-r-2 border-black p-4 flex items-center justify-center">
+                            <span class="text-2xl font-bold">€10</span>
+                        </div>
+                        <div class="flex-1 p-4 flex justify-between items-center">
+                            <span class="font-bold">VOUCHER</span>
+                            <span class="font-bold">10 COINS</span>
+                        </div>
+                    </button>
+                    <button onclick="claimVoucher('20')" class="w-full flex border-2 border-black hover:bg-gray-100 transition-colors">
+                        <div class="w-20 border-r-2 border-black p-4 flex items-center justify-center">
+                            <span class="text-2xl font-bold">€20</span>
+                        </div>
+                        <div class="flex-1 p-4 flex justify-between items-center">
+                            <span class="font-bold">VOUCHER</span>
+                            <span class="font-bold">5 COINS</span>
+                        </div>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Activity -->
+            <div class="px-4 py-6">
+                <h2 class="font-bold text-lg mb-4">ACTIVITY</h2>
+                <div id="activity-list" class="space-y-2">
+                    <div class="flex justify-between items-center border-2 border-black p-3">
+                        <div>
+                            <p class="font-medium">SIGNUP BONUS</p>
+                            <p class="text-sm text-gray-500">NOW</p>
+                        </div>
+                        <span class="text-success font-bold">+10</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Voucher -->
+        <section id="page-voucher" class="hidden">
+            <div class="border-b-2 border-black px-4 py-4">
+                <button onclick="navigate('dashboard')" class="text-sm underline">
+                    ← BACK
+                </button>
+            </div>
+
+            <div class="border-b-2 border-black">
+                <div class="bg-gray-100 p-8 flex items-center justify-center">
+                    <div class="text-center">
+                        <span class="text-6xl font-bold text-gray-400">€10</span>
+                        <p class="text-gray-500 mt-2">VOUCHER IMAGE</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="px-4 py-6">
+                <div class="border-2 border-black p-4 mb-4">
+                    <p class="text-sm text-gray-600 mb-1">BARCODE</p>
+                    <p class="font-mono text-xl">123456789012345</p>
+                </div>
+
+                <div class="border-2 border-black mb-6">
+                    <div class="flex border-b border-gray-300">
+                        <div class="w-24 p-3 border-r border-gray-300 font-bold">TYPE</div>
+                        <div class="flex-1 p-3">€10 OFF €50</div>
+                    </div>
+                    <div class="flex border-b border-gray-300">
+                        <div class="w-24 p-3 border-r border-gray-300 font-bold">EXPIRES</div>
+                        <div class="flex-1 p-3">DEC 15, 2026</div>
+                    </div>
+                    <div class="flex">
+                        <div class="w-24 p-3 border-r border-gray-300 font-bold">STATUS</div>
+                        <div class="flex-1 p-3 text-success font-bold">ACTIVE</div>
+                    </div>
+                </div>
+
+                <div class="space-y-2">
+                    <button onclick="showToast('Copied to clipboard')" class="w-full bg-black text-white py-4 font-bold hover:bg-gray-800">
+                        COPY BARCODE
+                    </button>
+                    <button onclick="reportVoucher()" class="w-full border-2 border-error text-error py-3 font-bold hover:bg-red-50">
+                        REPORT ISSUE
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Help -->
+        <section id="page-help" class="hidden px-4 py-6">
+            <h1 class="text-3xl font-bold mb-6">HELP</h1>
+
+            <div class="space-y-4">
+                <div class="border-2 border-black p-4">
+                    <h3 class="font-bold mb-2">CONTACT</h3>
+                    <p class="text-sm text-gray-600 mb-3">Need assistance?</p>
+                    <button class="underline font-medium">OPEN SUPPORT</button>
+                </div>
+
+                <div>
+                    <h3 class="font-bold mb-3">QUESTIONS</h3>
+                    <div class="space-y-2">
+                        <details class="border-2 border-black">
+                            <summary class="p-4 font-bold cursor-pointer">Why smaller vouchers cost more?</summary>
+                            <div class="px-4 pb-4 text-gray-600 border-t-2 border-black">
+                                €5 = 15 coins. €20 = 5 coins. Smaller vouchers are more flexible.
+                            </div>
+                        </details>
+                        <details class="border-2 border-black">
+                            <summary class="p-4 font-bold cursor-pointer">How to upload?</summary>
+                            <div class="px-4 pb-4 text-gray-600 border-t-2 border-black">
+                                Tap upload. Take photo. Barcode must be visible.
+                            </div>
+                        </details>
+                        <details class="border-2 border-black">
+                            <summary class="p-4 font-bold cursor-pointer">What are limits?</summary>
+                            <div class="px-4 pb-4 text-gray-600 border-t-2 border-black">
+                                10 uploads/day. 5 claims/day. 1 report/day.
+                            </div>
+                        </details>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Bottom Nav -->
+    <nav id="bottom-nav" class="fixed bottom-0 left-0 right-0 bg-white border-t-2 border-black">
+        <div class="flex max-w-md mx-auto">
+            <button onclick="navigate('dashboard')" class="flex-1 py-4 text-center font-bold border-r-2 border-black hover:bg-gray-100">
+                HOME
+            </button>
+            <button onclick="navigate('dashboard')" class="flex-1 py-4 text-center font-bold border-r-2 border-black hover:bg-gray-100">
+                UPLOAD
+            </button>
+            <button onclick="navigate('help')" class="flex-1 py-4 text-center font-bold hover:bg-gray-100">
+                HELP
+            </button>
+        </div>
+    </nav>
+
+    <!-- Toast -->
+    <div id="toast" class="hidden fixed bottom-24 left-4 right-4 bg-black text-white p-4 z-50 font-medium">
+        Message
+    </div>
+
+    <script>
+        let currentPage = 'landing';
+        let userCoins = 10;
+
+        function navigate(page) {
+            document.querySelectorAll('section').forEach((s) => { s.classList.add('hidden'); });
+            document.getElementById('page-' + page).classList.remove('hidden');
+            document.getElementById('page-' + page).classList.add('fade-in');
+            
+            // Always update display
+            updateDisplay();
+            
+            currentPage = page;
+            window.scrollTo(0, 0);
+        }
+
+        function onTelegramAuth(user) {
+            showToast('Authenticated');
+            setTimeout(() => { navigate('dashboard'); }, 800);
+        }
+
+        function updateDisplay() {
+            document.getElementById('coin-display').textContent = userCoins;
+            document.getElementById('dashboard-coins').textContent = userCoins;
+        }
+
+        function simulateUpload() {
+            showToast('Processing...');
+            setTimeout(() => {
+                document.getElementById('upload-status').classList.remove('hidden');
+                userCoins += 10;
+                updateDisplay();
+                showToast('Complete: +10 coins');
+            }, 1500);
+        }
+
+        function claimVoucher(type) {
+            var costs = { '5': 15, '10': 10, '20': 5 };
+            if (userCoins < costs[type]) {
+                showToast('Insufficient coins');
+                return;
+            }
+            userCoins -= costs[type];
+            updateDisplay();
+            showToast('Claimed €' + type + ' voucher');
+            setTimeout(() => { navigate('voucher'); }, 800);
+        }
+
+        function reportVoucher() {
+            showToast('Reported. Refund issued.');
+            userCoins += 10;
+            updateDisplay();
+            setTimeout(() => { navigate('dashboard'); }, 1500);
+        }
+
+        function showToast(msg) {
+            var toast = document.getElementById('toast');
+            toast.textContent = msg;
+            toast.classList.remove('hidden');
+            setTimeout(() => { toast.classList.add('hidden'); }, 3000);
+        }
+
+        navigate('landing');
+    </script>
+</body>
+</html>

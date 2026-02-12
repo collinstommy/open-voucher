@@ -1,0 +1,1308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Open Voucher</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        :root {
+            --primary: #10B981;
+            --primary-dark: #059669;
+            --secondary: #3B82F6;
+            --accent: #F59E0B;
+            --danger: #EF4444;
+            --dark: #1F2937;
+            --gray-50: #F9FAFB;
+            --gray-100: #F3F4F6;
+            --gray-200: #E5E7EB;
+            --gray-300: #D1D5DB;
+            --gray-400: #9CA3AF;
+            --gray-500: #6B7280;
+            --gray-600: #4B5563;
+            --gray-700: #374151;
+            --gray-800: #1F2937;
+            --gray-900: #111827;
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: var(--gray-100);
+            color: var(--gray-900);
+            line-height: 1.5;
+            overflow-x: hidden;
+        }
+
+        /* Mobile Container */
+        .mobile-container {
+            max-width: 430px;
+            margin: 0 auto;
+            background: var(--gray-50);
+            min-height: 100vh;
+            position: relative;
+            box-shadow: 0 0 40px rgba(0,0,0,0.1);
+        }
+
+        /* Screen Management */
+        .screen {
+            display: none;
+            min-height: 100vh;
+            padding-bottom: 80px;
+        }
+
+        .screen.active {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Header */
+        .header {
+            background: white;
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--gray-200);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--gray-900);
+        }
+
+        .header-action {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--gray-100);
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .header-action:active {
+            transform: scale(0.95);
+            background: var(--gray-200);
+        }
+
+        /* Balance Card */
+        .balance-card {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            margin: 20px;
+            padding: 24px;
+            border-radius: 20px;
+            color: white;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .balance-label {
+            font-size: 14px;
+            opacity: 0.9;
+            margin-bottom: 8px;
+        }
+
+        .balance-amount {
+            font-size: 48px;
+            font-weight: 800;
+            line-height: 1;
+        }
+
+        .balance-currency {
+            font-size: 20px;
+            font-weight: 600;
+            opacity: 0.9;
+        }
+
+        .balance-stats {
+            display: flex;
+            gap: 24px;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .balance-stat {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .balance-stat-value {
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        .balance-stat-label {
+            font-size: 12px;
+            opacity: 0.8;
+        }
+
+        /* Section */
+        .section {
+            padding: 0 20px;
+            margin-bottom: 24px;
+        }
+
+        .section-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--gray-700);
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* Upload Section */
+        .upload-area {
+            background: white;
+            border: 2px dashed var(--gray-300);
+            border-radius: 16px;
+            padding: 40px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .upload-area:active {
+            border-color: var(--primary);
+            background: var(--gray-50);
+        }
+
+        .upload-icon {
+            width: 64px;
+            height: 64px;
+            background: var(--gray-100);
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 16px;
+            font-size: 28px;
+        }
+
+        .upload-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--gray-800);
+            margin-bottom: 8px;
+        }
+
+        .upload-subtitle {
+            font-size: 14px;
+            color: var(--gray-500);
+        }
+
+        /* Claim Section */
+        .claim-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+        }
+
+        .claim-card {
+            background: white;
+            border-radius: 16px;
+            padding: 20px 12px;
+            text-align: center;
+            border: 2px solid transparent;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .claim-card:active {
+            transform: scale(0.98);
+        }
+
+        .claim-card.available {
+            border-color: var(--primary);
+        }
+
+        .claim-card.unavailable {
+            opacity: 0.5;
+        }
+
+        .claim-amount {
+            font-size: 24px;
+            font-weight: 800;
+            color: var(--gray-900);
+            margin-bottom: 4px;
+        }
+
+        .claim-currency {
+            font-size: 14px;
+            color: var(--gray-500);
+        }
+
+        .claim-cost {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid var(--gray-100);
+            font-size: 13px;
+            color: var(--primary);
+            font-weight: 600;
+        }
+
+        /* Transaction List */
+        .transaction-list {
+            background: white;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .transaction-item {
+            display: flex;
+            align-items: center;
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--gray-100);
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .transaction-item:last-child {
+            border-bottom: none;
+        }
+
+        .transaction-item:active {
+            background: var(--gray-50);
+        }
+
+        .transaction-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            margin-right: 14px;
+            flex-shrink: 0;
+        }
+
+        .transaction-icon.upload {
+            background: #D1FAE5;
+        }
+
+        .transaction-icon.claim {
+            background: #DBEAFE;
+        }
+
+        .transaction-icon.report {
+            background: #FEE2E2;
+        }
+
+        .transaction-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .transaction-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--gray-900);
+            margin-bottom: 2px;
+        }
+
+        .transaction-meta {
+            font-size: 13px;
+            color: var(--gray-500);
+        }
+
+        .transaction-amount {
+            font-size: 15px;
+            font-weight: 700;
+            text-align: right;
+        }
+
+        .transaction-amount.positive {
+            color: var(--primary);
+        }
+
+        .transaction-amount.negative {
+            color: var(--gray-700);
+        }
+
+        /* Bottom Navigation */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100%;
+            max-width: 430px;
+            background: white;
+            border-top: 1px solid var(--gray-200);
+            display: flex;
+            justify-content: space-around;
+            padding: 8px 0 24px;
+            z-index: 100;
+        }
+
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            padding: 8px 16px;
+            border: none;
+            background: none;
+            cursor: pointer;
+            color: var(--gray-400);
+            transition: color 0.2s;
+        }
+
+        .nav-item.active {
+            color: var(--primary);
+        }
+
+        .nav-icon {
+            font-size: 24px;
+        }
+
+        .nav-label {
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        /* Voucher Card */
+        .voucher-card {
+            background: white;
+            border-radius: 20px;
+            overflow: hidden;
+            margin: 20px;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .voucher-image {
+            width: 100%;
+            aspect-ratio: 16/9;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 48px;
+            font-weight: 800;
+            position: relative;
+        }
+
+        .voucher-image::after {
+            content: 'B AR CODE: 1234 5678 9012';
+            position: absolute;
+            bottom: 16px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: 2px;
+            opacity: 0.9;
+        }
+
+        .voucher-info {
+            padding: 20px;
+        }
+
+        .voucher-value {
+            font-size: 28px;
+            font-weight: 800;
+            color: var(--gray-900);
+            margin-bottom: 4px;
+        }
+
+        .voucher-expiry {
+            font-size: 14px;
+            color: var(--gray-500);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .voucher-expiry.warning {
+            color: var(--accent);
+        }
+
+        .voucher-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 20px;
+        }
+
+        /* Buttons */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 14px 24px;
+            border-radius: 12px;
+            font-size: 15px;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s;
+            flex: 1;
+        }
+
+        .btn:active {
+            transform: scale(0.98);
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:active {
+            background: var(--primary-dark);
+        }
+
+        .btn-secondary {
+            background: var(--gray-100);
+            color: var(--gray-700);
+        }
+
+        .btn-secondary:active {
+            background: var(--gray-200);
+        }
+
+        .btn-danger {
+            background: #FEE2E2;
+            color: var(--danger);
+        }
+
+        .btn-danger:active {
+            background: #FECACA;
+        }
+
+        .btn-full {
+            width: 100%;
+            margin: 20px;
+            max-width: calc(100% - 40px);
+        }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            display: none;
+            align-items: flex-end;
+            justify-content: center;
+            z-index: 200;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+            opacity: 1;
+        }
+
+        .modal {
+            background: white;
+            width: 100%;
+            max-width: 430px;
+            border-radius: 24px 24px 0 0;
+            padding: 24px;
+            transform: translateY(100%);
+            transition: transform 0.3s;
+        }
+
+        .modal-overlay.active .modal {
+            transform: translateY(0);
+        }
+
+        .modal-header {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+
+        .modal-icon {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 16px;
+            font-size: 28px;
+        }
+
+        .modal-icon.success {
+            background: #D1FAE5;
+        }
+
+        .modal-icon.error {
+            background: #FEE2E2;
+        }
+
+        .modal-title {
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .modal-text {
+            font-size: 15px;
+            color: var(--gray-600);
+            line-height: 1.6;
+        }
+
+        /* Help Screen */
+        .faq-item {
+            background: white;
+            border-radius: 12px;
+            margin-bottom: 12px;
+            overflow: hidden;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .faq-question {
+            padding: 16px 20px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .faq-answer {
+            padding: 0 20px 16px;
+            font-size: 14px;
+            color: var(--gray-600);
+            line-height: 1.6;
+            display: none;
+        }
+
+        .faq-item.open .faq-answer {
+            display: block;
+        }
+
+        .faq-item.open .faq-arrow {
+            transform: rotate(180deg);
+        }
+
+        /* Toast */
+        .toast {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-100px);
+            background: var(--dark);
+            color: white;
+            padding: 14px 24px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 500;
+            z-index: 300;
+            opacity: 0;
+            transition: all 0.3s;
+            max-width: 90%;
+            text-align: center;
+        }
+
+        .toast.show {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--gray-500);
+        }
+
+        .empty-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        .empty-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--gray-700);
+            margin-bottom: 8px;
+        }
+
+        /* Camera Overlay */
+        .camera-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: black;
+            z-index: 300;
+            display: none;
+            flex-direction: column;
+        }
+
+        .camera-overlay.active {
+            display: flex;
+        }
+
+        .camera-viewfinder {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--dark);
+            position: relative;
+        }
+
+        .camera-frame {
+            width: 280px;
+            height: 180px;
+            border: 2px solid var(--primary);
+            border-radius: 12px;
+            position: relative;
+        }
+
+        .camera-frame::before,
+        .camera-frame::after {
+            content: '';
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            border: 3px solid var(--primary);
+        }
+
+        .camera-frame::before {
+            top: -3px;
+            left: -3px;
+            border-right: none;
+            border-bottom: none;
+        }
+
+        .camera-frame::after {
+            bottom: -3px;
+            right: -3px;
+            border-left: none;
+            border-top: none;
+        }
+
+        .camera-hint {
+            position: absolute;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: white;
+            font-size: 14px;
+            text-align: center;
+            opacity: 0.8;
+        }
+
+        .camera-controls {
+            padding: 24px;
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            align-items: center;
+        }
+
+        .camera-btn {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            border: 4px solid white;
+            background: transparent;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .camera-btn::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 48px;
+            height: 48px;
+            background: white;
+            border-radius: 50%;
+        }
+
+        .camera-btn:active::after {
+            transform: translate(-50%, -50%) scale(0.9);
+        }
+
+        .camera-cancel {
+            color: white;
+            font-size: 16px;
+            font-weight: 600;
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="mobile-container">
+        <!-- Dashboard Screen -->
+        <div class="screen active" id="screen-dashboard">
+            <div class="header">
+                <div class="header-content">
+                    <h1 class="header-title">Dashboard</h1>
+                    <button class="header-action" onclick="showScreen('screen-help')">
+                        <span>?</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="balance-card">
+                <div class="balance-label">Your Balance</div>
+                <div class="balance-amount">
+                    <span id="balance-value">245</span>
+                    <span class="balance-currency">coins</span>
+                </div>
+                <div class="balance-stats">
+                    <div class="balance-stat">
+                        <span class="balance-stat-value" id="uploads-today">2/10</span>
+                        <span class="balance-stat-label">Uploads today</span>
+                    </div>
+                    <div class="balance-stat">
+                        <span class="balance-stat-value" id="claims-today">1/5</span>
+                        <span class="balance-stat-label">Claims today</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="section-title">
+                    <span>+</span>
+                    Upload Voucher
+                </div>
+                <div class="upload-area" onclick="openCamera()">
+                    <div class="upload-icon">📷</div>
+                    <div class="upload-title">Tap to upload</div>
+                    <div class="upload-subtitle">Take a photo of your voucher<br>Get 10 coins per voucher</div>
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="section-title">
+                    <span>🎁</span>
+                    Claim Voucher
+                </div>
+                <div class="claim-grid">
+                    <div class="claim-card available" onclick="claimVoucher(5)">
+                        <div class="claim-amount">€5</div>
+                        <div class="claim-currency">Voucher</div>
+                        <div class="claim-cost">50 coins</div>
+                    </div>
+                    <div class="claim-card available" onclick="claimVoucher(10)">
+                        <div class="claim-amount">€10</div>
+                        <div class="claim-currency">Voucher</div>
+                        <div class="claim-cost">95 coins</div>
+                    </div>
+                    <div class="claim-card unavailable" onclick="showToast('Need 180 coins to claim')">
+                        <div class="claim-amount">€20</div>
+                        <div class="claim-currency">Voucher</div>
+                        <div class="claim-cost">180 coins</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="section-title">
+                    <span>📝</span>
+                    Recent Activity
+                </div>
+                <div class="transaction-list">
+                    <div class="transaction-item" onclick="showVoucherDetail()">
+                        <div class="transaction-icon claim">🎁</div>
+                        <div class="transaction-info">
+                            <div class="transaction-title">Claimed €10 Voucher</div>
+                            <div class="transaction-meta">2 hours ago</div>
+                        </div>
+                        <div class="transaction-amount negative">-95</div>
+                    </div>
+                    <div class="transaction-item">
+                        <div class="transaction-icon upload">📤</div>
+                        <div class="transaction-info">
+                            <div class="transaction-title">Uploaded Voucher</div>
+                            <div class="transaction-meta">5 hours ago • #1234</div>
+                        </div>
+                        <div class="transaction-amount positive">+10</div>
+                    </div>
+                    <div class="transaction-item">
+                        <div class="transaction-icon upload">📤</div>
+                        <div class="transaction-info">
+                            <div class="transaction-title">Uploaded Voucher</div>
+                            <div class="transaction-meta">Yesterday • #1233</div>
+                        </div>
+                        <div class="transaction-amount positive">+10</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- History Screen -->
+        <div class="screen" id="screen-history">
+            <div class="header">
+                <div class="header-content">
+                    <h1 class="header-title">History</h1>
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="transaction-list">
+                    <div class="transaction-item" onclick="showVoucherDetail()">
+                        <div class="transaction-icon claim">🎁</div>
+                        <div class="transaction-info">
+                            <div class="transaction-title">Claimed €10 Voucher</div>
+                            <div class="transaction-meta">Today, 2:30 PM</div>
+                        </div>
+                        <div class="transaction-amount negative">-95</div>
+                    </div>
+                    <div class="transaction-item">
+                        <div class="transaction-icon upload">📤</div>
+                        <div class="transaction-info">
+                            <div class="transaction-title">Uploaded Voucher #1234</div>
+                            <div class="transaction-meta">Today, 11:15 AM</div>
+                        </div>
+                        <div class="transaction-amount positive">+10</div>
+                    </div>
+                    <div class="transaction-item">
+                        <div class="transaction-icon upload">📤</div>
+                        <div class="transaction-info">
+                            <div class="transaction-title">Uploaded Voucher #1233</div>
+                            <div class="transaction-meta">Yesterday, 4:45 PM</div>
+                        </div>
+                        <div class="transaction-amount positive">+10</div>
+                    </div>
+                    <div class="transaction-item">
+                        <div class="transaction-icon claim">🎁</div>
+                        <div class="transaction-info">
+                            <div class="transaction-title">Claimed €5 Voucher</div>
+                            <div class="transaction-meta">Yesterday, 3:20 PM</div>
+                        </div>
+                        <div class="transaction-amount negative">-50</div>
+                    </div>
+                    <div class="transaction-item">
+                        <div class="transaction-icon upload">📤</div>
+                        <div class="transaction-info">
+                            <div class="transaction-title">Uploaded Voucher #1232</div>
+                            <div class="transaction-meta">2 days ago</div>
+                        </div>
+                        <div class="transaction-amount positive">+10</div>
+                    </div>
+                    <div class="transaction-item">
+                        <div class="transaction-icon upload">📤</div>
+                        <div class="transaction-info">
+                            <div class="transaction-title">Uploaded Voucher #1231</div>
+                            <div class="transaction-meta">2 days ago</div>
+                        </div>
+                        <div class="transaction-amount positive">+10</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Vouchers Screen -->
+        <div class="screen" id="screen-vouchers">
+            <div class="header">
+                <div class="header-content">
+                    <h1 class="header-title">My Vouchers</h1>
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="voucher-card" onclick="showVoucherDetail()">
+                    <div class="voucher-image">€10</div>
+                    <div class="voucher-info">
+                        <div class="voucher-value">€10 Voucher</div>
+                        <div class="voucher-expiry warning">
+                            <span>⏰</span>
+                            Expires in 3 days
+                        </div>
+                    </div>
+                </div>
+
+                <div class="voucher-card">
+                    <div class="voucher-image" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">€5</div>
+                    <div class="voucher-info">
+                        <div class="voucher-value">€5 Voucher</div>
+                        <div class="voucher-expiry">
+                            <span>📅</span>
+                            Expires in 12 days
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="empty-state" style="display: none;">
+                <div class="empty-icon">🎫</div>
+                <div class="empty-title">No vouchers yet</div>
+                <div>Upload vouchers to earn coins, then claim vouchers here!</div>
+            </div>
+        </div>
+
+        <!-- Voucher Detail Screen -->
+        <div class="screen" id="screen-voucher-detail">
+            <div class="header">
+                <div class="header-content">
+                    <button class="header-action" onclick="showScreen('screen-vouchers')">
+                        <span>←</span>
+                    </button>
+                    <h1 class="header-title">Voucher</h1>
+                    <div style="width: 40px;"></div>
+                </div>
+            </div>
+
+            <div class="voucher-card">
+                <div class="voucher-image">€10</div>
+                <div class="voucher-info">
+                    <div class="voucher-value">€10 Voucher</div>
+                    <div class="voucher-expiry warning">
+                        <span>⏰</span>
+                        Expires on Feb 10, 2026
+                    </div>
+                    <div style="margin-top: 12px; padding: 12px; background: var(--gray-100); border-radius: 8px; font-family: monospace; font-size: 14px; letter-spacing: 1px;">
+                        1234 5678 9012 3456
+                    </div>
+                </div>
+            </div>
+
+            <div style="padding: 0 20px;">
+                <div class="section-title">Actions</div>
+                <div style="display: flex; gap: 12px; flex-direction: column;">
+                    <button class="btn btn-secondary" onclick="showToast('Barcode copied to clipboard')">
+                        <span>📋</span> Copy Code
+                    </button>
+                    <button class="btn btn-danger" onclick="showReportModal()">
+                        <span>⚠️</span> Report Issue
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Help Screen -->
+        <div class="screen" id="screen-help">
+            <div class="header">
+                <div class="header-content">
+                    <button class="header-action" onclick="showScreen('screen-dashboard')">
+                        <span>←</span>
+                    </button>
+                    <h1 class="header-title">Help & FAQ</h1>
+                    <div style="width: 40px;"></div>
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="faq-item">
+                    <div class="faq-question" onclick="toggleFaq(this)">
+                        How do I earn coins?
+                        <span class="faq-arrow">▼</span>
+                    </div>
+                    <div class="faq-answer">
+                        Upload photos of your unused vouchers! Each valid voucher earns you 10 coins. You can upload up to 10 vouchers per day.
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <div class="faq-question" onclick="toggleFaq(this)">
+                        What vouchers can I claim?
+                        <span class="faq-arrow">▼</span>
+                    </div>
+                    <div class="faq-answer">
+                        Exchange your coins for €5 (50 coins), €10 (95 coins), or €20 (180 coins) vouchers. You can claim up to 5 vouchers per day.
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <div class="faq-question" onclick="toggleFaq(this)">
+                        Do vouchers expire?
+                        <span class="faq-arrow">▼</span>
+                    </div>
+                    <div class="faq-answer">
+                        Yes, claimed vouchers typically expire within 14 days. We'll show you the expiration date clearly so you don't miss it!
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <div class="faq-question" onclick="toggleFaq(this)">
+                        What if a voucher doesn't work?
+                        <span class="faq-arrow">▼</span>
+                    </div>
+                    <div class="faq-answer">
+                        Use the "Report Issue" button on any voucher. We'll investigate and refund your coins if the voucher was invalid.
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <div class="faq-question" onclick="toggleFaq(this)">
+                        Is my data secure?
+                        <span class="faq-arrow">▼</span>
+                    </div>
+                    <div class="faq-answer">
+                        Absolutely! We only use your Telegram ID for login. Your voucher photos are processed automatically and stored securely.
+                    </div>
+                </div>
+            </div>
+
+            <button class="btn btn-primary btn-full">
+                <span>💬</span> Contact Support
+            </button>
+        </div>
+
+        <!-- Bottom Navigation -->
+        <nav class="bottom-nav">
+            <button class="nav-item active" onclick="showScreen('screen-dashboard')" data-screen="screen-dashboard">
+                <span class="nav-icon">🏠</span>
+                <span class="nav-label">Home</span>
+            </button>
+            <button class="nav-item" onclick="showScreen('screen-vouchers')" data-screen="screen-vouchers">
+                <span class="nav-icon">🎫</span>
+                <span class="nav-label">Vouchers</span>
+            </button>
+            <button class="nav-item" onclick="showScreen('screen-history')" data-screen="screen-history">
+                <span class="nav-icon">📋</span>
+                <span class="nav-label">History</span>
+            </button>
+        </nav>
+
+        <!-- Success Modal -->
+        <div class="modal-overlay" id="success-modal" onclick="closeModal('success-modal')">
+            <div class="modal" onclick="event.stopPropagation()">
+                <div class="modal-header">
+                    <div class="modal-icon success">✓</div>
+                    <h3 class="modal-title">Upload Successful!</h3>
+                    <p class="modal-text">
+                        You earned <strong>10 coins</strong> for this voucher.<br>
+                        Keep uploading to earn more!
+                    </p>
+                </div>
+                <button class="btn btn-primary" style="width: 100%;" onclick="closeModal('success-modal')">
+                    Great!
+                </button>
+            </div>
+        </div>
+
+        <!-- Claim Modal -->
+        <div class="modal-overlay" id="claim-modal" onclick="closeModal('claim-modal')">
+            <div class="modal" onclick="event.stopPropagation()">
+                <div class="modal-header">
+                    <div class="modal-icon success" style="background: #DBEAFE;">🎁</div>
+                    <h3 class="modal-title" id="claim-title">Claim €10 Voucher?</h3>
+                    <p class="modal-text" id="claim-text">
+                        This will cost <strong>95 coins</strong>.<br>
+                        You'll receive a voucher code immediately.
+                    </p>
+                </div>
+                <div style="display: flex; gap: 12px;">
+                    <button class="btn btn-secondary" style="flex: 1;" onclick="closeModal('claim-modal')">
+                        Cancel
+                    </button>
+                    <button class="btn btn-primary" style="flex: 1;" onclick="confirmClaim()">
+                        Claim Now
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Report Modal -->
+        <div class="modal-overlay" id="report-modal" onclick="closeModal('report-modal')">
+            <div class="modal" onclick="event.stopPropagation()">
+                <div class="modal-header">
+                    <div class="modal-icon error">⚠️</div>
+                    <h3 class="modal-title">Report Voucher Issue</h3>
+                    <p class="modal-text">
+                        If this voucher didn't work at checkout, please report it. We'll investigate and refund your coins if confirmed.
+                    </p>
+                </div>
+                <div style="display: flex; gap: 12px;">
+                    <button class="btn btn-secondary" style="flex: 1;" onclick="closeModal('report-modal')">
+                        Cancel
+                    </button>
+                    <button class="btn btn-danger" style="flex: 1;" onclick="confirmReport()">
+                        Report Issue
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Camera Overlay -->
+        <div class="camera-overlay" id="camera-overlay">
+            <div class="camera-viewfinder">
+                <div class="camera-frame"></div>
+                <div class="camera-hint">
+                    Position voucher barcode within frame
+                </div>
+            </div>
+            <div class="camera-controls">
+                <button class="camera-cancel" onclick="closeCamera()">Cancel</button>
+                <button class="camera-btn" onclick="takePhoto()"></button>
+                <div style="width: 64px;"></div>
+            </div>
+        </div>
+
+        <!-- Toast -->
+        <div class="toast" id="toast"></div>
+    </div>
+
+    <script>
+        let currentBalance = 245;
+        let uploadsToday = 2;
+        let claimsToday = 1;
+        let pendingClaimAmount = 0;
+
+        function showScreen(screenId) {
+            // Hide all screens
+            document.querySelectorAll('.screen').forEach(screen => {
+                screen.classList.remove('active');
+            });
+            
+            // Show target screen
+            document.getElementById(screenId).classList.add('active');
+            
+            // Update nav
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.classList.remove('active');
+                if (item.dataset.screen === screenId) {
+                    item.classList.add('active');
+                }
+            });
+            
+            // Scroll to top
+            window.scrollTo(0, 0);
+        }
+
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.classList.add('show');
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+
+        function openCamera() {
+            if (uploadsToday >= 10) {
+                showToast('Daily upload limit reached (10/10)');
+                return;
+            }
+            document.getElementById('camera-overlay').classList.add('active');
+        }
+
+        function closeCamera() {
+            document.getElementById('camera-overlay').classList.remove('active');
+        }
+
+        function takePhoto() {
+            closeCamera();
+            
+            // Simulate processing
+            setTimeout(() => {
+                currentBalance += 10;
+                uploadsToday++;
+                updateBalance();
+                document.getElementById('success-modal').classList.add('active');
+            }, 500);
+        }
+
+        function claimVoucher(amount) {
+            const costs = { 5: 50, 10: 95, 20: 180 };
+            const cost = costs[amount];
+            
+            if (currentBalance < cost) {
+                showToast(`Need ${cost} coins to claim €${amount} voucher`);
+                return;
+            }
+            
+            if (claimsToday >= 5) {
+                showToast('Daily claim limit reached (5/5)');
+                return;
+            }
+            
+            pendingClaimAmount = amount;
+            document.getElementById('claim-title').textContent = `Claim €${amount} Voucher?`;
+            document.getElementById('claim-text').innerHTML = 
+                `This will cost <strong>${cost} coins</strong>.<br>You'll receive a voucher code immediately.`;
+            document.getElementById('claim-modal').classList.add('active');
+        }
+
+        function confirmClaim() {
+            const costs = { 5: 50, 10: 95, 20: 180 };
+            currentBalance -= costs[pendingClaimAmount];
+            claimsToday++;
+            updateBalance();
+            closeModal('claim-modal');
+            showToast(`€${pendingClaimAmount} voucher claimed! Check your vouchers.`);
+        }
+
+        function showVoucherDetail() {
+            showScreen('screen-voucher-detail');
+        }
+
+        function showReportModal() {
+            document.getElementById('report-modal').classList.add('active');
+        }
+
+        function confirmReport() {
+            closeModal('report-modal');
+            showToast('Report submitted. We\'ll investigate shortly.');
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.remove('active');
+        }
+
+        function toggleFaq(element) {
+            const faqItem = element.parentElement;
+            faqItem.classList.toggle('open');
+        }
+
+        function updateBalance() {
+            document.getElementById('balance-value').textContent = currentBalance;
+            document.getElementById('uploads-today').textContent = `${uploadsToday}/10`;
+            document.getElementById('claims-today').textContent = `${claimsToday}/5`;
+            
+            // Update claim card availability
+            const costs = { 5: 50, 10: 95, 20: 180 };
+            document.querySelectorAll('.claim-card').forEach((card, index) => {
+                const amounts = [5, 10, 20];
+                const cost = costs[amounts[index]];
+                if (currentBalance >= cost) {
+                    card.classList.add('available');
+                    card.classList.remove('unavailable');
+                } else {
+                    card.classList.remove('available');
+                    card.classList.add('unavailable');
+                }
+            });
+        }
+    </script>
+</body>
+</html>

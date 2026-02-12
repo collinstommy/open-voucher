@@ -1,10 +1,9 @@
 import { v } from "convex/values";
-import { Id } from "./_generated/dataModel";
-import { internal } from "./_generated/api";
-import { internalMutation, internalQuery } from "./_generated/server";
-import { CLAIM_COSTS } from "./constants";
-
 import dayjs from "dayjs";
+import { internal } from "./_generated/api";
+import type { Id } from "./_generated/dataModel";
+import { internalMutation, internalQuery } from "./_generated/server";
+import { CLAIM_COSTS, MIN_COINS, UPLOAD_REWARDS } from "./constants";
 
 export const getVoucherByBarcode = internalQuery({
 	args: { barcodeNumber: v.string() },
@@ -32,7 +31,6 @@ export const uploadVoucher = internalMutation({
 
 		const now = Date.now();
 		const oneDayAgo = now - 24 * 60 * 60 * 1000;
-
 		const MAX_DAILY_UPLOADS = 10;
 		const recentUploads = await ctx.db
 			.query("vouchers")
@@ -79,7 +77,6 @@ export const requestVoucher = internalMutation({
 
 		const now = Date.now();
 		const oneDayAgo = now - 24 * 60 * 60 * 1000;
-
 		const MAX_DAILY_CLAIMS = 5;
 		const recentClaims = await ctx.db
 			.query("vouchers")
@@ -180,11 +177,18 @@ export const reportVoucher = internalMutation({
 		const now = Date.now();
 		const startOfDay = dayjs(now).startOf("day").valueOf();
 
-		if (user.lastReportAt && user.lastReportAt >= startOfDay) {
+		// Check reports from today
+		const todayReports = await ctx.db
+			.query("reports")
+			.withIndex("by_reporterId", (q) => q.eq("reporterId", user._id))
+			.filter((q) => q.gte(q.field("createdAt"), startOfDay))
+			.collect();
+
+		if (todayReports.length >= 2) {
 			return {
 				status: "rate_limited",
 				message:
-					"You can only report 1 voucher per day. Please try again tomorrow.",
+					"You can only report 2 vouchers per day. Please try again tomorrow.",
 			};
 		}
 
@@ -269,22 +273,48 @@ export const reportVoucher = internalMutation({
 			});
 
 			const uploader = await ctx.db.get(voucher.uploaderId);
-			if (uploader) {
+			if (uploader && voucher.type !== "0") {
 				await ctx.db.patch(voucher.uploaderId, {
 					uploadReportCount: (uploader.uploadReportCount || 0) + 1,
 				});
+
+				// Send message to uploader asking if they used the voucher
+				await ctx.scheduler.runAfter(
+					0,
+					internal.telegram.sendUploaderReportMessage,
+					{
+						uploaderChatId: uploader.telegramChatId,
+						voucherId: voucher._id,
+						voucherType: voucher.type as "5" | "10" | "20",
+					},
+				);
 			}
 		}
 
-		const last5Uploads = await ctx.db
+		const totalUploads = await ctx.db
+			.query("vouchers")
+			.withIndex("by_uploader_created", (q) =>
+				q.eq("uploaderId", voucher.uploaderId),
+			)
+			.collect();
+
+		const totalUploadCount = totalUploads.length;
+
+		// For accounts with 20+ uploads: check 5+ of last 10
+		// For accounts with fewer uploads: check 3+ of last 5
+		const isHighVolumeUploader = totalUploadCount >= 20;
+		const uploadsToCheck = isHighVolumeUploader ? 10 : 5;
+		const reportsThreshold = isHighVolumeUploader ? 5 : 3;
+
+		const recentUploads = await ctx.db
 			.query("vouchers")
 			.withIndex("by_uploader_created", (q) =>
 				q.eq("uploaderId", voucher.uploaderId),
 			)
 			.order("desc")
-			.take(5);
+			.take(uploadsToCheck);
 
-		if (last5Uploads.length >= 5) {
+		if (recentUploads.length >= uploadsToCheck) {
 			const uploaderReports = await ctx.db
 				.query("reports")
 				.withIndex("by_uploader", (q) => q.eq("uploaderId", voucher.uploaderId))
@@ -298,28 +328,28 @@ export const reportVoucher = internalMutation({
 				}
 			}
 
-			// Check if 3+ of last 5 uploads were reported
-			const last5UploadIds = last5Uploads.map((v) => v._id);
-			const last5Reported = validReports.filter((r) =>
-				last5UploadIds.includes(r.voucherId),
+			// Check if threshold of recent uploads were reported
+			const recentUploadIds = recentUploads.map((v) => v._id);
+			const recentReported = validReports.filter((r) =>
+				recentUploadIds.includes(r.voucherId),
 			);
 
-			const threeOutOfFiveReported = last5Reported.length >= 3;
+			const shouldBan = recentReported.length >= reportsThreshold;
 
-			if (threeOutOfFiveReported) {
+			if (shouldBan) {
 				console.log(
 					`🚫 UPLOADER BAN: User ${voucher.uploaderId} banned for bad uploads. ` +
-						`${last5Reported.length} of last 5 uploads reported. ` +
-						`Total uploads: ${last5Uploads.length}, Valid reports (non-banned): ${validReports.length}`,
+						`${recentReported.length} of last ${uploadsToCheck} uploads reported. ` +
+						`Total uploads: ${totalUploadCount}, Valid reports (non-banned): ${validReports.length}`,
 				);
 				console.log(
-					"Last 5 uploads:",
-					last5Uploads.map((v) => ({
+					`Last ${uploadsToCheck} uploads:`,
+					recentUploads.map((v) => ({
 						voucherId: v._id,
 						type: v.type,
 						status: v.status,
 						createdAt: new Date(v.createdAt).toISOString(),
-						wasReported: last5Reported.some((r) => r.voucherId === v._id),
+						wasReported: recentReported.some((r) => r.voucherId === v._id),
 					})),
 				);
 				await ctx.db.patch(voucher.uploaderId, {
@@ -331,7 +361,7 @@ export const reportVoucher = internalMutation({
 				if (uploader) {
 					await ctx.scheduler.runAfter(0, internal.telegram.sendMessageAction, {
 						chatId: uploader.telegramChatId,
-						text: "🚫 <b>Account Banned</b>\n\nYour account has been banned because 3 or more of your last 5 uploads were reported as not working.",
+						text: `🚫 <b>Account Banned</b>\n\nYour account has been banned because ${reportsThreshold} or more of your last ${uploadsToCheck} uploads were reported as not working.`,
 					});
 				}
 			}
@@ -436,5 +466,47 @@ export const getAvailableVoucherCount = internalQuery({
 			counts[v.type] = (counts[v.type] || 0) + 1;
 		}
 		return counts;
+	},
+});
+
+export const getVoucherForUploaderConfirm = internalQuery({
+	args: { voucherId: v.id("vouchers") },
+	handler: async (ctx, { voucherId }) => {
+		return await ctx.db.get(voucherId);
+	},
+});
+
+export const confirmUploaderUsedVoucher = internalMutation({
+	args: {
+		uploaderId: v.id("users"),
+		voucherId: v.id("vouchers"),
+		amount: v.number(),
+	},
+	handler: async (ctx, { uploaderId, voucherId, amount }) => {
+		const uploader = await ctx.db.get(uploaderId);
+		if (!uploader) return;
+
+		const newCoins = Math.max(MIN_COINS, uploader.coins - amount);
+		await ctx.db.patch(uploaderId, { coins: newCoins });
+
+		await ctx.db.patch(voucherId, { status: "uploader_admitted_used" });
+
+		// Remove the report since uploader admitted (honesty should not penalize ban status)
+		const report = await ctx.db
+			.query("reports")
+			.withIndex("by_voucher", (q) => q.eq("voucherId", voucherId))
+			.first();
+
+		if (report) {
+			await ctx.db.delete(report._id);
+		}
+
+		await ctx.db.insert("transactions", {
+			userId: uploaderId,
+			type: "uploader_refund",
+			amount: -amount,
+			voucherId,
+			createdAt: Date.now(),
+		});
 	},
 });
