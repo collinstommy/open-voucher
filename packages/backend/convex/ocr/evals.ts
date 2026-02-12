@@ -121,17 +121,14 @@ export const runOcrEvalsInternal = internalAction({
 	handler: async (ctx, args): Promise<EvalsResponse> => {
 		const images = args.images || [];
 
-		const defaultImageUrls: ImageInput[] = Object.keys(TEST_CONFIG).map(
-			(filename) => ({
-				filename,
-				imageUrl: `http://localhost:3000/test-images/${filename}`,
-			}),
-		);
-
-		const imagesToProcess = images.length > 0 ? images : defaultImageUrls;
+		// Note: Images must be provided via frontend (web UI sends base64 data)
+		// CLI support removed - only web UI is supported
+		if (images.length === 0) {
+			throw new Error("Images must be provided from frontend");
+		}
 		const results: EvalResult[] = [];
 
-		for (const imageData of imagesToProcess) {
+		for (const imageData of images) {
 			const imageConfig = TEST_CONFIG[imageData.filename];
 			if (!imageConfig) {
 				results.push({
