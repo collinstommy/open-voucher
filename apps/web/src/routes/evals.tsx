@@ -98,12 +98,13 @@ function EvalCard({ group }: { group: GroupedResults }) {
 }
 
 const TEST_IMAGE_FILES = [
-	"23dec-3jan.jpg",
 	"23dec-5jan.jpg",
 	"29dec-7jan.jpg",
 	"30Dec-8jan.jpg",
 	"dec21-jan5.jpg",
 	"26jan-1feb.jpg",
+	"jan26-feb01.jpg",
+	"feb2nd-feb11th.jpg",
 	"feb11-feb17.jpg",
 ];
 
