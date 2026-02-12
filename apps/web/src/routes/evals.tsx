@@ -27,41 +27,73 @@ type EvalsResponse = {
 	results: EvalResult[];
 };
 
-function EvalResultRow({ result }: { result: EvalResult }) {
+type GroupedResults = {
+	filename: string;
+	results: EvalResult[];
+};
+
+function EvalCard({ group }: { group: GroupedResults }) {
+	const imageUrl = `/test-images/${group.filename}`;
+	const passed = group.results.filter((r) => r.success).length;
+
 	return (
-		<tr className="border-border border-b last:border-b-0">
-			<td className="px-4 py-3 font-medium">{result.filename}</td>
-			<td className="px-4 py-3 text-muted-foreground text-sm">
-				{result.testDate}
-			</td>
-			<td className="px-4 py-3">
-				<div className="flex items-center gap-2">
-					{result.success ? (
-						<CheckCircle2 className="h-5 w-5 text-green-600" />
-					) : (
-						<XCircle className="h-5 w-5 text-red-600" />
-					)}
-					<span className={result.success ? "text-green-600" : "text-red-600"}>
-						{result.success ? "Pass" : "Fail"}
-					</span>
+		<div className="overflow-hidden rounded-lg border shadow-sm">
+			<div className="grid grid-cols-[350px_1fr]">
+				<div className="bg-muted/30 p-4">
+					<img
+						src={imageUrl}
+						alt={group.filename}
+						className="h-auto w-full rounded border bg-white object-contain"
+					/>
 				</div>
-			</td>
-			<td className="px-4 py-3 text-sm">
-				{result.error ? (
-					<span className="text-red-600">{result.error}</span>
-				) : (
-					<div className="space-y-1">
-						<div className="text-muted-foreground">
-							Expected: {result.expectedValidFrom} → {result.expectedExpiry}
-						</div>
-						<div className={result.success ? "text-green-600" : "text-red-600"}>
-							Actual: {result.actualValidFrom ?? "N/A"} →{" "}
-							{result.actualExpiry ?? "N/A"}
-						</div>
+				<div className="p-4">
+					<div className="mb-3 flex items-center justify-between">
+						<h3 className="font-semibold">{group.filename}</h3>
+						<span className="text-muted-foreground text-sm">
+							{passed}/{group.results.length} passed
+						</span>
 					</div>
-				)}
-			</td>
-		</tr>
+					<div className="grid grid-cols-3 gap-4">
+						{group.results.map((result) => (
+							<div
+								key={result.testDate}
+								className={`rounded border p-3 ${
+									result.success
+										? "border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950/30"
+										: "border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/30"
+								}`}
+							>
+								<div className="mb-2 flex items-center gap-2">
+									{result.success ? (
+										<CheckCircle2 className="h-4 w-4 text-green-600" />
+									) : (
+										<XCircle className="h-4 w-4 text-red-600" />
+									)}
+									<span className="font-medium text-sm">{result.testDate}</span>
+								</div>
+								{result.error ? (
+									<p className="text-red-600 text-xs">{result.error}</p>
+								) : (
+									<div className="space-y-1 text-xs">
+										<div className="text-muted-foreground">
+											Exp: {result.expectedValidFrom} → {result.expectedExpiry}
+										</div>
+										<div
+											className={
+												result.success ? "text-green-600" : "text-red-600"
+											}
+										>
+											Act: {result.actualValidFrom ?? "N/A"} →{" "}
+											{result.actualExpiry ?? "N/A"}
+										</div>
+									</div>
+								)}
+							</div>
+						))}
+					</div>
+				</div>
+			</div>
+		</div>
 	);
 }
 
@@ -71,6 +103,8 @@ const TEST_IMAGE_FILES = [
 	"29dec-7jan.jpg",
 	"30Dec-8jan.jpg",
 	"dec21-jan5.jpg",
+	"26jan-1feb.jpg",
+	"feb11-feb17.jpg",
 ];
 
 async function fetchImageAsBase64(url: string): Promise<string> {
@@ -187,27 +221,24 @@ function EvalsPage() {
 						</div>
 					</div>
 
-					<div className="overflow-hidden rounded-lg border shadow-sm">
-						<table className="w-full">
-							<thead className="bg-muted">
-								<tr>
-									<th className="px-4 py-3 text-left font-semibold">Image</th>
-									<th className="px-4 py-3 text-left font-semibold">
-										Test Date
-									</th>
-									<th className="px-4 py-3 text-left font-semibold">Result</th>
-									<th className="px-4 py-3 text-left font-semibold">Details</th>
-								</tr>
-							</thead>
-							<tbody>
-								{results.results.map((result) => (
-									<EvalResultRow
-										key={`${result.filename}-${result.testDate}`}
-										result={result}
-									/>
-								))}
-							</tbody>
-						</table>
+					<div className="space-y-4">
+						{Object.entries(
+							results.results.reduce<Record<string, EvalResult[]>>(
+								(acc, result) => {
+									if (!acc[result.filename]) {
+										acc[result.filename] = [];
+									}
+									acc[result.filename].push(result);
+									return acc;
+								},
+								{},
+							),
+						).map(([filename, groupResults]) => (
+							<EvalCard
+								key={filename}
+								group={{ filename, results: groupResults }}
+							/>
+						))}
 					</div>
 				</div>
 			)}

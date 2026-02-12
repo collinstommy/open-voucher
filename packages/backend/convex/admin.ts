@@ -318,12 +318,12 @@ export const getAllFeedback = adminQuery({
 					createdAt: f.createdAt,
 					user: user
 						? {
-							telegramChatId: user.telegramChatId,
-							username: user.username,
-							firstName: user.firstName,
-							isBanned: user.isBanned,
-							id: user._id,
-						}
+								telegramChatId: user.telegramChatId,
+								username: user.username,
+								firstName: user.firstName,
+								isBanned: user.isBanned,
+								id: user._id,
+							}
 						: null,
 				};
 			}),
@@ -419,18 +419,18 @@ export const getUserDetails = adminQuery({
 					createdAt: report.createdAt,
 					voucher: voucher
 						? {
-							type: voucher.type,
-							status: voucher.status,
-							imageUrl,
-							expiryDate: voucher.expiryDate,
-						}
+								type: voucher.type,
+								status: voucher.status,
+								imageUrl,
+								expiryDate: voucher.expiryDate,
+							}
 						: null,
 					uploader: uploader
 						? {
-							username: uploader.username,
-							firstName: uploader.firstName,
-							telegramChatId: uploader.telegramChatId,
-						}
+								username: uploader.username,
+								firstName: uploader.firstName,
+								telegramChatId: uploader.telegramChatId,
+							}
 						: null,
 				};
 			}),
@@ -450,18 +450,18 @@ export const getUserDetails = adminQuery({
 					createdAt: report.createdAt,
 					voucher: voucher
 						? {
-							type: voucher.type,
-							status: voucher.status,
-							imageUrl,
-							expiryDate: voucher.expiryDate,
-						}
+								type: voucher.type,
+								status: voucher.status,
+								imageUrl,
+								expiryDate: voucher.expiryDate,
+							}
 						: null,
 					reporter: reporter
 						? {
-							username: reporter.username,
-							firstName: reporter.firstName,
-							telegramChatId: reporter.telegramChatId,
-						}
+								username: reporter.username,
+								firstName: reporter.firstName,
+								telegramChatId: reporter.telegramChatId,
+							}
 						: null,
 				};
 			}),
@@ -1017,58 +1017,6 @@ export const getUserGrowth = adminQuery({
 	},
 });
 
-type TestImage = {
-	filename: string;
-	expectedValidFromDay: number;
-	expectedValidFromMonth: number;
-	expectedExpiryDay: number;
-	expectedExpiryMonth: number;
-};
-
-const TEST_IMAGES: TestImage[] = [
-	{
-		filename: "23dec-3jan.jpg",
-		expectedValidFromDay: 23,
-		expectedValidFromMonth: 12,
-		expectedExpiryDay: 5,
-		expectedExpiryMonth: 1,
-	},
-	{
-		filename: "23dec-5jan.jpg",
-		expectedValidFromDay: 23,
-		expectedValidFromMonth: 12,
-		expectedExpiryDay: 5,
-		expectedExpiryMonth: 1,
-	},
-	{
-		filename: "29dec-7jan.jpg",
-		expectedValidFromDay: 29,
-		expectedValidFromMonth: 12,
-		expectedExpiryDay: 7,
-		expectedExpiryMonth: 1,
-	},
-	{
-		filename: "30Dec-8jan.jpg",
-		expectedValidFromDay: 30,
-		expectedValidFromMonth: 12,
-		expectedExpiryDay: 8,
-		expectedExpiryMonth: 1,
-	},
-	{
-		filename: "dec21-jan5.jpg",
-		expectedValidFromDay: 21,
-		expectedValidFromMonth: 12,
-		expectedExpiryDay: 5,
-		expectedExpiryMonth: 1,
-	},
-];
-
-const TEST_DATES = [
-	{ label: "Dec 22 2025", year: 2025, date: "2025-12-22" },
-	{ label: "Jan 1 2026", year: 2026, date: "2026-01-01" },
-	{ label: "Jan 3 2026", year: 2026, date: "2026-01-03" },
-];
-
 export const runOcrEvals = adminAction({
 	args: {
 		token: v.string(),
@@ -1079,8 +1027,14 @@ export const runOcrEvals = adminAction({
 			}),
 		),
 	},
-	handler: async (ctx, { token, images }) => {
-		const results: {
+	handler: async (
+		ctx,
+		{ token, images },
+	): Promise<{
+		overallSuccess: boolean;
+		passed: number;
+		total: number;
+		results: Array<{
 			filename: string;
 			testDate: string;
 			success: boolean;
@@ -1089,92 +1043,8 @@ export const runOcrEvals = adminAction({
 			actualValidFrom?: string;
 			actualExpiry?: string;
 			error?: string;
-		}[] = [];
-
-		for (const imageData of images) {
-			// Find expected dates for this image
-			const imageConfig = TEST_IMAGES.find(
-				(img) => img.filename === imageData.filename,
-			);
-			if (!imageConfig) {
-				results.push({
-					filename: imageData.filename,
-					testDate: "unknown",
-					success: false,
-					expectedValidFrom: "",
-					expectedExpiry: "",
-					error: "Unknown image filename",
-				});
-				continue;
-			}
-
-			for (const testDate of TEST_DATES) {
-				// Logic mirrors extract.ts: expiry uses currentYear (or next year if crosses boundary)
-				// validFrom is initially same year as expiry, then adjusted back if needed
-				const expiryYear =
-					imageConfig.expectedExpiryMonth < imageConfig.expectedValidFromMonth
-						? testDate.year + 1
-						: testDate.year;
-
-				// Check if validFrom is chronologically after expiry
-				const validFromMonthDay =
-					imageConfig.expectedValidFromMonth * 100 +
-					imageConfig.expectedValidFromDay;
-				const expiryMonthDay =
-					imageConfig.expectedExpiryMonth * 100 + imageConfig.expectedExpiryDay;
-				const validFromIsAfterExpiry = validFromMonthDay > expiryMonthDay;
-
-				const expectedValidFromYear = validFromIsAfterExpiry
-					? expiryYear - 1
-					: expiryYear;
-				const expectedExpiryYear = expiryYear;
-
-				const expectedValidFrom = `${expectedValidFromYear}-${String(imageConfig.expectedValidFromMonth).padStart(2, "0")}-${String(imageConfig.expectedValidFromDay).padStart(2, "0")}`;
-				const expectedExpiry = `${expectedExpiryYear}-${String(imageConfig.expectedExpiryMonth).padStart(2, "0")}-${String(imageConfig.expectedExpiryDay).padStart(2, "0")}`;
-
-				try {
-					const ocrResult = await ctx.runAction(
-						internal.ocr.extract.extractFromBase64,
-						{
-							imageBase64: imageData.imageBase64,
-							currentYear: testDate.year,
-						},
-					);
-
-					const success =
-						ocrResult.validFrom === expectedValidFrom &&
-						ocrResult.expiryDate === expectedExpiry;
-
-					results.push({
-						filename: imageData.filename,
-						testDate: testDate.label,
-						success,
-						expectedValidFrom,
-						expectedExpiry,
-						actualValidFrom: ocrResult.validFrom,
-						actualExpiry: ocrResult.expiryDate,
-					});
-				} catch (error) {
-					results.push({
-						filename: imageData.filename,
-						testDate: testDate.label,
-						success: false,
-						expectedValidFrom,
-						expectedExpiry,
-						error: error instanceof Error ? error.message : String(error),
-					});
-				}
-			}
-		}
-
-		const passedTests = results.filter((r) => r.success).length;
-		const totalTests = results.length;
-
-		return {
-			overallSuccess: passedTests === totalTests,
-			passed: passedTests,
-			total: totalTests,
-			results,
-		};
+		}>;
+	}> => {
+		return ctx.runAction(internal.ocr.evals.runOcrEvalsInternal, { images });
 	},
 });
