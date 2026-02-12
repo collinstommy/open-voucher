@@ -318,12 +318,12 @@ export const getAllFeedback = adminQuery({
 					createdAt: f.createdAt,
 					user: user
 						? {
-							telegramChatId: user.telegramChatId,
-							username: user.username,
-							firstName: user.firstName,
-							isBanned: user.isBanned,
-							id: user._id,
-						}
+								telegramChatId: user.telegramChatId,
+								username: user.username,
+								firstName: user.firstName,
+								isBanned: user.isBanned,
+								id: user._id,
+							}
 						: null,
 				};
 			}),
@@ -419,18 +419,18 @@ export const getUserDetails = adminQuery({
 					createdAt: report.createdAt,
 					voucher: voucher
 						? {
-							type: voucher.type,
-							status: voucher.status,
-							imageUrl,
-							expiryDate: voucher.expiryDate,
-						}
+								type: voucher.type,
+								status: voucher.status,
+								imageUrl,
+								expiryDate: voucher.expiryDate,
+							}
 						: null,
 					uploader: uploader
 						? {
-							username: uploader.username,
-							firstName: uploader.firstName,
-							telegramChatId: uploader.telegramChatId,
-						}
+								username: uploader.username,
+								firstName: uploader.firstName,
+								telegramChatId: uploader.telegramChatId,
+							}
 						: null,
 				};
 			}),
@@ -450,18 +450,18 @@ export const getUserDetails = adminQuery({
 					createdAt: report.createdAt,
 					voucher: voucher
 						? {
-							type: voucher.type,
-							status: voucher.status,
-							imageUrl,
-							expiryDate: voucher.expiryDate,
-						}
+								type: voucher.type,
+								status: voucher.status,
+								imageUrl,
+								expiryDate: voucher.expiryDate,
+							}
 						: null,
 					reporter: reporter
 						? {
-							username: reporter.username,
-							firstName: reporter.firstName,
-							telegramChatId: reporter.telegramChatId,
-						}
+								username: reporter.username,
+								firstName: reporter.firstName,
+								telegramChatId: reporter.telegramChatId,
+							}
 						: null,
 				};
 			}),
@@ -1014,5 +1014,37 @@ export const getUserGrowth = adminQuery({
 		}
 
 		return { data };
+	},
+});
+
+export const runOcrEvals = adminAction({
+	args: {
+		token: v.string(),
+		images: v.array(
+			v.object({
+				filename: v.string(),
+				imageBase64: v.string(),
+			}),
+		),
+	},
+	handler: async (
+		ctx,
+		{ token, images },
+	): Promise<{
+		overallSuccess: boolean;
+		passed: number;
+		total: number;
+		results: Array<{
+			filename: string;
+			testDate: string;
+			success: boolean;
+			expectedValidFrom: string;
+			expectedExpiry: string;
+			actualValidFrom?: string;
+			actualExpiry?: string;
+			error?: string;
+		}>;
+	}> => {
+		return ctx.runAction(internal.ocr.evals.runOcrEvalsInternal, { images });
 	},
 });
