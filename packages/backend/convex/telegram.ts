@@ -752,6 +752,8 @@ export const handleTelegramCallback = internalAction({
 								return "💳 Claim Spent";
 							case "report_refund":
 								return "↩️ Refund";
+							case "uploader_denied":
+								return "❌ Upload Denied";
 							default:
 								return type;
 						}
@@ -814,6 +816,20 @@ export const handleTelegramCallback = internalAction({
 				callbackQuery.message.message_id,
 				callbackQuery.message.text,
 			);
+
+			const uploadedVoucher = await ctx.runQuery(
+				internal.vouchers.getVoucherForUploaderConfirm,
+				{
+					voucherId: voucherId as Id<"vouchers">,
+				},
+			);
+
+			if (uploadedVoucher) {
+				await ctx.runMutation(internal.vouchers.recordUploaderDenied, {
+					uploaderId: uploadedVoucher.uploaderId,
+					voucherId: uploadedVoucher._id,
+				});
+			}
 
 			await sendTelegramMessage(
 				chatId,

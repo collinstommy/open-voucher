@@ -510,3 +510,30 @@ export const confirmUploaderUsedVoucher = internalMutation({
 		});
 	},
 });
+
+export const recordUploaderDenied = internalMutation({
+	args: {
+		uploaderId: v.id("users"),
+		voucherId: v.id("vouchers"),
+	},
+	handler: async (ctx, { uploaderId, voucherId }) => {
+		await ctx.db.patch(voucherId, { status: "uploader_denied" });
+
+		const report = await ctx.db
+			.query("reports")
+			.withIndex("by_voucher", (q) => q.eq("voucherId", voucherId))
+			.first();
+
+		if (report) {
+			await ctx.db.delete(report._id);
+		}
+
+		await ctx.db.insert("transactions", {
+			userId: uploaderId,
+			type: "uploader_denied",
+			amount: 0,
+			voucherId,
+			createdAt: Date.now(),
+		});
+	},
+});

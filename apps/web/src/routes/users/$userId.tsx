@@ -201,7 +201,9 @@ function UserDetailPage() {
 																? "bg-red-100 text-red-800"
 																: tx.type === "report_refund"
 																	? "bg-purple-100 text-purple-800"
-																	: "bg-amber-100 text-amber-800"
+																	: tx.type === "uploader_denied"
+																		? "bg-red-100 text-red-800"
+																		: "bg-amber-100 text-amber-800"
 												}`}
 											>
 												{tx.type.replace(/_/g, " ")}
