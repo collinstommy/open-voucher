@@ -66,3 +66,55 @@ export const getExpiringVouchers = internalQuery({
 		return expiringVouchers;
 	},
 });
+
+export const getWeeklyVouchers = query({
+	handler: async (ctx) => {
+		const now = new Date();
+		const startOfToday = new Date(
+			now.getFullYear(),
+			now.getMonth(),
+			now.getDate(),
+		).getTime();
+
+		const sevenDaysAgo = startOfToday - 7 * 24 * 60 * 60 * 1000;
+
+		const vouchers = await ctx.db
+			.query("vouchers")
+			.withIndex("_creationTime", (q) => q.gte("_creationTime", sevenDaysAgo))
+			.collect();
+
+		const dailyData: Record<
+			string,
+			{ uploaded: number; claimed: number; date: string }
+		> = {};
+
+		for (let i = 0; i < 7; i++) {
+			const date = new Date(startOfToday - i * 24 * 60 * 60 * 1000);
+			const dateKey = date.toISOString().split("T")[0];
+			dailyData[dateKey] = { uploaded: 0, claimed: 0, date: dateKey };
+		}
+
+		for (const voucher of vouchers) {
+			const dateKey = new Date(voucher._creationTime)
+				.toISOString()
+				.split("T")[0];
+			if (dailyData[dateKey]) {
+				dailyData[dateKey].uploaded++;
+			}
+		}
+
+		const claimedVouchers = vouchers.filter(
+			(v) => v.status === "claimed" && v.claimedAt,
+		);
+		for (const voucher of claimedVouchers) {
+			const dateKey = new Date(voucher.claimedAt!).toISOString().split("T")[0];
+			if (dailyData[dateKey]) {
+				dailyData[dateKey].claimed++;
+			}
+		}
+
+		return Object.values(dailyData).sort(
+			(a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
+		);
+	},
+});
