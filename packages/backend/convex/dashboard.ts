@@ -80,7 +80,9 @@ export const getWeeklyVouchers = query({
 
 		const vouchers = await ctx.db
 			.query("vouchers")
-			.withIndex("_creationTime", (q) => q.gte("_creationTime", sevenDaysAgo))
+			.withIndex("by_creation_time", (q) =>
+				q.gte("_creationTime", sevenDaysAgo),
+			)
 			.collect();
 
 		const dailyData: Record<
