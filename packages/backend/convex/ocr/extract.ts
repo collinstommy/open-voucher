@@ -108,6 +108,7 @@ function computeYears(
 async function extractVoucherData(
 	imageBase64: string,
 	currentDate: string,
+	useOpenRouter = false,
 ): Promise<{
 	type: number;
 	validFrom: string | undefined;
@@ -120,19 +121,27 @@ async function extractVoucherData(
 
 	let result: { text: string; raw: string };
 
-	try {
-		const geminiApiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
-		if (!geminiApiKey) {
-			throw new Error("Gemini API key not configured");
-		}
-		result = await callGeminiApi(imageBase64, prompt, geminiApiKey);
-	} catch (geminiError) {
-		console.warn("Gemini extraction failed, trying OpenRouter:", geminiError);
+	if (useOpenRouter) {
 		const openRouterApiKey = process.env.OPENROUTER_API_KEY;
 		if (!openRouterApiKey) {
-			throw new Error("OpenRouter API key not configured and Gemini failed");
+			throw new Error("OpenRouter API key not configured");
 		}
 		result = await callOpenRouterApi(imageBase64, prompt, openRouterApiKey);
+	} else {
+		try {
+			const geminiApiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+			if (!geminiApiKey) {
+				throw new Error("Gemini API key not configured");
+			}
+			result = await callGeminiApi(imageBase64, prompt, geminiApiKey);
+		} catch (geminiError) {
+			console.warn("Gemini extraction failed, trying OpenRouter:", geminiError);
+			const openRouterApiKey = process.env.OPENROUTER_API_KEY;
+			if (!openRouterApiKey) {
+				throw new Error("OpenRouter API key not configured and Gemini failed");
+			}
+			result = await callOpenRouterApi(imageBase64, prompt, openRouterApiKey);
+		}
 	}
 
 	const extracted: ExtractedData = JSON.parse(result.text);
@@ -326,9 +335,10 @@ export const extractFromBase64 = internalAction({
 	args: {
 		imageBase64: v.string(),
 		currentDate: v.string(),
+		useOpenRouter: v.optional(v.boolean()),
 	},
-	handler: async (_ctx, { imageBase64, currentDate }) => {
-		return extractVoucherData(imageBase64, currentDate);
+	handler: async (_ctx, { imageBase64, currentDate, useOpenRouter }) => {
+		return extractVoucherData(imageBase64, currentDate, useOpenRouter);
 	},
 });
 

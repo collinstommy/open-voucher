@@ -117,9 +117,11 @@ export const runOcrEvalsInternal = internalAction({
 				),
 			),
 		),
+		useOpenRouter: v.optional(v.boolean()),
 	},
 	handler: async (ctx, args): Promise<EvalsResponse> => {
 		const images = args.images || [];
+		const useOpenRouter = args.useOpenRouter ?? false;
 
 		// Note: Images must be provided via frontend (web UI sends base64 data)
 		// CLI support removed - only web UI is supported
@@ -154,6 +156,7 @@ export const runOcrEvalsInternal = internalAction({
 						{
 							imageBase64: imageBase64,
 							currentDate: dateStr,
+							useOpenRouter,
 						},
 					);
 
@@ -192,5 +195,84 @@ export const runOcrEvalsInternal = internalAction({
 			total: totalTests,
 			results,
 		};
+	},
+});
+
+type SingleEvalResult = {
+	filename: string;
+	testDate: string;
+	testDateRaw: string;
+	success: boolean;
+	expectedValidFrom: string;
+	expectedExpiry: string;
+	actualValidFrom?: string;
+	actualExpiry?: string;
+	error?: string;
+};
+
+type ImageEvalResults = {
+	filename: string;
+	results: SingleEvalResult[];
+};
+
+export const runImageOcrEval = internalAction({
+	args: {
+		filename: v.string(),
+		imageBase64: v.string(),
+		useOpenRouter: v.optional(v.boolean()),
+	},
+	handler: async (ctx, args): Promise<ImageEvalResults> => {
+		const { filename, imageBase64, useOpenRouter } = args;
+
+		const imageConfig = TEST_CONFIG[filename];
+		if (!imageConfig) {
+			throw new Error(`Unknown image filename: ${filename}`);
+		}
+
+		const testDates = Object.keys(imageConfig);
+
+		const results = await Promise.all(
+			testDates.map(async (testDate) => {
+				const expected = imageConfig[testDate];
+
+				try {
+					const ocrResult = await ctx.runAction(
+						internal.ocr.extract.extractFromBase64,
+						{
+							imageBase64,
+							currentDate: testDate,
+							useOpenRouter,
+						},
+					);
+
+					const success =
+						ocrResult.validFrom === expected.validFrom &&
+						ocrResult.expiryDate === expected.expiry;
+
+					return {
+						filename,
+						testDate: formatDateLabel(testDate),
+						testDateRaw: testDate,
+						success,
+						expectedValidFrom: expected.validFrom,
+						expectedExpiry: expected.expiry,
+						actualValidFrom: ocrResult.validFrom,
+						actualExpiry: ocrResult.expiryDate,
+					} as SingleEvalResult;
+				} catch (error) {
+					return {
+						filename,
+						testDate: formatDateLabel(testDate),
+						testDateRaw: testDate,
+						success: false,
+						expectedValidFrom: expected.validFrom,
+						expectedExpiry: expected.expiry,
+						error: error instanceof Error ? error.message : String(error),
+					} as SingleEvalResult;
+				}
+			}),
+		);
+
+		return { filename, results };
 	},
 });

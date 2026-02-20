@@ -132,25 +132,53 @@ function EvalsPage() {
 	const convex = useConvex();
 	const [results, setResults] = useState<EvalsResponse | null>(null);
 	const [isLoading, setIsLoading] = useState(false);
+	const [useOpenRouter, setUseOpenRouter] = useState(false);
 
 	const handleRunEvals = async () => {
 		if (!token) return;
 		setIsLoading(true);
 		try {
-			// Fetch all test images and convert to base64
-			const images = await Promise.all(
+			const imagesMap = new Map<string, string>();
+
+			await Promise.all(
 				TEST_IMAGE_FILES.map(async (filename) => {
 					const imageUrl = `/test-images/${filename}`;
 					const imageBase64 = await fetchImageAsBase64(imageUrl);
-					return { filename, imageBase64 };
+					imagesMap.set(filename, imageBase64);
 				}),
 			);
 
-			const result = await convex.action(api.admin.runOcrEvals, {
-				token,
-				images,
+			const results = await Promise.all(
+				TEST_IMAGE_FILES.map((filename) =>
+					convex.action(api.admin.runSingleOcrEval, {
+						token,
+						filename,
+						imageBase64: imagesMap.get(filename)!,
+						useOpenRouter,
+					}),
+				),
+			);
+
+			const evalResults = results.flatMap((r) =>
+				r.results.map((result) => ({
+					filename: result.filename,
+					testDate: result.testDate,
+					success: result.success,
+					expectedValidFrom: result.expectedValidFrom,
+					expectedExpiry: result.expectedExpiry,
+					actualValidFrom: result.actualValidFrom,
+					actualExpiry: result.actualExpiry,
+					error: result.error,
+				})),
+			);
+
+			const passed = evalResults.filter((r) => r.success).length;
+			setResults({
+				overallSuccess: passed === evalResults.length,
+				passed,
+				total: evalResults.length,
+				results: evalResults,
 			});
-			setResults(result as EvalsResponse);
 		} catch (error) {
 			console.error("Evals failed:", error);
 		} finally {
@@ -167,7 +195,7 @@ function EvalsPage() {
 				<h1 className="font-bold text-2xl">OCR Evaluations</h1>
 			</div>
 
-			<div className="mb-6">
+			<div className="mb-6 flex items-center gap-4">
 				<button
 					type="button"
 					onClick={handleRunEvals}
@@ -186,6 +214,16 @@ function EvalsPage() {
 						</>
 					)}
 				</button>
+
+				<label className="flex items-center gap-2 text-sm">
+					<input
+						type="checkbox"
+						checked={useOpenRouter}
+						onChange={(e) => setUseOpenRouter(e.target.checked)}
+						className="rounded border-gray-300"
+					/>
+					Use OpenRouter (fallback)
+				</label>
 			</div>
 
 			{!token && (

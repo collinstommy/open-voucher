@@ -1026,10 +1026,11 @@ export const runOcrEvals = adminAction({
 				imageBase64: v.string(),
 			}),
 		),
+		useOpenRouter: v.optional(v.boolean()),
 	},
 	handler: async (
 		ctx,
-		{ token, images },
+		{ token, images, useOpenRouter },
 	): Promise<{
 		overallSuccess: boolean;
 		passed: number;
@@ -1045,6 +1046,40 @@ export const runOcrEvals = adminAction({
 			error?: string;
 		}>;
 	}> => {
-		return ctx.runAction(internal.ocr.evals.runOcrEvalsInternal, { images });
+		return ctx.runAction(internal.ocr.evals.runOcrEvalsInternal, {
+			images,
+			useOpenRouter,
+		});
+	},
+});
+
+export const runSingleOcrEval = adminAction({
+	args: {
+		token: v.string(),
+		filename: v.string(),
+		imageBase64: v.string(),
+		useOpenRouter: v.optional(v.boolean()),
+	},
+	handler: async (
+		ctx,
+		{ token, filename, imageBase64, useOpenRouter },
+	): Promise<{
+		filename: string;
+		results: Array<{
+			filename: string;
+			testDate: string;
+			success: boolean;
+			expectedValidFrom: string;
+			expectedExpiry: string;
+			actualValidFrom?: string;
+			actualExpiry?: string;
+			error?: string;
+		}>;
+	}> => {
+		return ctx.runAction(internal.ocr.evals.runImageOcrEval, {
+			filename,
+			imageBase64,
+			useOpenRouter,
+		});
 	},
 });
