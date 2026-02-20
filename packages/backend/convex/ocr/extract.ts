@@ -115,15 +115,26 @@ async function extractVoucherData(
 	barcode: string | undefined;
 	rawResponse: string;
 }> {
-	const geminiApiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
-	if (!geminiApiKey) {
-		throw new Error("Gemini API key not configured");
+	const currentYear = new Date(currentDate).getFullYear();
+	const prompt = buildPrompt(currentYear);
+
+	let result: { text: string; raw: string };
+
+	try {
+		const geminiApiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+		if (!geminiApiKey) {
+			throw new Error("Gemini API key not configured");
+		}
+		result = await callGeminiApi(imageBase64, prompt, geminiApiKey);
+	} catch (geminiError) {
+		console.warn("Gemini extraction failed, trying OpenRouter:", geminiError);
+		const openRouterApiKey = process.env.OPENROUTER_API_KEY;
+		if (!openRouterApiKey) {
+			throw new Error("OpenRouter API key not configured and Gemini failed");
+		}
+		result = await callOpenRouterApi(imageBase64, prompt, openRouterApiKey);
 	}
 
-	const currentYear = new Date(currentDate).getFullYear();
-
-	const prompt = buildPrompt(currentYear);
-	const result = await callGeminiApi(imageBase64, prompt, geminiApiKey);
 	const extracted: ExtractedData = JSON.parse(result.text);
 
 	console.log("Extracted (raw):", extracted);
@@ -225,6 +236,61 @@ async function callGeminiApi(
 	const textContent = result.candidates?.[0]?.content?.parts?.[0]?.text;
 	if (!textContent) {
 		throw new Error("No text in Gemini response");
+	}
+
+	return { text: textContent, raw: rawResponse };
+}
+
+async function callOpenRouterApi(
+	imageBase64: string,
+	prompt: string,
+	apiKey: string,
+): Promise<{ text: string; raw: string }> {
+	const response = await fetch(
+		"https://openrouter.ai/api/v1/chat/completions",
+		{
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				Authorization: `Bearer ${apiKey}`,
+				"HTTP-Referer": "https://open-voucher.com",
+				"X-Title": "Open Voucher",
+			},
+			body: JSON.stringify({
+				model: "moonshotai/kimi-k2.5",
+				messages: [
+					{
+						role: "user",
+						content: [
+							{ type: "text", text: prompt },
+							{
+								type: "image_url",
+								image_url: {
+									url: `data:image/jpeg;base64,${imageBase64}`,
+								},
+							},
+						],
+					},
+				],
+				response_format: { type: "json_object" },
+				temperature: 0.0,
+				max_tokens: 10000,
+			}),
+		},
+	);
+
+	if (!response.ok) {
+		const error = await response.text();
+		throw new Error(`OpenRouter API error: ${error}`);
+	}
+
+	const result = await response.json();
+	const rawResponse = JSON.stringify(result);
+	console.log("OpenRouter response:", rawResponse);
+
+	const textContent = result.choices?.[0]?.message?.content;
+	if (!textContent) {
+		throw new Error("No text in OpenRouter response");
 	}
 
 	return { text: textContent, raw: rawResponse };
