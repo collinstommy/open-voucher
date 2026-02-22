@@ -368,6 +368,7 @@ export const getUserDetails = adminQuery({
 		const uploadedVouchersWithDetails = await Promise.all(
 			uploadedVouchers.map(async (voucher) => {
 				const imageUrl = await ctx.storage.getUrl(voucher.imageStorageId);
+				const claimer = voucher.claimerId ? await ctx.db.get(voucher.claimerId) : null;
 				return {
 					_id: voucher._id,
 					type: voucher.type,
@@ -375,6 +376,14 @@ export const getUserDetails = adminQuery({
 					imageUrl,
 					expiryDate: voucher.expiryDate,
 					createdAt: voucher.createdAt,
+					claimer: claimer
+						? {
+								_id: claimer._id,
+								username: claimer.username,
+								firstName: claimer.firstName,
+								telegramChatId: claimer.telegramChatId,
+							}
+						: null,
 				};
 			}),
 		);
@@ -384,6 +393,7 @@ export const getUserDetails = adminQuery({
 		const claimedVouchersWithDetails = await Promise.all(
 			claimedVouchers.map(async (voucher) => {
 				const imageUrl = await ctx.storage.getUrl(voucher.imageStorageId);
+				const uploader = await ctx.db.get(voucher.uploaderId);
 				return {
 					_id: voucher._id,
 					type: voucher.type,
@@ -391,6 +401,14 @@ export const getUserDetails = adminQuery({
 					imageUrl,
 					expiryDate: voucher.expiryDate,
 					claimedAt: voucher.claimedAt,
+					uploader: uploader
+						? {
+								_id: uploader._id,
+								username: uploader.username,
+								firstName: uploader.firstName,
+								telegramChatId: uploader.telegramChatId,
+							}
+						: null,
 				};
 			}),
 		);
@@ -427,6 +445,7 @@ export const getUserDetails = adminQuery({
 						: null,
 					uploader: uploader
 						? {
+								_id: uploader._id,
 								username: uploader.username,
 								firstName: uploader.firstName,
 								telegramChatId: uploader.telegramChatId,
@@ -458,6 +477,7 @@ export const getUserDetails = adminQuery({
 						: null,
 					reporter: reporter
 						? {
+								_id: reporter._id,
 								username: reporter.username,
 								firstName: reporter.firstName,
 								telegramChatId: reporter.telegramChatId,
