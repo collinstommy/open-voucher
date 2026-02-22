@@ -287,6 +287,18 @@ function UserDetailPage() {
 									<div className="text-muted-foreground text-sm">
 										Uploaded {new Date(voucher.createdAt).toLocaleString()}
 									</div>
+									{voucher.claimer && (
+										<div className="mt-2 text-sm">
+											<span className="text-muted-foreground">Claimed by: </span>
+											<Link
+												to="/users/$userId"
+												params={{ userId: voucher.claimer._id }}
+												className="text-blue-600 hover:underline"
+											>
+												{voucher.claimer.username || voucher.claimer.firstName || voucher.claimer.telegramChatId}
+											</Link>
+										</div>
+									)}
 								</div>
 							</div>
 						))}
@@ -352,6 +364,18 @@ function UserDetailPage() {
 											Claimed {new Date(voucher.claimedAt).toLocaleString()}
 										</div>
 									)}
+									{voucher.uploader && (
+										<div className="mt-2 text-sm">
+											<span className="text-muted-foreground">Uploaded by: </span>
+											<Link
+												to="/users/$userId"
+												params={{ userId: voucher.uploader._id }}
+												className="text-blue-600 hover:underline"
+											>
+												{voucher.uploader.username || voucher.uploader.firstName || voucher.uploader.telegramChatId}
+											</Link>
+										</div>
+									)}
 								</div>
 							</div>
 						))}
@@ -400,10 +424,15 @@ function UserDetailPage() {
 									</div>
 									<div className="text-muted-foreground text-sm">
 										Uploaded by{" "}
-										{report.uploader?.username ||
-											report.uploader?.firstName ||
-											"Unknown"}{" "}
-										({report.uploader?.telegramChatId})
+										{report.uploader ? (
+											<Link
+												to="/users/$userId"
+												params={{ userId: report.uploader._id }}
+												className="text-blue-600 hover:underline"
+											>
+												{report.uploader.username || report.uploader.firstName || report.uploader.telegramChatId}
+											</Link>
+										) : "Unknown"}
 									</div>
 								</div>
 								<div className="rounded bg-muted p-3">
@@ -489,10 +518,15 @@ function UserDetailPage() {
 									</div>
 									<div className="text-muted-foreground text-sm">
 										Reported by{" "}
-										{report.reporter?.username ||
-											report.reporter?.firstName ||
-											"Unknown"}{" "}
-										({report.reporter?.telegramChatId})
+										{report.reporter ? (
+											<Link
+												to="/users/$userId"
+												params={{ userId: report.reporter._id }}
+												className="text-blue-600 hover:underline"
+											>
+												{report.reporter.username || report.reporter.firstName || report.reporter.telegramChatId}
+											</Link>
+										) : "Unknown"}
 									</div>
 								</div>
 								<div className="rounded bg-muted p-3">
