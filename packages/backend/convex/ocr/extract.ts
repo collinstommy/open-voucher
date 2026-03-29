@@ -144,7 +144,9 @@ async function extractVoucherData(
 		}
 	}
 
-	const extracted: ExtractedData = JSON.parse(result.text);
+
+	const normalizedText = result.text.trim().replace(/(:\s*)0+(\d)/g, "$1$2");
+	const extracted: ExtractedData = JSON.parse(normalizedText);
 
 	console.log("Extracted (raw):", extracted);
 
@@ -185,7 +187,7 @@ The date format on the voucher can vary:
 - "Valid from 11/02/26 to 17/02/26" means validFrom is day 11, month 2, and expiry is day 17, month 2
 
 Extract ONLY the day and month numbers from the voucher validity range:
-1. **Type**: The discount amount (5, 10, or 20). If it is NOT one of these specific amounts, return "0".
+1. **Type**: The discount amount (5, 10, or 20). For example, if the voucher says "SAVE €5" and "When you spend €25 or more", return "5". If it is NOT one of these specific amounts, return "0".
 2. **validFromDay**: Day of month for the START of validity range (e.g., "Valid 30 Dec - 5 Jan" → 30, "11/02/26" → 11)
 3. **validFromMonth**: Month number for the START of validity range (e.g., "Valid 30 Dec - 5 Jan" → 12, "11/02/26" → 2 for February)
 4. **expiryDay**: Day of month for the END of validity range (e.g., "Valid 30 Dec - 5 Jan" → 5, "17/02/26" → 17)
