@@ -248,6 +248,49 @@ async function handleImageUpload(
 	}
 }
 
+async function sendHelpMenu(chatId: string) {
+	await sendTelegramMessage(chatId, "Choose an option below", {
+		inline_keyboard: [
+			[
+				{ text: "Balance", callback_data: "help:balance" },
+				{ text: "FAQ", callback_data: "help:faq" },
+			],
+			[{ text: "Give feedback", callback_data: "help:feedback" }],
+			[
+				{
+					text: "Voucher Availability",
+					callback_data: "help:availability",
+				},
+			],
+			[
+				{ text: "How to upload?", callback_data: "help:upload" },
+				{ text: "How to claim?", callback_data: "help:claim" },
+			],
+			[{ text: "View Transactions", callback_data: "help:transactions" }],
+		],
+	});
+}
+
+async function sendFaqMenu(chatId: string) {
+	await sendTelegramMessage(chatId, "Choose a FAQ question below", {
+		inline_keyboard: [
+			[
+				{
+					text: "Can I return/cancel a voucher?",
+					callback_data: "faq:return_cancel",
+				},
+			],
+			[
+				{
+					text: "Voucher processing failed",
+					callback_data: "faq:processing_failed",
+				},
+			],
+			[{ text: "Back to Help", callback_data: "faq:back" }],
+		],
+	});
+}
+
 async function handleCommand(
 	ctx: ActionCtx,
 	chatId: string,
@@ -261,26 +304,12 @@ async function handleCommand(
 	}
 
 	if (lowerText === "help") {
-		await sendTelegramMessage(chatId, "Choose an option below", {
-			inline_keyboard: [
-				[
-					{ text: "Balance", callback_data: "help:balance" },
-					{ text: "Support", callback_data: "help:support" },
-				],
-				[{ text: "Give feedback", callback_data: "help:feedback" }],
-				[
-					{
-						text: "Voucher Availability",
-						callback_data: "help:availability",
-					},
-				],
-				[
-					{ text: "How to upload?", callback_data: "help:upload" },
-					{ text: "How to claim?", callback_data: "help:claim" },
-				],
-				[{ text: "View Transactions", callback_data: "help:transactions" }],
-			],
-		});
+		await sendHelpMenu(chatId);
+		return true;
+	}
+
+	if (lowerText === "faq") {
+		await sendFaqMenu(chatId);
 		return true;
 	}
 
@@ -678,15 +707,9 @@ export const handleTelegramCallback = internalAction({
 					await sendTelegramMessage(chatId, `💰 You have ${user.coins} coins.`);
 					break;
 				}
-				case "support": {
-					await ctx.runMutation(internal.users.setUserTelegramState, {
-						userId: user._id,
-						state: "waiting_for_support_message",
-					});
-					await sendTelegramMessage(
-						chatId,
-						"Please reply with a message describing what you need help with",
-					);
+				case "support":
+				case "faq": {
+					await sendFaqMenu(chatId);
 					break;
 				}
 				case "feedback": {
@@ -769,6 +792,31 @@ export const handleTelegramCallback = internalAction({
 					await sendTelegramMessage(
 						chatId,
 						`📋 <b>Your Last 25 Transactions:</b>\n\n${transactionList.join("\n")}`,
+					);
+					break;
+				}
+			}
+		} else if (data.startsWith("faq:")) {
+			await answerTelegramCallback(callbackQuery.id);
+
+			const faqAction = data.split(":")[1];
+
+			switch (faqAction) {
+				case "back": {
+					await sendHelpMenu(chatId);
+					break;
+				}
+				case "return_cancel": {
+					await sendTelegramMessage(
+						chatId,
+						"Voucher return/cancel is currently <b>not supported</b>.",
+					);
+					break;
+				}
+				case "processing_failed": {
+					await sendTelegramMessage(
+						chatId,
+						"If uploading a paper voucher, retake the photo with clear lighting, the full voucher visible, and no blur.\n\nWe currently do <b>not</b> support Three+ vouchers yet, but support is coming soon.",
 					);
 					break;
 				}
