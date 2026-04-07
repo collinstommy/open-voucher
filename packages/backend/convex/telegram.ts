@@ -357,7 +357,7 @@ async function handleVoucherRequest(
 	if (!result.success) {
 		await sendTelegramMessage(chatId, `❌ ${result.error}`);
 	} else {
-		await sendTelegramPhoto(
+		const sent = await sendTelegramPhoto(
 			chatId,
 			result.imageUrl!,
 			`✅ <b>Here is your €${type} voucher!</b>\n\nExpires: ${dayjs(result.expiryDate!).format("MMM Do")}\nRemaining coins: ${result.remainingCoins}`,
@@ -372,6 +372,24 @@ async function handleVoucherRequest(
 				],
 			},
 		);
+
+		if (!sent) {
+			const refundResult = await ctx.runMutation(
+				internal.vouchers.refundFailedClaimDelivery,
+				{
+					userId: user._id,
+					voucherId: result.voucherId as Id<"vouchers">,
+					type,
+				},
+			);
+
+			if (refundResult.refunded) {
+				await sendTelegramMessage(
+					chatId,
+					`⚠️ We couldn't deliver your voucher image right now. Your ${refundResult.refundAmount} coins were refunded automatically. Please try requesting again.`,
+				);
+			}
+		}
 	}
 	return true;
 }
@@ -524,10 +542,10 @@ async function sendTelegramPhoto(
 	photoUrl: string,
 	caption?: string,
 	replyMarkup?: Record<string, unknown>,
-) {
+): Promise<boolean> {
 	const token = process.env.TELEGRAM_BOT_TOKEN;
 	if (!token) {
-		return;
+		return false;
 	}
 
 	if (photoUrl === "image") {
@@ -536,7 +554,7 @@ async function sendTelegramPhoto(
 			caption || "Sample image placeholder",
 			replyMarkup,
 		);
-		return;
+		return true;
 	}
 
 	const url = `https://api.telegram.org/bot${token}/sendPhoto`;
@@ -546,7 +564,7 @@ async function sendTelegramPhoto(
 			console.error(
 				`Failed to fetch image from storage URL: ${photoUrl} - ${imageRes.statusText}`,
 			);
-			return;
+			return false;
 		}
 		const imageBlob = await imageRes.blob();
 
@@ -570,9 +588,13 @@ async function sendTelegramPhoto(
 		if (!response.ok) {
 			const errorText = await response.text();
 			console.error("Failed to send Telegram photo:", errorText);
+			return false;
 		}
+
+		return true;
 	} catch (error) {
 		console.error("Network error sending Telegram photo:", error);
+		return false;
 	}
 }
 
@@ -773,6 +795,8 @@ export const handleTelegramCallback = internalAction({
 								return "📤 Upload Reward";
 							case "claim_spend":
 								return "💳 Claim Spent";
+							case "refund":
+								return "↩️ Refund";
 							case "report_refund":
 								return "↩️ Refund";
 							case "uploader_denied":

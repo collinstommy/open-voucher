@@ -102,6 +102,7 @@ export default defineSchema({
 			v.literal("signup_bonus"),
 			v.literal("upload_reward"),
 			v.literal("claim_spend"),
+			v.literal("refund"),
 			v.literal("report_refund"),
 			v.literal("uploader_refund"),
 			v.literal("uploader_denied"),
