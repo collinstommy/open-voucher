@@ -5,6 +5,9 @@ export interface MockGeminiParams {
 	validFromDay?: number | null;
 	validFromMonth?: number | null;
 	expiryDate?: string | null;
+	expiryDay?: number | null;
+	expiryMonth?: number | null;
+	expiryYear?: number | null;
 	barcode?: string | null;
 }
 
@@ -14,8 +17,20 @@ export function mockGeminiResponse(params: MockGeminiParams) {
 		validFromDay = null,
 		validFromMonth = null,
 		expiryDate = null,
+		expiryDay = null,
+		expiryMonth = null,
+		expiryYear = null,
 		barcode = null,
 	} = params;
+
+	const dateParts = expiryDate ? expiryDate.split("-") : null;
+	const parsedExpiryYear =
+		expiryYear ?? (dateParts ? Number.parseInt(dateParts[0], 10) : null);
+	const parsedExpiryMonth =
+		expiryMonth ?? (dateParts ? Number.parseInt(dateParts[1], 10) : null);
+	const parsedExpiryDay =
+		expiryDay ?? (dateParts ? Number.parseInt(dateParts[2], 10) : null);
+
 	return {
 		candidates: [
 			{
@@ -26,7 +41,9 @@ export function mockGeminiResponse(params: MockGeminiParams) {
 								type,
 								validFromDay,
 								validFromMonth,
-								expiryDate,
+								expiryDay: parsedExpiryDay,
+								expiryMonth: parsedExpiryMonth,
+								expiryYear: parsedExpiryYear,
 								barcode,
 							}),
 						},

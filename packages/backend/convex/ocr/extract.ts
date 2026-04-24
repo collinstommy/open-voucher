@@ -25,7 +25,25 @@ function parseVoucherDates(
 	extracted: ExtractedData,
 	currentDate: string,
 ): ParsedDates {
-	if (!extracted.validFromDay || !extracted.validFromMonth) {
+	const validFromDay = Number(extracted.validFromDay);
+	const validFromMonth = Number(extracted.validFromMonth);
+	const expiryDay = Number(extracted.expiryDay);
+	const expiryMonth = Number(extracted.expiryMonth);
+	const extractedExpiryYear = Number(extracted.expiryYear);
+
+	const hasValidFromFields =
+		Number.isFinite(validFromDay) &&
+		validFromDay > 0 &&
+		Number.isFinite(validFromMonth) &&
+		validFromMonth > 0;
+
+	const hasExpiryFields =
+		Number.isFinite(expiryDay) &&
+		expiryDay > 0 &&
+		Number.isFinite(expiryMonth) &&
+		expiryMonth > 0;
+
+	if (!hasValidFromFields && !hasExpiryFields) {
 		return { validFrom: undefined, expiryDate: undefined };
 	}
 
@@ -33,34 +51,49 @@ function parseVoucherDates(
 	const testYear = testDate.year();
 	const testMonth = testDate.month() + 1; // dayjs months are 0-indexed
 
-	const validFromMonth = Number(extracted.validFromMonth);
-	const expiryMonth = Number(extracted.expiryMonth);
-
 	// Compute the year for validFrom and expiry based on test date context
-	const { validFromYear, expiryYear } = computeYears(
-		validFromMonth,
-		expiryMonth,
-		testYear,
-		testMonth,
-		extracted.expiryYear,
-	);
+	let validFromYear = testYear;
+	let expiryYear =
+		Number.isFinite(extractedExpiryYear) && extractedExpiryYear > 0
+			? extractedExpiryYear
+			: testYear;
+
+	if (hasValidFromFields && hasExpiryFields) {
+		const computedYears = computeYears(
+			validFromMonth,
+			expiryMonth,
+			testYear,
+			testMonth,
+			numberOrUndefined(extractedExpiryYear),
+		);
+		validFromYear = computedYears.validFromYear;
+		expiryYear = computedYears.expiryYear;
+	}
 
 	// Build dates
-	const validFrom = dayjs()
-		.year(validFromYear)
-		.month(validFromMonth - 1)
-		.date(extracted.validFromDay)
-		.startOf("day")
-		.format("YYYY-MM-DD");
+	const validFrom = hasValidFromFields
+		? dayjs()
+				.year(validFromYear)
+				.month(validFromMonth - 1)
+				.date(validFromDay)
+				.startOf("day")
+				.format("YYYY-MM-DD")
+		: undefined;
 
-	const expiryDate = dayjs()
-		.year(expiryYear)
-		.month((extracted.expiryMonth ?? 1) - 1)
-		.date(extracted.expiryDay ?? 1)
-		.startOf("day")
-		.format("YYYY-MM-DD");
+	const expiryDate = hasExpiryFields
+		? dayjs()
+				.year(expiryYear)
+				.month(expiryMonth - 1)
+				.date(expiryDay)
+				.startOf("day")
+				.format("YYYY-MM-DD")
+		: undefined;
 
 	return { validFrom, expiryDate };
+}
+
+function numberOrUndefined(value: number): number | undefined {
+	return Number.isFinite(value) && value > 0 ? value : undefined;
 }
 
 /**
@@ -143,7 +176,6 @@ async function extractVoucherData(
 			result = await callOpenRouterApi(imageBase64, prompt, openRouterApiKey);
 		}
 	}
-
 
 	const normalizedText = result.text.trim().replace(/(:\s*)0+(\d)/g, "$1$2");
 	const extracted: ExtractedData = JSON.parse(normalizedText);

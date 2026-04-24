@@ -73,6 +73,8 @@ function setupFetchMock(
 		}),
 		valid_5: mockGeminiResponse({
 			type: 5,
+			validFromDay,
+			validFromMonth,
 			expiryDate: customExpiryDate || futureDateStr,
 			barcode: "1234567890001",
 		}),

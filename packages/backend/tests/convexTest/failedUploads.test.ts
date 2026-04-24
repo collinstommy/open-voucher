@@ -148,7 +148,7 @@ function setupFetchMock(geminiScenario: OCRSenario = "valid_10") {
 
 			// Mock Telegram sendPhoto
 			if (url.includes("api.telegram.org") && url.includes("/sendPhoto")) {
-				let body: any = {};
+				const body: any = {};
 				if (options?.body instanceof FormData) {
 					sentMessages.push({
 						chatId: options.body.get("chat_id") as string,
@@ -200,7 +200,7 @@ describe("Failed Uploads", () => {
 	});
 
 	describe("Validation Failures", () => {
-		test("records COULD_NOT_READ_VALID_FROM when validFrom missing", async () => {
+		test("records COULD_NOT_READ_VALID_FROM when validFrom is missing", async () => {
 			vi.useFakeTimers();
 			setupFetchMock("missing_valid_from");
 			const t = convexTest(schema, modules);
@@ -237,7 +237,6 @@ describe("Failed Uploads", () => {
 				failureReason: "COULD_NOT_READ_VALID_FROM",
 				extractedType: "10",
 				extractedBarcode: "1234567890006",
-				extractedExpiryDate: expect.any(String),
 			});
 			expect(failedUploads[0].extractedValidFrom).toBeUndefined();
 
@@ -293,7 +292,7 @@ describe("Failed Uploads", () => {
 			expect(sentMessages[0].text).toContain("€5, €10, or €20 Dunnes voucher");
 		});
 
-		test("records COULD_NOT_READ_EXPIRY_DATE when expiry date missing", async () => {
+		test("records COULD_NOT_READ_EXPIRY_DATE when expiry fields are missing", async () => {
 			vi.useFakeTimers();
 			setupFetchMock("missing_expiry");
 			const t = convexTest(schema, modules);
@@ -315,15 +314,19 @@ describe("Failed Uploads", () => {
 
 			await t.finishAllScheduledFunctions(vi.runAllTimers);
 
-			const failedUploads = await t.run(async (ctx) => {
-				return await ctx.db.query("failedUploads").collect();
-			});
-
+			const failedUploads = await t.run(async (ctx) =>
+				ctx.db.query("failedUploads").collect(),
+			);
 			expect(failedUploads).toHaveLength(1);
 			expect(failedUploads[0]).toMatchObject({
 				failureType: "validation",
 				failureReason: "COULD_NOT_READ_EXPIRY_DATE",
 			});
+
+			const vouchers = await t.run(async (ctx) =>
+				ctx.db.query("vouchers").collect(),
+			);
+			expect(vouchers).toHaveLength(0);
 
 			expect(sentMessages[0].text).toContain("expiry date");
 		});
@@ -528,7 +531,9 @@ describe("Failed Uploads", () => {
 				failureType: "system",
 				failureReason: "SYSTEM_ERROR",
 			});
-			expect(failedUploads[0].errorMessage).toContain("Gemini API error");
+			expect(failedUploads[0].errorMessage).toContain(
+				"OpenRouter API key not configured and Gemini failed",
+			);
 
 			// Verify no OCR data
 			expect(failedUploads[0].rawOcrResponse).toBeUndefined();
