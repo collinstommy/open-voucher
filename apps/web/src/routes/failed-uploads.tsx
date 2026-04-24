@@ -4,10 +4,22 @@ import { convexQuery } from "@convex-dev/react-query";
 import { api } from "@open-voucher/backend/convex/_generated/api";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { CheckIcon, ChevronDownIcon } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Button } from "@/components/ui/button";
+import {
+	DropdownMenu,
+	DropdownMenuCheckboxItem,
+	DropdownMenuContent,
+	DropdownMenuSeparator,
+	DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export const Route = createFileRoute("/failed-uploads")({
 	component: FailedUploadsPage,
 });
+
+const DEFAULT_EXCLUDED = new Set(["TOO_LATE_TODAY", "DUPLICATE_BARCODE"]);
 
 function FailedUploadsPage() {
 	const { token } = useAdminAuth();
@@ -15,6 +27,42 @@ function FailedUploadsPage() {
 	const { data, isLoading, error } = useQuery(
 		convexQuery(api.admin.getFailedUploads, token ? { token } : "skip"),
 	);
+
+	const [excludedReasons, setExcludedReasons] = useState<Set<string>>(
+		new Set(DEFAULT_EXCLUDED),
+	);
+
+	const failedUploads = data?.failedUploads ?? [];
+
+	const allReasons = useMemo(() => {
+		return [
+			...new Set(
+				failedUploads
+					.map((u) => u.failureReason)
+					.filter((r): r is string => !!r),
+			),
+		].sort();
+	}, [failedUploads]);
+
+	const filteredUploads = useMemo(
+		() => failedUploads.filter((u) => !excludedReasons.has(u.failureReason)),
+		[failedUploads, excludedReasons],
+	);
+
+	const toggleReason = (reason: string) => {
+		setExcludedReasons((prev) => {
+			const next = new Set(prev);
+			if (next.has(reason)) {
+				next.delete(reason);
+			} else {
+				next.add(reason);
+			}
+			return next;
+		});
+	};
+
+	const selectAll = () => setExcludedReasons(new Set());
+	const deselectAll = () => setExcludedReasons(new Set(allReasons));
 
 	if (isLoading) {
 		return (
@@ -25,8 +73,6 @@ function FailedUploadsPage() {
 	if (error) {
 		return <div className="text-red-500">Error loading failed uploads</div>;
 	}
-
-	const failedUploads = data?.failedUploads ?? [];
 
 	if (failedUploads.length === 0) {
 		return (
@@ -45,11 +91,49 @@ function FailedUploadsPage() {
 		<div>
 			<div className="mb-6 flex items-center justify-between">
 				<h1 className="text-xl font-semibold">
-					Failed Uploads ({failedUploads.length})
+					Failed Uploads ({filteredUploads.length})
 				</h1>
+				<DropdownMenu>
+					<DropdownMenuTrigger asChild>
+						<Button variant="outline" size="sm">
+							Filter
+							{allReasons.length - excludedReasons.size !== allReasons.length ? (
+								<span className="bg-primary text-primary-foreground ml-1 rounded-full px-1.5 text-xs">
+									{allReasons.length - excludedReasons.size}
+								</span>
+							) : null}
+							<ChevronDownIcon className="size-4" />
+						</Button>
+					</DropdownMenuTrigger>
+					<DropdownMenuContent align="end" className="w-64">
+						{allReasons.map((reason) => (
+							<DropdownMenuCheckboxItem
+								key={reason}
+								checked={!excludedReasons.has(reason)}
+								onCheckedChange={() => toggleReason(reason)}
+							>
+								{reason}
+							</DropdownMenuCheckboxItem>
+						))}
+						<DropdownMenuSeparator />
+						<button
+							className="focus:bg-accent focus:text-accent-foreground relative flex w-full cursor-default items-center gap-2 rounded-sm px-2 py-1.5 pl-8 text-sm outline-hidden select-none"
+							onClick={selectAll}
+						>
+							<CheckIcon className="pointer-events-none absolute left-2 size-4 text-transparent" />
+							Select All
+						</button>
+						<button
+							className="focus:bg-accent focus:text-accent-foreground relative flex w-full cursor-default items-center gap-2 rounded-sm px-2 py-1.5 pl-8 text-sm outline-hidden select-none"
+							onClick={deselectAll}
+						>
+							Deselect All
+						</button>
+					</DropdownMenuContent>
+				</DropdownMenu>
 			</div>
 			<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-				{failedUploads.map((failedUpload) => (
+				{filteredUploads.map((failedUpload) => (
 					<div
 						key={failedUpload._id}
 						className="rounded-lg border border-red-200 p-4"
