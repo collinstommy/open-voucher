@@ -4,8 +4,8 @@ import { convexQuery } from "@convex-dev/react-query";
 import { api } from "@open-voucher/backend/convex/_generated/api";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { CheckIcon, ChevronDownIcon } from "lucide-react";
-import { useState } from "react";
+import { CheckIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
+import { useCallback, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
 	DropdownMenu,
@@ -27,31 +27,46 @@ function FailedUploadsPage() {
 	const [excludedReasons, setExcludedReasons] = useState<Set<string>>(
 		new Set(DEFAULT_EXCLUDED),
 	);
+	const [page, setPage] = useState(1);
 
 	const { data, isLoading, error } = useQuery(
 		convexQuery(
 			api.admin.getFailedUploads,
-			token ? { token, excludeReasons: [...excludedReasons] } : "skip",
+			token
+				? { token, excludeReasons: [...excludedReasons], page }
+				: "skip",
 		),
 	);
 
 	const failedUploads = data?.failedUploads ?? [];
 	const allReasons = data?.allReasons ?? [];
+	const total = data?.total ?? 0;
+	const hasMore = data?.hasMore ?? false;
 
-	const toggleReason = (reason: string) => {
-		setExcludedReasons((prev) => {
-			const next = new Set(prev);
-			if (next.has(reason)) {
-				next.delete(reason);
-			} else {
-				next.add(reason);
-			}
-			return next;
-		});
+	const toggleReason = useCallback(
+		(reason: string) => {
+			setExcludedReasons((prev) => {
+				const next = new Set(prev);
+				if (next.has(reason)) {
+					next.delete(reason);
+				} else {
+					next.add(reason);
+				}
+				return next;
+			});
+			setPage(1);
+		},
+		[],
+	);
+
+	const selectAll = () => {
+		setExcludedReasons(new Set());
+		setPage(1);
 	};
-
-	const selectAll = () => setExcludedReasons(new Set());
-	const deselectAll = () => setExcludedReasons(new Set(allReasons));
+	const deselectAll = () => {
+		setExcludedReasons(new Set(allReasons));
+		setPage(1);
+	};
 
 	if (isLoading) {
 		return (
@@ -76,11 +91,13 @@ function FailedUploadsPage() {
 		);
 	}
 
+	const totalPages = Math.ceil(total / (data?.pageSize ?? 12));
+
 	return (
 		<div>
 			<div className="mb-6 flex items-center justify-between">
 				<h1 className="text-xl font-semibold">
-					Failed Uploads ({failedUploads.length})
+					Failed Uploads ({total > failedUploads.length ? `${failedUploads.length} of ${total}` : total})
 				</h1>
 				<DropdownMenu>
 					<DropdownMenuTrigger asChild>
@@ -183,6 +200,31 @@ function FailedUploadsPage() {
 					</div>
 				))}
 			</div>
+			{totalPages > 1 && (
+				<div className="mt-6 flex items-center justify-center gap-3">
+					<Button
+						variant="outline"
+						size="sm"
+						disabled={page <= 1}
+						onClick={() => setPage((p) => p - 1)}
+					>
+						<ChevronLeftIcon className="size-4" />
+						Previous
+					</Button>
+					<span className="text-muted-foreground text-sm">
+						Page {page} of {totalPages}
+					</span>
+					<Button
+						variant="outline"
+						size="sm"
+						disabled={!hasMore}
+						onClick={() => setPage((p) => p + 1)}
+					>
+						Next
+						<ChevronRightIcon className="size-4" />
+					</Button>
+				</div>
+			)}
 		</div>
 	);
 }
