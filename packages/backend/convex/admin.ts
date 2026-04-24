@@ -805,15 +805,31 @@ export const clearUserData = internalMutation({
 });
 
 export const getFailedUploads = adminQuery({
-	args: {},
-	handler: async (ctx) => {
+	args: {
+		excludeReasons: v.optional(v.array(v.string())),
+	},
+	handler: async (ctx, { excludeReasons }) => {
 		const failedUploads = await ctx.db
 			.query("failedUploads")
 			.order("desc")
 			.take(50);
 
+		const allReasons = [
+			...new Set(
+				failedUploads
+					.map((u) => u.failureReason)
+					.filter((r): r is string => !!r),
+			),
+		].sort();
+
+		const filtered = excludeReasons?.length
+			? failedUploads.filter(
+					(u) => !excludeReasons.includes(u.failureReason),
+				)
+			: failedUploads;
+
 		const failedUploadsWithDetails = await Promise.all(
-			failedUploads.map(async (failedUpload) => {
+			filtered.map(async (failedUpload) => {
 				const user = await ctx.db.get(failedUpload.userId);
 				const imageUrl = await ctx.storage.getUrl(failedUpload.imageStorageId);
 
@@ -833,7 +849,10 @@ export const getFailedUploads = adminQuery({
 			}),
 		);
 
-		return { failedUploads: failedUploadsWithDetails };
+		return {
+			failedUploads: failedUploadsWithDetails,
+			allReasons,
+		};
 	},
 });
 

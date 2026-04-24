@@ -5,7 +5,7 @@ import { api } from "@open-voucher/backend/convex/_generated/api";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { CheckIcon, ChevronDownIcon } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
 	DropdownMenu,
@@ -24,30 +24,19 @@ const DEFAULT_EXCLUDED = new Set(["TOO_LATE_TODAY", "DUPLICATE_BARCODE"]);
 function FailedUploadsPage() {
 	const { token } = useAdminAuth();
 
-	const { data, isLoading, error } = useQuery(
-		convexQuery(api.admin.getFailedUploads, token ? { token } : "skip"),
-	);
-
 	const [excludedReasons, setExcludedReasons] = useState<Set<string>>(
 		new Set(DEFAULT_EXCLUDED),
 	);
 
-	const failedUploads = data?.failedUploads ?? [];
-
-	const allReasons = useMemo(() => {
-		return [
-			...new Set(
-				failedUploads
-					.map((u) => u.failureReason)
-					.filter((r): r is string => !!r),
-			),
-		].sort();
-	}, [failedUploads]);
-
-	const filteredUploads = useMemo(
-		() => failedUploads.filter((u) => !excludedReasons.has(u.failureReason)),
-		[failedUploads, excludedReasons],
+	const { data, isLoading, error } = useQuery(
+		convexQuery(
+			api.admin.getFailedUploads,
+			token ? { token, excludeReasons: [...excludedReasons] } : "skip",
+		),
 	);
+
+	const failedUploads = data?.failedUploads ?? [];
+	const allReasons = data?.allReasons ?? [];
 
 	const toggleReason = (reason: string) => {
 		setExcludedReasons((prev) => {
@@ -91,13 +80,13 @@ function FailedUploadsPage() {
 		<div>
 			<div className="mb-6 flex items-center justify-between">
 				<h1 className="text-xl font-semibold">
-					Failed Uploads ({filteredUploads.length})
+					Failed Uploads ({failedUploads.length})
 				</h1>
 				<DropdownMenu>
 					<DropdownMenuTrigger asChild>
 						<Button variant="outline" size="sm">
 							Filter
-							{allReasons.length - excludedReasons.size !== allReasons.length ? (
+							{excludedReasons.size > 0 ? (
 								<span className="bg-primary text-primary-foreground ml-1 rounded-full px-1.5 text-xs">
 									{allReasons.length - excludedReasons.size}
 								</span>
@@ -133,7 +122,7 @@ function FailedUploadsPage() {
 				</DropdownMenu>
 			</div>
 			<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-				{filteredUploads.map((failedUpload) => (
+				{failedUploads.map((failedUpload) => (
 					<div
 						key={failedUpload._id}
 						className="rounded-lg border border-red-200 p-4"
