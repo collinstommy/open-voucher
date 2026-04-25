@@ -840,7 +840,7 @@ export const handleTelegramCallback = internalAction({
 				case "processing_failed": {
 					await sendTelegramMessage(
 						chatId,
-						"If uploading a paper voucher, retake the photo with clear lighting, the full voucher visible, and no blur.\n\nWe currently do <b>not</b> support Three+ vouchers yet, but support is coming soon.",
+						"If uploading a paper voucher, retake the photo with clear lighting, the full voucher visible, and no blur.",
 					);
 					break;
 				}

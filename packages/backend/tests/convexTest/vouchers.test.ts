@@ -29,6 +29,7 @@ type OCRSenario =
 	| "missing_expiry"
 	| "missing_barcode"
 	| "too_late_today"
+	| "three_plus"
 	| "gemini_api_error";
 
 function setupFetchMock(
@@ -73,6 +74,8 @@ function setupFetchMock(
 		}),
 		valid_5: mockGeminiResponse({
 			type: 5,
+			validFromDay,
+			validFromMonth,
 			expiryDate: customExpiryDate || futureDateStr,
 			barcode: "1234567890001",
 		}),
@@ -131,6 +134,14 @@ function setupFetchMock(
 			validFromMonth,
 			expiryDate: todayDateStr,
 			barcode: "1234567890010",
+		}),
+		three_plus: mockGeminiResponse({
+			type: 5,
+			validFromDay: null,
+			validFromMonth: null,
+			expiryDate: customExpiryDate || futureDateStr,
+			barcode: "2226687019052",
+			isThreePlus: true,
 		}),
 		gemini_api_error: null,
 	};

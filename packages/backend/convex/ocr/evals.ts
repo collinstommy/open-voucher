@@ -9,7 +9,7 @@ const TEST_CONFIG: Record<
 	Record<
 		string,
 		{
-			validFrom: string;
+			validFrom: string | undefined;
 			expiry: string;
 		}
 	>
@@ -68,6 +68,11 @@ const TEST_CONFIG: Record<
 		"2026-03-23": { validFrom: "2026-03-23", expiry: "2026-03-29" },
 		"2026-03-30": { validFrom: "2026-03-23", expiry: "2026-03-29" },
 	},
+	"threeplus-expire-mar-31.png": {
+		"2026-03-30": { validFrom: undefined, expiry: "2026-03-31" },
+		"2026-03-31": { validFrom: undefined, expiry: "2026-03-31" },
+		"2026-04-01": { validFrom: undefined, expiry: "2026-03-31" },
+	},
 };
 
 /**
@@ -82,7 +87,7 @@ type EvalResult = {
 	filename: string;
 	testDate: string;
 	success: boolean;
-	expectedValidFrom: string;
+	expectedValidFrom: string | undefined;
 	expectedExpiry: string;
 	actualValidFrom?: string;
 	actualExpiry?: string;
@@ -213,7 +218,7 @@ type SingleEvalResult = {
 	testDate: string;
 	testDateRaw: string;
 	success: boolean;
-	expectedValidFrom: string;
+	expectedValidFrom: string | undefined;
 	expectedExpiry: string;
 	actualValidFrom?: string;
 	actualExpiry?: string;

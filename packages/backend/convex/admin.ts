@@ -1092,7 +1092,7 @@ export const runOcrEvals = adminAction({
 			filename: string;
 			testDate: string;
 			success: boolean;
-			expectedValidFrom: string;
+			expectedValidFrom: string | undefined;
 			expectedExpiry: string;
 			actualValidFrom?: string;
 			actualExpiry?: string;
@@ -1122,7 +1122,7 @@ export const runSingleOcrEval = adminAction({
 			filename: string;
 			testDate: string;
 			success: boolean;
-			expectedValidFrom: string;
+			expectedValidFrom: string | undefined;
 			expectedExpiry: string;
 			actualValidFrom?: string;
 			actualExpiry?: string;

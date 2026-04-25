@@ -50,6 +50,7 @@ export const storeVoucherFromOcr = internalMutation({
 		validFrom: v.optional(v.string()),
 		expiryDate: v.optional(v.string()),
 		barcode: v.optional(v.string()),
+		isThreePlus: v.optional(v.boolean()),
 		rawResponse: v.string(),
 	},
 	handler: async (ctx, args) => {
@@ -60,6 +61,7 @@ export const storeVoucherFromOcr = internalMutation({
 			validFrom,
 			expiryDate,
 			barcode,
+			isThreePlus,
 			rawResponse,
 		} = args;
 
@@ -158,48 +160,51 @@ export const storeVoucherFromOcr = internalMutation({
 			};
 		}
 
-		if (!validFrom) {
-			await recordFailedUpload(
-				ctx,
-				userId,
-				imageStorageId,
-				"COULD_NOT_READ_VALID_FROM",
-				{
-					rawResponse,
-					type,
-					barcode,
-					expiryDate,
-					validFrom,
-				},
-			);
-			await sendErrorMessage(
-				ctx,
-				user.telegramChatId,
-				"COULD_NOT_READ_VALID_FROM",
-			);
-			return { success: false, reason: "COULD_NOT_READ_VALID_FROM" };
-		}
+		// Three+ vouchers don't have a validFrom date - skip this check for them
+		if (!isThreePlus) {
+			if (!validFrom) {
+				await recordFailedUpload(
+					ctx,
+					userId,
+					imageStorageId,
+					"COULD_NOT_READ_VALID_FROM",
+					{
+						rawResponse,
+						type,
+						barcode,
+						expiryDate,
+						validFrom,
+					},
+				);
+				await sendErrorMessage(
+					ctx,
+					user.telegramChatId,
+					"COULD_NOT_READ_VALID_FROM",
+				);
+				return { success: false, reason: "COULD_NOT_READ_VALID_FROM" };
+			}
 
-		if (!isValidFromValid) {
-			await recordFailedUpload(
-				ctx,
-				userId,
-				imageStorageId,
-				"COULD_NOT_READ_VALID_FROM",
-				{
-					rawResponse,
-					type,
-					barcode,
-					expiryDate,
-					validFrom,
-				},
-			);
-			await sendErrorMessage(
-				ctx,
-				user.telegramChatId,
-				"COULD_NOT_READ_VALID_FROM",
-			);
-			return { success: false, reason: "COULD_NOT_READ_VALID_FROM" };
+			if (!isValidFromValid) {
+				await recordFailedUpload(
+					ctx,
+					userId,
+					imageStorageId,
+					"COULD_NOT_READ_VALID_FROM",
+					{
+						rawResponse,
+						type,
+						barcode,
+						expiryDate,
+						validFrom,
+					},
+				);
+				await sendErrorMessage(
+					ctx,
+					user.telegramChatId,
+					"COULD_NOT_READ_VALID_FROM",
+				);
+				return { success: false, reason: "COULD_NOT_READ_VALID_FROM" };
+			}
 		}
 
 		if (!barcode) {
@@ -254,7 +259,9 @@ export const storeVoucherFromOcr = internalMutation({
 			imageStorageId,
 			uploaderId: userId,
 			expiryDate: expiryDateMs,
-			validFrom: dayjsValidFrom?.startOf("day").valueOf(),
+			validFrom: isThreePlus
+				? undefined
+				: dayjsValidFrom?.startOf("day").valueOf(),
 			barcodeNumber: barcode,
 			ocrRawResponse: rawResponse,
 			createdAt: nowMs,

@@ -10,6 +10,7 @@ type ExtractedData = {
 	expiryMonth?: number;
 	expiryYear?: number;
 	barcode?: string;
+	isThreePlus?: boolean;
 };
 
 type ParsedDates = {
@@ -25,7 +26,25 @@ function parseVoucherDates(
 	extracted: ExtractedData,
 	currentDate: string,
 ): ParsedDates {
-	if (!extracted.validFromDay || !extracted.validFromMonth) {
+	const validFromDay = Number(extracted.validFromDay);
+	const validFromMonth = Number(extracted.validFromMonth);
+	const expiryDay = Number(extracted.expiryDay);
+	const expiryMonth = Number(extracted.expiryMonth);
+	const extractedExpiryYear = Number(extracted.expiryYear);
+
+	const hasValidFromFields =
+		Number.isFinite(validFromDay) &&
+		validFromDay > 0 &&
+		Number.isFinite(validFromMonth) &&
+		validFromMonth > 0;
+
+	const hasExpiryFields =
+		Number.isFinite(expiryDay) &&
+		expiryDay > 0 &&
+		Number.isFinite(expiryMonth) &&
+		expiryMonth > 0;
+
+	if (!hasValidFromFields && !hasExpiryFields) {
 		return { validFrom: undefined, expiryDate: undefined };
 	}
 
@@ -33,34 +52,49 @@ function parseVoucherDates(
 	const testYear = testDate.year();
 	const testMonth = testDate.month() + 1; // dayjs months are 0-indexed
 
-	const validFromMonth = Number(extracted.validFromMonth);
-	const expiryMonth = Number(extracted.expiryMonth);
-
 	// Compute the year for validFrom and expiry based on test date context
-	const { validFromYear, expiryYear } = computeYears(
-		validFromMonth,
-		expiryMonth,
-		testYear,
-		testMonth,
-		extracted.expiryYear,
-	);
+	let validFromYear = testYear;
+	let expiryYear =
+		Number.isFinite(extractedExpiryYear) && extractedExpiryYear > 0
+			? extractedExpiryYear
+			: testYear;
+
+	if (hasValidFromFields && hasExpiryFields) {
+		const computedYears = computeYears(
+			validFromMonth,
+			expiryMonth,
+			testYear,
+			testMonth,
+			numberOrUndefined(extractedExpiryYear),
+		);
+		validFromYear = computedYears.validFromYear;
+		expiryYear = computedYears.expiryYear;
+	}
 
 	// Build dates
-	const validFrom = dayjs()
-		.year(validFromYear)
-		.month(validFromMonth - 1)
-		.date(extracted.validFromDay)
-		.startOf("day")
-		.format("YYYY-MM-DD");
+	const validFrom = hasValidFromFields
+		? dayjs()
+				.year(validFromYear)
+				.month(validFromMonth - 1)
+				.date(validFromDay)
+				.startOf("day")
+				.format("YYYY-MM-DD")
+		: undefined;
 
-	const expiryDate = dayjs()
-		.year(expiryYear)
-		.month((extracted.expiryMonth ?? 1) - 1)
-		.date(extracted.expiryDay ?? 1)
-		.startOf("day")
-		.format("YYYY-MM-DD");
+	const expiryDate = hasExpiryFields
+		? dayjs()
+				.year(expiryYear)
+				.month(expiryMonth - 1)
+				.date(expiryDay)
+				.startOf("day")
+				.format("YYYY-MM-DD")
+		: undefined;
 
 	return { validFrom, expiryDate };
+}
+
+function numberOrUndefined(value: number): number | undefined {
+	return Number.isFinite(value) && value > 0 ? value : undefined;
 }
 
 /**
@@ -114,6 +148,7 @@ async function extractVoucherData(
 	validFrom: string | undefined;
 	expiryDate: string | undefined;
 	barcode: string | undefined;
+	isThreePlus: boolean;
 	rawResponse: string;
 }> {
 	const currentYear = new Date(currentDate).getFullYear();
@@ -144,7 +179,6 @@ async function extractVoucherData(
 		}
 	}
 
-
 	const normalizedText = result.text.trim().replace(/(:\s*)0+(\d)/g, "$1$2");
 	const extracted: ExtractedData = JSON.parse(normalizedText);
 
@@ -164,6 +198,7 @@ async function extractVoucherData(
 		validFrom,
 		expiryDate,
 		barcode: extracted.barcode,
+		isThreePlus: extracted.isThreePlus ?? false,
 		rawResponse: result.raw,
 	};
 }
@@ -179,28 +214,33 @@ We are ONLY looking for specific Dunnes Stores vouchers (Ireland) of these exact
 
 Any other voucher type (e.g. "€1 off", "€3 off", product specific, or from other stores) is INVALID.
 
+Three+ vouchers are special: they are issued by Three mobile and say "with Three+" or "Three+" on them. They typically only have an expiry date ("valid until X") and NO start date. These ARE valid €5 off €25 vouchers and should return type "5".
+
 The date on the voucher is relative to the voucher issue date of ${currentYear}.
 
 The date format on the voucher can vary:
 - "Valid 30 Dec - 5 Jan" (day month)
 - "11/02/26 to 17/02/26" means day 11, month 02 (February), year 26 (DD/MM/YY format)
 - "Valid from 11/02/26 to 17/02/26" means validFrom is day 11, month 2, and expiry is day 17, month 2
+- "Valid until 31st March 2026" means ONLY an expiry date, no start date
 
 Extract ONLY the day and month numbers from the voucher validity range:
 1. **Type**: The discount amount (5, 10, or 20). For example, if the voucher says "SAVE €5" and "When you spend €25 or more", return "5". If it is NOT one of these specific amounts, return "0".
-2. **validFromDay**: Day of month for the START of validity range (e.g., "Valid 30 Dec - 5 Jan" → 30, "11/02/26" → 11)
-3. **validFromMonth**: Month number for the START of validity range (e.g., "Valid 30 Dec - 5 Jan" → 12, "11/02/26" → 2 for February)
-4. **expiryDay**: Day of month for the END of validity range (e.g., "Valid 30 Dec - 5 Jan" → 5, "17/02/26" → 17)
-5. **expiryMonth**: Month number for the END of validity range (e.g., "Valid 30 Dec - 5 Jan" → 1, "17/02/26" → 2 for February)
+2. **validFromDay**: Day of month for the START of validity range (e.g., "Valid 30 Dec - 5 Jan" → 30, "11/02/26" → 11). If there is no start date (e.g., "valid until X"), return null.
+3. **validFromMonth**: Month number for the START of validity range (e.g., "Valid 30 Dec - 5 Jan" → 12, "11/02/26" → 2 for February). If there is no start date, return null.
+4. **expiryDay**: Day of month for the END of validity range (e.g., "Valid 30 Dec - 5 Jan" → 5, "17/02/26" → 17, "valid until 31st March" → 31)
+5. **expiryMonth**: Month number for the END of validity range (e.g., "Valid 30 Dec - 5 Jan" → 1, "17/02/26" → 2 for February, "valid until 31st March" → 3)
 6. **expiryYear**: If the image shows a full date with year (e.g., "11/02/26"), extract the year (26). Otherwise leave as null.
-7. **Barcode**: The number below the barcode.
+7. **barcode**: The number below the barcode.
+8. **isThreePlus**: true if this is a Three+ voucher (says "Three+" or "with Three+"), false otherwise.
 
 Return ONLY JSON:
-{"type": "10", "validFromDay": 11, "validFromMonth": 2, "expiryDay": 17, "expiryMonth": 2, "expiryYear": 2026, "barcode": "1234567890"}
+{"type": "10", "validFromDay": 11, "validFromMonth": 2, "expiryDay": 17, "expiryMonth": 2, "expiryYear": 2026, "barcode": "1234567890", "isThreePlus": false}
 
 If barcode is missing: null.
 If type is unknown or invalid: "0".
-If any date field is unknown: null.`;
+If any date field is unknown: null.
+If the voucher only has "valid until" with no start date: set validFromDay and validFromMonth to null.`;
 }
 
 async function callGeminiApi(
