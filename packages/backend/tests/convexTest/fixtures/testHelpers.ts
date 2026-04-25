@@ -9,6 +9,7 @@ export interface MockGeminiParams {
 	expiryMonth?: number | null;
 	expiryYear?: number | null;
 	barcode?: string | null;
+	isThreePlus?: boolean;
 }
 
 export function mockGeminiResponse(params: MockGeminiParams) {
@@ -21,6 +22,7 @@ export function mockGeminiResponse(params: MockGeminiParams) {
 		expiryMonth = null,
 		expiryYear = null,
 		barcode = null,
+		isThreePlus = false,
 	} = params;
 
 	const dateParts = expiryDate ? expiryDate.split("-") : null;
@@ -45,6 +47,7 @@ export function mockGeminiResponse(params: MockGeminiParams) {
 								expiryMonth: parsedExpiryMonth,
 								expiryYear: parsedExpiryYear,
 								barcode,
+								isThreePlus,
 							}),
 						},
 					],
@@ -232,4 +235,5 @@ export type OCRScenario =
 	| "missing_expiry"
 	| "missing_barcode"
 	| "too_late_today"
+	| "three_plus"
 	| "gemini_api_error";

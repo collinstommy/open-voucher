@@ -23,6 +23,7 @@ type OCRSenario =
 	| "missing_expiry"
 	| "missing_barcode"
 	| "too_late_today"
+	| "three_plus"
 	| "gemini_api_error";
 
 function setupFetchMock(geminiScenario: OCRSenario = "valid_10") {
@@ -93,6 +94,14 @@ function setupFetchMock(geminiScenario: OCRSenario = "valid_10") {
 			validFromMonth,
 			expiryDate: todayDateStr,
 			barcode: "1234567890010",
+		}),
+		three_plus: mockGeminiResponse({
+			type: 5,
+			validFromDay: null,
+			validFromMonth: null,
+			expiryDate: futureDateStr,
+			barcode: "2226687019052",
+			isThreePlus: true,
 		}),
 		gemini_api_error: null,
 	};
@@ -692,6 +701,40 @@ describe("Failed Uploads", () => {
 			});
 
 			expect(storageUrl).toBeDefined();
+		});
+
+		test("accepts Three+ voucher without validFrom date", async () => {
+			vi.useFakeTimers();
+			setupFetchMock("three_plus");
+			const t = convexTest(schema, modules);
+			const chatId = "909090909";
+
+			const userId = await createUser(t, { telegramChatId: chatId });
+			const imageStorageId = await t.run(async (ctx) => {
+				return await ctx.storage.store(new Blob(["fake-image"]));
+			});
+
+			await t.mutation(internal.vouchers.uploadVoucher, {
+				userId,
+				imageStorageId,
+			});
+
+			await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+			// Verify no failed upload was created
+			const failedUploads = await t.run(async (ctx) => {
+				return await ctx.db.query("failedUploads").collect();
+			});
+			expect(failedUploads).toHaveLength(0);
+
+			// Verify voucher was created
+			const vouchers = await t.run(async (ctx) => {
+				return await ctx.db.query("vouchers").collect();
+			});
+			expect(vouchers).toHaveLength(1);
+			expect(vouchers[0].type).toBe("5");
+			expect(vouchers[0].barcodeNumber).toBe("2226687019052");
+			expect(vouchers[0].validFrom).toBeUndefined();
 		});
 	});
 });
