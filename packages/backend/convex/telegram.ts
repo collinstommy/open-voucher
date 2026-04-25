@@ -267,6 +267,7 @@ async function sendHelpMenu(chatId: string) {
 				{ text: "How to claim?", callback_data: "help:claim" },
 			],
 			[{ text: "View Transactions", callback_data: "help:transactions" }],
+			[{ text: "View updates", callback_data: "help:updates" }],
 		],
 	});
 }
@@ -776,51 +777,58 @@ export const handleTelegramCallback = internalAction({
 					);
 					break;
 				}
-				case "transactions": {
-					const transactions = await ctx.runQuery(
-						internal.users.getUserTransactions,
-						{ userId: user._id },
-					);
+			case "transactions": {
+				const transactions = await ctx.runQuery(
+					internal.users.getUserTransactions,
+					{ userId: user._id },
+				);
 
-					if (transactions.length === 0) {
-						await sendTelegramMessage(chatId, "📋 No transactions yet.");
-						break;
-					}
-
-					const formatType = (type: string) => {
-						switch (type) {
-							case "signup_bonus":
-								return "🎁 Signup Bonus";
-							case "upload_reward":
-								return "📤 Upload Reward";
-							case "claim_spend":
-								return "💳 Claim Spent";
-							case "refund":
-								return "↩️ Refund";
-							case "report_refund":
-								return "↩️ Refund";
-							case "uploader_denied":
-								return "❌ Upload Denied";
-							default:
-								return type;
-						}
-					};
-
-					const transactionList = transactions.map((t) => {
-						const date = dayjs(t.createdAt).format("MMM D, YYYY");
-						const formattedType = formatType(t.type);
-						const amountPrefix = t.type === "claim_spend" ? "-" : "+";
-						return `${formattedType}: ${amountPrefix}${t.amount} (${date})`;
-					});
-
-					await sendTelegramMessage(
-						chatId,
-						`📋 <b>Your Last 25 Transactions:</b>\n\n${transactionList.join("\n")}`,
-					);
+				if (transactions.length === 0) {
+					await sendTelegramMessage(chatId, "📋 No transactions yet.");
 					break;
 				}
+
+				const formatType = (type: string) => {
+					switch (type) {
+						case "signup_bonus":
+							return "🎁 Signup Bonus";
+						case "upload_reward":
+							return "📤 Upload Reward";
+						case "claim_spend":
+							return "💳 Claim Spent";
+						case "refund":
+							return "↩️ Refund";
+						case "report_refund":
+							return "↩️ Refund";
+						case "uploader_denied":
+							return "❌ Upload Denied";
+						default:
+							return type;
+					}
+				};
+
+				const transactionList = transactions.map((t) => {
+					const date = dayjs(t.createdAt).format("MMM D, YYYY");
+					const formattedType = formatType(t.type);
+					const amountPrefix = t.type === "claim_spend" ? "-" : "+";
+					return `${formattedType}: ${amountPrefix}${t.amount} (${date})`;
+				});
+
+				await sendTelegramMessage(
+					chatId,
+					`📋 <b>Your Last 25 Transactions:</b>\n\n${transactionList.join("\n")}`,
+				);
+				break;
 			}
-		} else if (data.startsWith("faq:")) {
+			case "updates": {
+				await sendTelegramMessage(
+					chatId,
+					"🆕 <b>Latest Updates</b>\n\nCheck out what's new:\nhttps://www.openvouchers.org#updates",
+				);
+				break;
+			}
+		}
+	} else if (data.startsWith("faq:")) {
 			await answerTelegramCallback(callbackQuery.id);
 
 			const faqAction = data.split(":")[1];

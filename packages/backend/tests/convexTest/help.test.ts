@@ -101,6 +101,7 @@ describe("Help Command", () => {
 		expect(buttonTexts).toContain("Voucher Availability");
 		expect(buttonTexts).toContain("How to upload?");
 		expect(buttonTexts).toContain("How to claim?");
+		expect(buttonTexts).toContain("View updates");
 	});
 });
 
@@ -242,6 +243,22 @@ describe("Help Callback Responses", () => {
 		expect(claimMsg).toBeDefined();
 		expect(claimMsg?.text).toContain("5") ||
 			claimMsg?.text?.toLowerCase().includes("send");
+	});
+
+	test("updates callback sends link to updates page", async () => {
+		const t = convexTest(schema, modules);
+		const chatId = "123456";
+		await createUser(t, { telegramChatId: chatId, coins: 100 });
+
+		await t.action(internal.telegram.handleTelegramCallback, {
+			callbackQuery: createTelegramCallback({ data: "help:updates", chatId }),
+		});
+
+		const updatesMsg = sentMessages.find(
+			(m) => m.chatId === chatId && m.text?.includes("openvouchers.org#updates"),
+		);
+		expect(updatesMsg).toBeDefined();
+		expect(updatesMsg?.text).toContain("https://openvouchers.org#updates");
 	});
 });
 
