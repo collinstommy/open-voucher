@@ -1210,3 +1210,211 @@ export const runSingleOcrEval = adminAction({
 		});
 	},
 });
+
+// --- Expired Voucher Image Cleanup ---
+
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+const MARK_DELAY_DAYS = 90; // Wait 90 days after expiry before marking
+const DELETE_DELAY_DAYS = 30; // Wait 30 days after marking before deleting
+const BATCH_SIZE = 100;
+
+export const getExpiredVouchersForCleanup = internalQuery({
+	args: {
+		mode: v.union(v.literal("mark"), v.literal("delete")),
+	},
+	handler: async (ctx, { mode }) => {
+		const now = Date.now();
+
+		if (mode === "mark") {
+			// Find expired vouchers older than 60 days that haven't been marked yet
+			const cutoff = now - MARK_DELAY_DAYS * MS_PER_DAY;
+			const vouchers = await ctx.db
+				.query("vouchers")
+				.withIndex("by_status_created", (q) => q.eq("status", "expired"))
+				.filter((q) =>
+					q.and(
+						q.lt(q.field("expiryDate"), cutoff),
+						q.eq(q.field("imageMarkedForDeletionAt"), undefined),
+						q.eq(q.field("imageDeletedAt"), undefined),
+					),
+				)
+				.take(BATCH_SIZE);
+
+			return vouchers.map((v) => ({
+				_id: v._id,
+				imageStorageId: v.imageStorageId,
+				expiryDate: v.expiryDate,
+				status: v.status,
+			}));
+		}
+
+		// Find vouchers marked for deletion older than 30 days
+		const cutoff = now - DELETE_DELAY_DAYS * MS_PER_DAY;
+		const vouchers = await ctx.db
+			.query("vouchers")
+			.filter((q) =>
+				q.and(
+					q.neq(q.field("imageMarkedForDeletionAt"), undefined),
+					q.lt(q.field("imageMarkedForDeletionAt"), cutoff),
+					q.eq(q.field("imageDeletedAt"), undefined),
+				),
+			)
+			.take(BATCH_SIZE);
+
+		return vouchers.map((v) => ({
+			_id: v._id,
+			imageStorageId: v.imageStorageId,
+			expiryDate: v.expiryDate,
+			status: v.status,
+			imageMarkedForDeletionAt: v.imageMarkedForDeletionAt,
+		}));
+	},
+});
+
+export const markVoucherImagesForDeletion = internalMutation({
+	args: {
+		voucherIds: v.array(v.id("vouchers")),
+	},
+	handler: async (ctx, { voucherIds }) => {
+		const now = Date.now();
+		for (const id of voucherIds) {
+			await ctx.db.patch(id, { imageMarkedForDeletionAt: now });
+		}
+		return { marked: voucherIds.length };
+	},
+});
+
+export const deleteVoucherImages = internalMutation({
+	args: {
+		vouchers: v.array(
+			v.object({
+				voucherId: v.id("vouchers"),
+				imageStorageId: v.id("_storage"),
+			}),
+		),
+	},
+	handler: async (ctx, { vouchers }) => {
+		const now = Date.now();
+		let deleted = 0;
+		let skipped = 0;
+
+		for (const { voucherId, imageStorageId } of vouchers) {
+			// Cross-reference check: no other voucher references this image
+			const otherVoucher = await ctx.db
+				.query("vouchers")
+				.filter((q) =>
+					q.and(
+						q.eq(q.field("imageStorageId"), imageStorageId),
+						q.neq(q.field("_id"), voucherId),
+					),
+				)
+				.first();
+
+			if (otherVoucher) {
+				console.log(
+					`Skipping image ${imageStorageId}: still referenced by voucher ${otherVoucher._id}`,
+				);
+				skipped++;
+				continue;
+			}
+
+			// Cross-reference check: no failed upload references this image
+			const failedUpload = await ctx.db
+				.query("failedUploads")
+				.filter((q) => q.eq(q.field("imageStorageId"), imageStorageId))
+				.first();
+
+			if (failedUpload) {
+				console.log(
+					`Skipping image ${imageStorageId}: still referenced by failed upload ${failedUpload._id}`,
+				);
+				skipped++;
+				continue;
+			}
+
+			// Delete the image from storage
+			await ctx.storage.delete(imageStorageId);
+			await ctx.db.patch(voucherId, { imageDeletedAt: now });
+			deleted++;
+		}
+
+		return { deleted, skipped };
+	},
+});
+
+export const cleanupExpiredVoucherImages = adminAction({
+	args: {
+		token: v.string(),
+		dryRun: v.optional(v.boolean()),
+	},
+	handler: async (ctx, { token, dryRun }) => {
+		await verifyAdminSession(ctx, token);
+		const isDryRun = dryRun !== false; // Default to dry-run
+
+		const result: {
+			dryRun: boolean;
+			marked: number;
+			deleted: number;
+			skipped: number;
+			toMark: Array<{ id: string; expiryDate: number }>;
+			toDelete: Array<{ id: string; imageStorageId: string }>;
+		} = {
+			dryRun: isDryRun,
+			marked: 0,
+			deleted: 0,
+			skipped: 0,
+			toMark: [],
+			toDelete: [],
+		};
+
+		// Phase 1: Mark expired vouchers for deletion
+		const toMark = await ctx.runQuery(
+			internal.admin.getExpiredVouchersForCleanup,
+			{ mode: "mark" },
+		);
+
+		result.toMark = toMark.map((v) => ({
+			id: v._id,
+			expiryDate: v.expiryDate,
+		}));
+
+		if (!isDryRun && toMark.length > 0) {
+			await ctx.runMutation(internal.admin.markVoucherImagesForDeletion, {
+				voucherIds: toMark.map((v) => v._id),
+			});
+			result.marked = toMark.length;
+		}
+
+		// Phase 2: Delete images from marked vouchers (past grace period)
+		const toDelete = await ctx.runQuery(
+			internal.admin.getExpiredVouchersForCleanup,
+			{ mode: "delete" },
+		);
+
+		result.toDelete = toDelete.map((v) => ({
+			id: v._id,
+			imageStorageId: v.imageStorageId,
+		}));
+
+		if (!isDryRun && toDelete.length > 0) {
+			const deleteResult = await ctx.runMutation(
+				internal.admin.deleteVoucherImages,
+				{
+					vouchers: toDelete.map((v) => ({
+						voucherId: v._id,
+						imageStorageId: v.imageStorageId,
+					})),
+				},
+			);
+			result.deleted = deleteResult.deleted;
+			result.skipped = deleteResult.skipped;
+		}
+
+		console.log(
+			`[Cleanup ${isDryRun ? "DRY RUN" : "EXECUTED"}] ` +
+				`Marked: ${result.marked}, Deleted: ${result.deleted}, Skipped: ${result.skipped}`,
+		);
+
+		return result;
+	},
+});
