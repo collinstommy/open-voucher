@@ -206,6 +206,7 @@ async function extractVoucherData(
 function buildPrompt(currentYear: number): string {
 	return `You are analyzing an image of a voucher.
 We are ONLY looking for specific Dunnes Stores vouchers (Ireland) of these exact types:
+- €5 off €20
 - €5 off €25
 - €10 off €40
 - €10 off €50
