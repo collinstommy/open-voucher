@@ -86,6 +86,7 @@ function UserDetailPage() {
 	const stats = data?.stats;
 	const uploadedVouchers = data?.uploadedVouchers ?? [];
 	const claimedVouchers = data?.claimedVouchers ?? [];
+	const failedUploads = data?.failedUploads ?? [];
 	const reportsFiledByUser = data?.reportsFiledByUser ?? [];
 	const reportsAgainstUploads = data?.reportsAgainstUploads ?? [];
 	const feedbackAndSupport = data?.feedbackAndSupport ?? [];
@@ -376,6 +377,93 @@ function UserDetailPage() {
 											</Link>
 										</div>
 									)}
+								</div>
+							</div>
+						))}
+					</div>
+				)}
+			</div>
+
+			<div>
+				<h2 className="mb-4 font-semibold text-xl">
+					Failed Uploads ({failedUploads.length})
+				</h2>
+
+				{failedUploads.length === 0 ? (
+					<div className="rounded-lg border p-12 text-center text-muted-foreground">
+						No failed uploads
+					</div>
+				) : (
+					<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+						{failedUploads.map((upload) => (
+							<div key={upload._id} className="rounded-lg border p-4">
+								{upload.imageUrl ? (
+									<img
+										src={upload.imageUrl}
+										alt="Failed Upload"
+										className="mb-3 h-96 w-full rounded border bg-muted object-contain"
+									/>
+								) : (
+									<div className="mb-3 flex h-96 w-full items-center justify-center rounded bg-muted">
+										<span className="text-muted-foreground text-xs">
+											No image
+										</span>
+									</div>
+								)}
+								<div className="mb-3">
+									<div className="mb-2 flex items-center gap-2">
+										<span
+											className={`rounded-full px-2 py-1 font-medium text-xs ${
+												upload.failureType === "validation"
+													? "bg-yellow-100 text-yellow-800"
+													: "bg-red-100 text-red-800"
+											}`}
+										>
+											{upload.failureType}
+										</span>
+									</div>
+									<div className="mb-1 text-muted-foreground text-xs">
+										ID: {upload._id}
+									</div>
+									<div className="mb-1 text-sm">
+										<span className="font-medium">Reason: </span>
+										<span className="text-red-600">{upload.failureReason}</span>
+									</div>
+									{upload.errorMessage && (
+										<div className="mb-1 text-sm">
+											<span className="font-medium">Error: </span>
+											<span className="text-muted-foreground">
+												{upload.errorMessage}
+											</span>
+										</div>
+									)}
+									{upload.extractedType && (
+										<div className="mb-1 text-sm">
+											<span className="font-medium">Extracted Type: </span>
+											<span className="text-muted-foreground">
+												€{upload.extractedType}
+											</span>
+										</div>
+									)}
+									{upload.extractedBarcode && (
+										<div className="mb-1 text-sm">
+											<span className="font-medium">Extracted Barcode: </span>
+											<span className="text-muted-foreground">
+												{upload.extractedBarcode}
+											</span>
+										</div>
+									)}
+									{upload.extractedExpiryDate && (
+										<div className="mb-1 text-sm">
+											<span className="font-medium">Extracted Expiry: </span>
+											<span className="text-muted-foreground">
+												{upload.extractedExpiryDate}
+											</span>
+										</div>
+									)}
+									<div className="text-muted-foreground text-sm">
+										Failed {new Date(upload._creationTime).toLocaleString()}
+									</div>
 								</div>
 							</div>
 						))}

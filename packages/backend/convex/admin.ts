@@ -510,6 +510,32 @@ export const getUserDetails = adminQuery({
 			.order("desc")
 			.collect();
 
+		// Get failed uploads for this user
+		const failedUploadsRaw = await ctx.db
+			.query("failedUploads")
+			.withIndex("by_userId", (q) => q.eq("userId", userId))
+			.order("desc")
+			.collect();
+
+		const failedUploadsWithDetails = await Promise.all(
+			failedUploadsRaw.map(async (failedUpload) => {
+				const imageUrl = await ctx.storage.getUrl(failedUpload.imageStorageId);
+
+				return {
+					_id: failedUpload._id,
+					imageUrl,
+					failureType: failedUpload.failureType,
+					failureReason: failedUpload.failureReason,
+					errorMessage: failedUpload.errorMessage,
+					extractedType: failedUpload.extractedType,
+					extractedBarcode: failedUpload.extractedBarcode,
+					extractedExpiryDate: failedUpload.extractedExpiryDate,
+					extractedValidFrom: failedUpload.extractedValidFrom,
+					_creationTime: failedUpload._creationTime,
+				};
+			}),
+		);
+
 		return {
 			user: {
 				_id: user._id,
@@ -529,6 +555,7 @@ export const getUserDetails = adminQuery({
 			},
 			uploadedVouchers: uploadedVouchersWithDetails,
 			claimedVouchers: claimedVouchersWithDetails,
+			failedUploads: failedUploadsWithDetails,
 			reportsFiledByUser,
 			reportsAgainstUploads: reportsAgainstUserUploads,
 			feedbackAndSupport,

@@ -124,7 +124,7 @@ export default defineSchema({
 		extractedBarcode: v.optional(v.string()),
 		extractedExpiryDate: v.optional(v.string()),
 		extractedValidFrom: v.optional(v.string()),
-	}),
+	}).index("by_userId", ["userId"]),
 	feedback: defineTable({
 		userId: v.id("users"),
 		text: v.string(),
