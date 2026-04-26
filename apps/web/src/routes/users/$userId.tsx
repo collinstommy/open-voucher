@@ -93,14 +93,14 @@ function UserDetailPage() {
 
 	const user = data?.user;
 	const stats = data?.stats;
-	const uploadedVouchers = data?.uploadedVouchers ?? [];
-	const claimedVouchers = data?.claimedVouchers ?? [];
-	const failedUploads = data?.failedUploads ?? [];
-	const reportsFiledByUser = data?.reportsFiledByUser ?? [];
-	const reportsAgainstUploads = data?.reportsAgainstUploads ?? [];
-	const feedbackAndSupport = data?.feedbackAndSupport ?? [];
-	const adminMessages = data?.adminMessages ?? [];
-	const transactions = data?.transactions ?? [];
+	const uploadedVouchers = [...(data?.uploadedVouchers ?? [])].sort((a, b) => b.createdAt - a.createdAt);
+	const claimedVouchers = [...(data?.claimedVouchers ?? [])].sort((a, b) => (b.claimedAt ?? 0) - (a.claimedAt ?? 0));
+	const failedUploads = [...(data?.failedUploads ?? [])].sort((a, b) => b._creationTime - a._creationTime);
+	const reportsFiledByUser = [...(data?.reportsFiledByUser ?? [])].sort((a, b) => b.createdAt - a.createdAt);
+	const reportsAgainstUploads = [...(data?.reportsAgainstUploads ?? [])].sort((a, b) => b.createdAt - a.createdAt);
+	const feedbackAndSupport = [...(data?.feedbackAndSupport ?? [])].sort((a, b) => b.createdAt - a.createdAt);
+	const adminMessages = [...(data?.adminMessages ?? [])].sort((a, b) => b.createdAt - a.createdAt);
+	const transactions = [...(data?.transactions ?? [])].sort((a, b) => b.createdAt - a.createdAt);
 
 	if (!user) {
 		return <div className="text-red-500">User not found</div>;
