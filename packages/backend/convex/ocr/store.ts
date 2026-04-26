@@ -81,8 +81,11 @@ export const storeVoucherFromOcr = internalMutation({
 		const isExpiryDateValid =
 			expiryDate && dayjsExpiry.isValid() && dayjsExpiry.valueOf() > oneYearAgo;
 		const isAlreadyExpired = dayjsExpiry.isBefore(now, "day");
-		const isTooLateToday = dayjsExpiry.isSame(now, "day") && now.hour() >= 21;
-		const expiryDateMs = dayjsExpiry.endOf("day").valueOf();
+		// Check if it's after 9 PM Irish time
+		const irishHour = Number(new Intl.DateTimeFormat("en-IE", { timeZone: "Europe/Dublin", hour: "numeric", hour12: false }).format(new Date()));
+		const isTooLateToday = dayjsExpiry.isSame(now, "day") && irishHour >= 21;
+		// Store at 22:59 UTC so it displays as the correct day in both UTC+0 and UTC+1
+		const expiryDateMs = Date.UTC(dayjsExpiry.year(), dayjsExpiry.month(), dayjsExpiry.date(), 22, 59, 0, 0);
 
 		// Parse validFrom for later validation
 		const dayjsValidFrom = dayjs(validFrom);
@@ -261,7 +264,7 @@ export const storeVoucherFromOcr = internalMutation({
 			expiryDate: expiryDateMs,
 			validFrom: isThreePlus
 				? undefined
-				: dayjsValidFrom?.startOf("day").valueOf(),
+				: Date.UTC(dayjsValidFrom.year(), dayjsValidFrom.month(), dayjsValidFrom.date(), 0, 0, 0, 0),
 			barcodeNumber: barcode,
 			ocrRawResponse: rawResponse,
 			createdAt: nowMs,

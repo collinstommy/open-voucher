@@ -255,10 +255,10 @@ describe("Help Callback Responses", () => {
 		});
 
 		const updatesMsg = sentMessages.find(
-			(m) => m.chatId === chatId && m.text?.includes("openvouchers.org#updates"),
+			(m) => m.chatId === chatId && m.text?.includes("www.openvouchers.org#updates"),
 		);
 		expect(updatesMsg).toBeDefined();
-		expect(updatesMsg?.text).toContain("https://openvouchers.org#updates");
+		expect(updatesMsg?.text).toContain("https://www.openvouchers.org#updates");
 	});
 });
 
