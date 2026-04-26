@@ -268,6 +268,7 @@ async function sendHelpMenu(chatId: string) {
 			],
 			[{ text: "View Transactions", callback_data: "help:transactions" }],
 			[{ text: "View updates", callback_data: "help:updates" }],
+			[{ text: "☕ Donate", callback_data: "help:donate" }],
 		],
 	});
 }
@@ -311,6 +312,22 @@ async function handleCommand(
 
 	if (lowerText === "faq") {
 		await sendFaqMenu(chatId);
+		return true;
+	}
+
+	if (lowerText === "donate") {
+		await sendTelegramMessage(
+			chatId,
+			"☕ <b>Support Open Vouchers</b>\n\nThe service is free, but servers and AI-powered OCR aren't. Your support helps keep the lights on!\n\nhttps://buymeacoffee.com/openvouchers",
+		);
+		return true;
+	}
+
+	if (lowerText === "feedback") {
+		await sendTelegramMessage(
+			chatId,
+			"📝 To send feedback, include your message:\n<code>feedback your message here</code>",
+		);
 		return true;
 	}
 
@@ -454,7 +471,7 @@ export const handleTelegramMessage = internalAction({
 			return;
 		}
 
-		const lowerText = text.toLowerCase().trim();
+		const lowerText = text.toLowerCase().trim().replace(/^\//, "");
 
 		if (await handleCommand(ctx, chatId, lowerText, text, user)) return;
 
@@ -598,6 +615,47 @@ async function sendTelegramPhoto(
 		return false;
 	}
 }
+
+async function setBotCommands() {
+	const token = process.env.TELEGRAM_BOT_TOKEN;
+	if (!token) {
+		console.error("TELEGRAM_BOT_TOKEN is not set");
+		return;
+	}
+
+	const commands = [
+		{ command: "help", description: "Show help menu" },
+		{ command: "balance", description: "Check your coin balance" },
+		{ command: "faq", description: "Frequently asked questions" },
+		{ command: "feedback", description: "Send feedback" },
+		{ command: "donate", description: "Support the project" },
+	];
+
+	const url = `https://api.telegram.org/bot${token}/setMyCommands`;
+	try {
+		const response = await fetch(url, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ commands }),
+		});
+
+		if (!response.ok) {
+			const errorText = await response.text();
+			console.error("Failed to set bot commands:", errorText);
+		} else {
+			console.log("Bot commands registered successfully");
+		}
+	} catch (error) {
+		console.error("Network error setting bot commands:", error);
+	}
+}
+
+export const registerBotCommands = internalAction({
+	args: {},
+	handler: async () => {
+		await setBotCommands();
+	},
+});
 
 export const handleTelegramCallback = internalAction({
 	args: {
@@ -824,6 +882,13 @@ export const handleTelegramCallback = internalAction({
 				await sendTelegramMessage(
 					chatId,
 					"🆕 <b>Latest Updates</b>\n\nCheck out what's new:\nhttps://www.openvouchers.org#updates",
+				);
+				break;
+			}
+			case "donate": {
+				await sendTelegramMessage(
+					chatId,
+					"☕ <b>Support Open Vouchers</b>\n\nThe service is free, but servers and AI-powered OCR aren't. Your support helps keep the lights on!\n\nhttps://buymeacoffee.com/openvouchers",
 				);
 				break;
 			}

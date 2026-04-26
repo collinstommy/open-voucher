@@ -81,6 +81,21 @@ This script will:
 - Delete and set the Telegram webhook
 - Configure all environment variables in Convex
 
+### Register Telegram Bot Commands
+
+After initial setup, register the bot commands so users see suggestions when typing `/`:
+
+```bash
+bunx convex run telegram:registerBotCommands
+```
+
+This enables the command menu in Telegram with:
+- `/help` - Show help menu
+- `/balance` - Check your coin balance
+- `/faq` - Frequently asked questions
+- `/feedback` - Send feedback
+- `/donate` - Support the project
+
 ### Sample/Test Voucher Setup
 
 To set up the sample voucher image shown to users:
