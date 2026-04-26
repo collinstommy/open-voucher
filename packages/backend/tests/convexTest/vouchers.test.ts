@@ -29,6 +29,7 @@ type OCRSenario =
 	| "missing_expiry"
 	| "missing_barcode"
 	| "too_late_today"
+	| "three_plus"
 	| "gemini_api_error";
 
 function setupFetchMock(
@@ -73,6 +74,8 @@ function setupFetchMock(
 		}),
 		valid_5: mockGeminiResponse({
 			type: 5,
+			validFromDay,
+			validFromMonth,
 			expiryDate: customExpiryDate || futureDateStr,
 			barcode: "1234567890001",
 		}),
@@ -132,6 +135,14 @@ function setupFetchMock(
 			expiryDate: todayDateStr,
 			barcode: "1234567890010",
 		}),
+		three_plus: mockGeminiResponse({
+			type: 5,
+			validFromDay: null,
+			validFromMonth: null,
+			expiryDate: customExpiryDate || futureDateStr,
+			barcode: "2226687019052",
+			isThreePlus: true,
+		}),
 		gemini_api_error: null,
 	};
 
@@ -188,7 +199,7 @@ function setupFetchMock(
 
 			// Mock Telegram sendPhoto
 			if (url.includes("api.telegram.org") && url.includes("/sendPhoto")) {
-				let body: any = {};
+				const body: any = {};
 				if (options?.body instanceof FormData) {
 					sentMessages.push({
 						chatId: options.body.get("chat_id") as string,
@@ -363,6 +374,94 @@ describe("Voucher Claim Flow", () => {
 			(m) => m.chatId === chatId && m.text?.includes("Insufficient coins"),
 		);
 		expect(errorMsg).toBeDefined();
+	});
+
+	test("claim auto-refunds when voucher delivery fails", async () => {
+		sentMessages = [];
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async (url: string, options?: RequestInit) => {
+				if (url.includes("api.telegram.org") && url.includes("/sendMessage")) {
+					let body: any = {};
+					if (typeof options?.body === "string") {
+						body = JSON.parse(options.body);
+					}
+					sentMessages.push({ chatId: body.chat_id, text: body.text });
+					return {
+						ok: true,
+						json: async () => mockTelegramResponse(),
+					} as Response;
+				}
+
+				if (url.includes("api.telegram.org") && url.includes("/sendPhoto")) {
+					return {
+						ok: false,
+						text: async () => "sendPhoto failed",
+					} as Response;
+				}
+
+				if (url.includes("convex.cloud") || url.includes("convex.site")) {
+					return {
+						ok: true,
+						arrayBuffer: async () => new ArrayBuffer(100),
+						blob: async () =>
+							new Blob(["voucher-image"], { type: "image/jpeg" }),
+					} as Response;
+				}
+
+				return {
+					ok: true,
+					json: async () => mockTelegramResponse(),
+				} as Response;
+			}),
+		);
+
+		const t = convexTest(schema, modules);
+		const chatId = "123456";
+
+		const userId = await createUser(t, { telegramChatId: chatId, coins: 20 });
+		const uploaderId = await createUser(t, {
+			telegramChatId: "uploader123",
+			coins: 0,
+		});
+
+		const voucherId = await createVoucher(t, {
+			type: "10",
+			uploaderId,
+			status: "available",
+		});
+
+		await t.action(internal.telegram.handleTelegramMessage, {
+			message: createTelegramMessage({ text: "10", chatId }),
+		});
+
+		const user = await t.run(async (ctx) => {
+			return await ctx.db.get(userId);
+		});
+		expect(user?.coins).toBe(20);
+
+		const voucher = await t.run(async (ctx) => {
+			return await ctx.db.get(voucherId);
+		});
+		expect(voucher?.status).toBe("available");
+		expect(voucher?.claimerId).toBeUndefined();
+
+		const transactions = await t.run(async (ctx) => {
+			return await ctx.db
+				.query("transactions")
+				.withIndex("by_user", (q) => q.eq("userId", userId))
+				.collect();
+		});
+
+		expect(transactions.some((tx) => tx.type === "claim_spend")).toBe(true);
+		expect(transactions.some((tx) => tx.type === "refund")).toBe(true);
+
+		const refundMsg = sentMessages.find(
+			(m) =>
+				m.chatId === chatId &&
+				m.text?.includes("coins were refunded automatically"),
+		);
+		expect(refundMsg).toBeDefined();
 	});
 
 	test("claim fails when no voucher available via Telegram webhook", async () => {

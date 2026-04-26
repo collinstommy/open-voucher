@@ -4,17 +4,69 @@ import { convexQuery } from "@convex-dev/react-query";
 import { api } from "@open-voucher/backend/convex/_generated/api";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { CheckIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
+import { useCallback, useState } from "react";
+import { Button } from "@/components/ui/button";
+import {
+	DropdownMenu,
+	DropdownMenuCheckboxItem,
+	DropdownMenuContent,
+	DropdownMenuSeparator,
+	DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export const Route = createFileRoute("/failed-uploads")({
 	component: FailedUploadsPage,
 });
 
+const DEFAULT_EXCLUDED = new Set(["TOO_LATE_TODAY", "DUPLICATE_BARCODE"]);
+
 function FailedUploadsPage() {
 	const { token } = useAdminAuth();
 
-	const { data, isLoading, error } = useQuery(
-		convexQuery(api.admin.getFailedUploads, token ? { token } : "skip"),
+	const [excludedReasons, setExcludedReasons] = useState<Set<string>>(
+		new Set(DEFAULT_EXCLUDED),
 	);
+	const [page, setPage] = useState(1);
+
+	const { data, isLoading, error } = useQuery(
+		convexQuery(
+			api.admin.getFailedUploads,
+			token
+				? { token, excludeReasons: [...excludedReasons], page }
+				: "skip",
+		),
+	);
+
+	const failedUploads = data?.failedUploads ?? [];
+	const allReasons = data?.allReasons ?? [];
+	const total = data?.total ?? 0;
+	const hasMore = data?.hasMore ?? false;
+
+	const toggleReason = useCallback(
+		(reason: string) => {
+			setExcludedReasons((prev) => {
+				const next = new Set(prev);
+				if (next.has(reason)) {
+					next.delete(reason);
+				} else {
+					next.add(reason);
+				}
+				return next;
+			});
+			setPage(1);
+		},
+		[],
+	);
+
+	const selectAll = () => {
+		setExcludedReasons(new Set());
+		setPage(1);
+	};
+	const deselectAll = () => {
+		setExcludedReasons(new Set(allReasons));
+		setPage(1);
+	};
 
 	if (isLoading) {
 		return (
@@ -25,8 +77,6 @@ function FailedUploadsPage() {
 	if (error) {
 		return <div className="text-red-500">Error loading failed uploads</div>;
 	}
-
-	const failedUploads = data?.failedUploads ?? [];
 
 	if (failedUploads.length === 0) {
 		return (
@@ -41,12 +91,52 @@ function FailedUploadsPage() {
 		);
 	}
 
+	const totalPages = Math.ceil(total / (data?.pageSize ?? 12));
+
 	return (
 		<div>
 			<div className="mb-6 flex items-center justify-between">
 				<h1 className="text-xl font-semibold">
-					Failed Uploads ({failedUploads.length})
+					Failed Uploads ({total > failedUploads.length ? `${failedUploads.length} of ${total}` : total})
 				</h1>
+				<DropdownMenu>
+					<DropdownMenuTrigger asChild>
+						<Button variant="outline" size="sm">
+							Filter
+							{excludedReasons.size > 0 ? (
+								<span className="bg-primary text-primary-foreground ml-1 rounded-full px-1.5 text-xs">
+									{allReasons.length - excludedReasons.size}
+								</span>
+							) : null}
+							<ChevronDownIcon className="size-4" />
+						</Button>
+					</DropdownMenuTrigger>
+					<DropdownMenuContent align="end" className="w-64">
+						{allReasons.map((reason) => (
+							<DropdownMenuCheckboxItem
+								key={reason}
+								checked={!excludedReasons.has(reason)}
+								onCheckedChange={() => toggleReason(reason)}
+							>
+								{reason}
+							</DropdownMenuCheckboxItem>
+						))}
+						<DropdownMenuSeparator />
+						<button
+							className="focus:bg-accent focus:text-accent-foreground relative flex w-full cursor-default items-center gap-2 rounded-sm px-2 py-1.5 pl-8 text-sm outline-hidden select-none"
+							onClick={selectAll}
+						>
+							<CheckIcon className="pointer-events-none absolute left-2 size-4 text-transparent" />
+							Select All
+						</button>
+						<button
+							className="focus:bg-accent focus:text-accent-foreground relative flex w-full cursor-default items-center gap-2 rounded-sm px-2 py-1.5 pl-8 text-sm outline-hidden select-none"
+							onClick={deselectAll}
+						>
+							Deselect All
+						</button>
+					</DropdownMenuContent>
+				</DropdownMenu>
 			</div>
 			<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
 				{failedUploads.map((failedUpload) => (
@@ -110,6 +200,31 @@ function FailedUploadsPage() {
 					</div>
 				))}
 			</div>
+			{totalPages > 1 && (
+				<div className="mt-6 flex items-center justify-center gap-3">
+					<Button
+						variant="outline"
+						size="sm"
+						disabled={page <= 1}
+						onClick={() => setPage((p) => p - 1)}
+					>
+						<ChevronLeftIcon className="size-4" />
+						Previous
+					</Button>
+					<span className="text-muted-foreground text-sm">
+						Page {page} of {totalPages}
+					</span>
+					<Button
+						variant="outline"
+						size="sm"
+						disabled={!hasMore}
+						onClick={() => setPage((p) => p + 1)}
+					>
+						Next
+						<ChevronRightIcon className="size-4" />
+					</Button>
+				</div>
+			)}
 		</div>
 	);
 }

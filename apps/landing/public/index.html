@@ -29,13 +29,16 @@
 <body class="bg-gray-50 text-gray-800 flex flex-col min-h-screen">
 
     <!-- Navbar -->
-    <nav class="bg-white border-b border-gray-100 py-4">
+    <nav class="bg-gray-900 py-4">
         <div class="container mx-auto px-6 flex justify-between items-center">
             <div class="flex items-center gap-2">
                 <span class="text-2xl">🛒</span>
-                <span class="font-bold text-xl tracking-tight text-gray-900">Open Vouchers</span>
+                <span class="font-bold text-xl tracking-tight text-white">Open Vouchers</span>
             </div>
-            <div class="text-sm text-gray-500 font-medium">Free</div>
+            <a href="https://buymeacoffee.com/openvouchers" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 text-yellow-400 hover:text-yellow-300 transition-colors text-sm font-medium">
+                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M20.216 6.415c-.04-.162-.134-.308-.272-.404-.138-.096-.308-.14-.478-.126h-.004c-.17.014-.336.07-.468.162l-.002.002c-.016.01-.03.022-.044.034l-.002.002-4.834 3.506-4.834-3.506-.002-.002c-.014-.012-.028-.024-.044-.034l-.002-.002c-.132-.092-.298-.148-.468-.162h-.004c-.17-.014-.34.03-.478.126-.138.096-.232.242-.272.404-.04.162-.03.334.028.488l.002.004c.006.016.014.03.022.044l.002.004 5.584 8.094c.092.134.234.23.394.27h.034c.16-.002.314-.06.436-.162l5.068-5.588.002-.002c.014-.016.026-.032.036-.048l.002-.004c.056-.154.066-.326.026-.488zM3.96 5h16.08c.53 0 .96.43.96.96v.08c0 .53-.43.96-.96.96H3.96c-.53 0-.96-.43-.96-.96v-.08c0-.53.43-.96.96-.96z"/></svg>
+                Buy me a coffee
+            </a>
         </div>
     </nav>
 
@@ -173,8 +176,47 @@
         </div>
     </section>
 
-    <!-- FAQ Section -->
+    <!-- Updates Section -->
     <section class="py-16 bg-white border-t border-gray-200">
+        <div class="container mx-auto px-6">
+            <div class="max-w-3xl mx-auto">
+                <div class="text-center mb-12">
+                    <h2 id="updates" class="text-3xl font-bold text-gray-900">What's New</h2>
+                    <p class="text-gray-500 mt-2">Latest updates and features.</p>
+                </div>
+
+                <div class="space-y-4">
+                    <div class="bg-gray-50 rounded-xl border border-gray-200 p-6 hover:shadow-md transition-all">
+                        <div class="text-sm text-gray-400 mb-2">April 25, 2025</div>
+                        <h3 class="text-lg font-semibold text-gray-900 mb-2">Added support for Three+ vouchers</h3>
+                        <p class="text-gray-600 leading-relaxed">
+                            The bot now accepts <strong>Three+</strong> vouchers (€5 off €25) from Three. You can upload and claim them just like Dunnes vouchers.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Support Section -->
+    <section class="py-16 bg-gradient-to-br from-amber-500 to-orange-500">
+        <div class="container mx-auto px-6">
+            <div class="max-w-2xl mx-auto text-center">
+                <div class="text-5xl mb-4">☕</div>
+                <h2 class="text-3xl font-bold text-white mb-4">Enjoying Open Vouchers?</h2>
+                <p class="text-amber-100 text-lg leading-relaxed mb-8">
+                    The service is free, but servers and AI-powered OCR aren't. Your support helps keep the lights on!
+                </p>
+                <a href="https://buymeacoffee.com/openvouchers" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 bg-white hover:bg-gray-100 text-amber-600 px-8 py-4 rounded-full font-bold text-lg transition-colors shadow-lg">
+                    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M20.216 6.415c-.04-.162-.134-.308-.272-.404-.138-.096-.308-.14-.478-.126h-.004c-.17.014-.336.07-.468.162l-.002.002c-.016.01-.03.022-.044.034l-.002.002-4.834 3.506-4.834-3.506-.002-.002c-.014-.012-.028-.024-.044-.034l-.002-.002c-.132-.092-.298-.148-.468-.162h-.004c-.17-.014-.34.03-.478.126-.138.096-.232.242-.272.404-.04.162-.03.334.028.488l.002.004c.006.016.014.03.022.044l.002.004 5.584 8.094c.092.134.234.23.394.27h.034c.16-.002.314-.06.436-.162l5.068-5.588.002-.002c.014-.016.026-.032.036-.048l.002-.004c.056-.154.066-.326.026-.488zM3.96 5h16.08c.53 0 .96.43.96.96v.08c0 .53-.43.96-.96.96H3.96c-.53 0-.96-.43-.96-.96v-.08c0-.53.43-.96.96-.96z"/></svg>
+                    Buy me a coffee
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- FAQ Section -->
+    <section class="py-16 bg-gray-50 border-t border-gray-200">
         <div class="container mx-auto px-6">
             <div class="max-w-3xl mx-auto">
                 <div class="text-center mb-12">

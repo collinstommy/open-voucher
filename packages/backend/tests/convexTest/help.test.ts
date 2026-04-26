@@ -95,12 +95,13 @@ describe("Help Command", () => {
 		const buttonTexts = buttons.map((b: any) => b.text);
 
 		expect(buttonTexts).toContain("Balance");
-		expect(buttonTexts).toContain("Support");
+		expect(buttonTexts).toContain("FAQ");
 		expect(buttonTexts).toContain("Give feedback");
-		expect(buttonTexts).not.toContain("Faq");
+		expect(buttonTexts).not.toContain("Support");
 		expect(buttonTexts).toContain("Voucher Availability");
 		expect(buttonTexts).toContain("How to upload?");
 		expect(buttonTexts).toContain("How to claim?");
+		expect(buttonTexts).toContain("View updates");
 	});
 });
 
@@ -131,20 +132,26 @@ describe("Help Callback Responses", () => {
 		expect(balanceMsg?.text).toContain("coins");
 	});
 
-	test("support callback prompts user for support message", async () => {
+	test("faq callback shows nested faq menu", async () => {
 		const t = convexTest(schema, modules);
 		const chatId = "123456";
 		await createUser(t, { telegramChatId: chatId, coins: 100 });
 
 		await t.action(internal.telegram.handleTelegramCallback, {
-			callbackQuery: createTelegramCallback({ data: "help:support", chatId }),
+			callbackQuery: createTelegramCallback({ data: "help:faq", chatId }),
 		});
 
-		const supportMsg = sentMessages.find(
-			(m) => m.chatId === chatId && m.text?.toLowerCase().includes("help"),
+		const faqMsg = sentMessages.find(
+			(m) => m.chatId === chatId && m.text?.includes("FAQ"),
 		);
-		expect(supportMsg).toBeDefined();
-		expect(supportMsg?.text).toContain("message");
+		expect(faqMsg).toBeDefined();
+
+		const replyMarkup = JSON.parse(faqMsg?.replyMarkup || "{}");
+		const buttons = (replyMarkup.inline_keyboard || []).flat();
+		const buttonTexts = buttons.map((b: any) => b.text);
+
+		expect(buttonTexts).toContain("Can I return/cancel a voucher?");
+		expect(buttonTexts).toContain("Voucher processing failed");
 	});
 
 	test("feedback callback prompts user for feedback message", async () => {
@@ -236,6 +243,22 @@ describe("Help Callback Responses", () => {
 		expect(claimMsg).toBeDefined();
 		expect(claimMsg?.text).toContain("5") ||
 			claimMsg?.text?.toLowerCase().includes("send");
+	});
+
+	test("updates callback sends link to updates page", async () => {
+		const t = convexTest(schema, modules);
+		const chatId = "123456";
+		await createUser(t, { telegramChatId: chatId, coins: 100 });
+
+		await t.action(internal.telegram.handleTelegramCallback, {
+			callbackQuery: createTelegramCallback({ data: "help:updates", chatId }),
+		});
+
+		const updatesMsg = sentMessages.find(
+			(m) => m.chatId === chatId && m.text?.includes("www.openvouchers.org#updates"),
+		);
+		expect(updatesMsg).toBeDefined();
+		expect(updatesMsg?.text).toContain("https://www.openvouchers.org#updates");
 	});
 });
 

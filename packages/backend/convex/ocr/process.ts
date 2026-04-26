@@ -27,6 +27,7 @@ export const processVoucherImage = internalAction({
 					validFrom: extracted.validFrom || undefined,
 					expiryDate: extracted.expiryDate || undefined,
 					barcode: extracted.barcode || undefined,
+					isThreePlus: extracted.isThreePlus,
 					rawResponse: extracted.rawResponse,
 				},
 			);

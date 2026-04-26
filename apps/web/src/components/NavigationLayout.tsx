@@ -1,8 +1,8 @@
-import { Button } from "@/components/ui/button";
-import { useAdminAuth } from "@/hooks/useAdminAuth";
 import { Link } from "@tanstack/react-router";
 import { LogOut } from "lucide-react";
 import { EnvironmentDropdown } from "@/components/EnvironmentDropdown";
+import { Button } from "@/components/ui/button";
+import { useAdminAuth } from "@/hooks/useAdminAuth";
 
 export function NavigationLayout() {
 	const { isValid, logout } = useAdminAuth();
@@ -27,6 +27,12 @@ export function NavigationLayout() {
 					className="text-muted-foreground hover:text-foreground"
 				>
 					Health Check
+				</Link>
+				<Link
+					to="/evals"
+					className="text-muted-foreground hover:text-foreground"
+				>
+					Evals
 				</Link>
 
 				<Link

@@ -23,6 +23,7 @@ type OCRSenario =
 	| "missing_expiry"
 	| "missing_barcode"
 	| "too_late_today"
+	| "three_plus"
 	| "gemini_api_error";
 
 function setupFetchMock(geminiScenario: OCRSenario = "valid_10") {
@@ -94,6 +95,14 @@ function setupFetchMock(geminiScenario: OCRSenario = "valid_10") {
 			expiryDate: todayDateStr,
 			barcode: "1234567890010",
 		}),
+		three_plus: mockGeminiResponse({
+			type: 5,
+			validFromDay: null,
+			validFromMonth: null,
+			expiryDate: futureDateStr,
+			barcode: "2226687019052",
+			isThreePlus: true,
+		}),
 		gemini_api_error: null,
 	};
 
@@ -148,7 +157,7 @@ function setupFetchMock(geminiScenario: OCRSenario = "valid_10") {
 
 			// Mock Telegram sendPhoto
 			if (url.includes("api.telegram.org") && url.includes("/sendPhoto")) {
-				let body: any = {};
+				const body: any = {};
 				if (options?.body instanceof FormData) {
 					sentMessages.push({
 						chatId: options.body.get("chat_id") as string,
@@ -200,7 +209,7 @@ describe("Failed Uploads", () => {
 	});
 
 	describe("Validation Failures", () => {
-		test("records COULD_NOT_READ_VALID_FROM when validFrom missing", async () => {
+		test("records COULD_NOT_READ_VALID_FROM when validFrom is missing", async () => {
 			vi.useFakeTimers();
 			setupFetchMock("missing_valid_from");
 			const t = convexTest(schema, modules);
@@ -237,7 +246,6 @@ describe("Failed Uploads", () => {
 				failureReason: "COULD_NOT_READ_VALID_FROM",
 				extractedType: "10",
 				extractedBarcode: "1234567890006",
-				extractedExpiryDate: expect.any(String),
 			});
 			expect(failedUploads[0].extractedValidFrom).toBeUndefined();
 
@@ -293,7 +301,7 @@ describe("Failed Uploads", () => {
 			expect(sentMessages[0].text).toContain("€5, €10, or €20 Dunnes voucher");
 		});
 
-		test("records COULD_NOT_READ_EXPIRY_DATE when expiry date missing", async () => {
+		test("records COULD_NOT_READ_EXPIRY_DATE when expiry fields are missing", async () => {
 			vi.useFakeTimers();
 			setupFetchMock("missing_expiry");
 			const t = convexTest(schema, modules);
@@ -315,15 +323,19 @@ describe("Failed Uploads", () => {
 
 			await t.finishAllScheduledFunctions(vi.runAllTimers);
 
-			const failedUploads = await t.run(async (ctx) => {
-				return await ctx.db.query("failedUploads").collect();
-			});
-
+			const failedUploads = await t.run(async (ctx) =>
+				ctx.db.query("failedUploads").collect(),
+			);
 			expect(failedUploads).toHaveLength(1);
 			expect(failedUploads[0]).toMatchObject({
 				failureType: "validation",
 				failureReason: "COULD_NOT_READ_EXPIRY_DATE",
 			});
+
+			const vouchers = await t.run(async (ctx) =>
+				ctx.db.query("vouchers").collect(),
+			);
+			expect(vouchers).toHaveLength(0);
 
 			expect(sentMessages[0].text).toContain("expiry date");
 		});
@@ -528,7 +540,9 @@ describe("Failed Uploads", () => {
 				failureType: "system",
 				failureReason: "SYSTEM_ERROR",
 			});
-			expect(failedUploads[0].errorMessage).toContain("Gemini API error");
+			expect(failedUploads[0].errorMessage).toContain(
+				"OpenRouter API key not configured and Gemini failed",
+			);
 
 			// Verify no OCR data
 			expect(failedUploads[0].rawOcrResponse).toBeUndefined();
@@ -687,6 +701,40 @@ describe("Failed Uploads", () => {
 			});
 
 			expect(storageUrl).toBeDefined();
+		});
+
+		test("accepts Three+ voucher without validFrom date", async () => {
+			vi.useFakeTimers();
+			setupFetchMock("three_plus");
+			const t = convexTest(schema, modules);
+			const chatId = "909090909";
+
+			const userId = await createUser(t, { telegramChatId: chatId });
+			const imageStorageId = await t.run(async (ctx) => {
+				return await ctx.storage.store(new Blob(["fake-image"]));
+			});
+
+			await t.mutation(internal.vouchers.uploadVoucher, {
+				userId,
+				imageStorageId,
+			});
+
+			await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+			// Verify no failed upload was created
+			const failedUploads = await t.run(async (ctx) => {
+				return await ctx.db.query("failedUploads").collect();
+			});
+			expect(failedUploads).toHaveLength(0);
+
+			// Verify voucher was created
+			const vouchers = await t.run(async (ctx) => {
+				return await ctx.db.query("vouchers").collect();
+			});
+			expect(vouchers).toHaveLength(1);
+			expect(vouchers[0].type).toBe("5");
+			expect(vouchers[0].barcodeNumber).toBe("2226687019052");
+			expect(vouchers[0].validFrom).toBeUndefined();
 		});
 	});
 });

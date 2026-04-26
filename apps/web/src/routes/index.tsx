@@ -30,6 +30,9 @@ function HomeComponent() {
 	const userGrowth = useQuery(
 		convexQuery(api.admin.getUserGrowth, token ? { token, range } : "skip"),
 	);
+	const weeklyVouchers = useQuery(
+		convexQuery(api.dashboard.getWeeklyVouchers, {}),
+	);
 
 	return (
 		<div className="grid gap-6">
@@ -154,6 +157,42 @@ function HomeComponent() {
 								/>
 							</LineChart>
 						</ResponsiveContainer>
+					</div>
+				)}
+			</section>
+
+			<section className="rounded-lg border p-4">
+				<h2 className="mb-4 font-medium">This Week's Vouchers</h2>
+				{weeklyVouchers.isLoading ? (
+					<div className="text-muted-foreground text-sm">Loading...</div>
+				) : weeklyVouchers.error ? (
+					<div className="text-red-500 text-sm">Error loading data</div>
+				) : (
+					<div className="overflow-x-auto">
+						<table className="w-full text-sm">
+							<thead>
+								<tr className="border-b">
+									<th className="pb-2 text-left font-medium">Date</th>
+									<th className="pb-2 text-right font-medium">Uploaded</th>
+									<th className="pb-2 text-right font-medium">Claimed</th>
+								</tr>
+							</thead>
+							<tbody>
+								{weeklyVouchers.data?.map((day) => (
+									<tr key={day.date} className="border-b">
+										<td className="py-2">
+											{new Date(day.date).toLocaleDateString("en-US", {
+												weekday: "short",
+												month: "short",
+												day: "numeric",
+											})}
+										</td>
+										<td className="py-2 text-right">{day.uploaded}</td>
+										<td className="py-2 text-right">{day.claimed}</td>
+									</tr>
+								))}
+							</tbody>
+						</table>
 					</div>
 				)}
 			</section>

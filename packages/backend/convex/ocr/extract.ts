@@ -1,20 +1,353 @@
 import { v } from "convex/values";
 import dayjs from "dayjs";
-import { internal } from "../_generated/api";
 import { internalAction } from "../_generated/server";
 
 type ExtractedData = {
 	type: number;
 	validFromDay?: number;
 	validFromMonth?: number;
-	expiryDate?: string;
+	expiryDay?: number;
+	expiryMonth?: number;
+	expiryYear?: number;
 	barcode?: string;
+	isThreePlus?: boolean;
+};
+
+type ParsedDates = {
+	validFrom: string | undefined;
+	expiryDate: string | undefined;
 };
 
 /**
- * Extract voucher data from an image using Gemini OCR.
- * Pure extraction - no side effects except logging.
+ * Parse raw extracted dates into actual dates
+ * Uses extracted year if available, otherwise computes from test date
  */
+function parseVoucherDates(
+	extracted: ExtractedData,
+	currentDate: string,
+): ParsedDates {
+	const validFromDay = Number(extracted.validFromDay);
+	const validFromMonth = Number(extracted.validFromMonth);
+	const expiryDay = Number(extracted.expiryDay);
+	const expiryMonth = Number(extracted.expiryMonth);
+	const extractedExpiryYear = Number(extracted.expiryYear);
+
+	const hasValidFromFields =
+		Number.isFinite(validFromDay) &&
+		validFromDay > 0 &&
+		Number.isFinite(validFromMonth) &&
+		validFromMonth > 0;
+
+	const hasExpiryFields =
+		Number.isFinite(expiryDay) &&
+		expiryDay > 0 &&
+		Number.isFinite(expiryMonth) &&
+		expiryMonth > 0;
+
+	if (!hasValidFromFields && !hasExpiryFields) {
+		return { validFrom: undefined, expiryDate: undefined };
+	}
+
+	const testDate = dayjs(currentDate);
+	const testYear = testDate.year();
+	const testMonth = testDate.month() + 1; // dayjs months are 0-indexed
+
+	// Compute the year for validFrom and expiry based on test date context
+	let validFromYear = testYear;
+	let expiryYear =
+		Number.isFinite(extractedExpiryYear) && extractedExpiryYear > 0
+			? extractedExpiryYear
+			: testYear;
+
+	if (hasValidFromFields && hasExpiryFields) {
+		const computedYears = computeYears(
+			validFromMonth,
+			expiryMonth,
+			testYear,
+			testMonth,
+			numberOrUndefined(extractedExpiryYear),
+		);
+		validFromYear = computedYears.validFromYear;
+		expiryYear = computedYears.expiryYear;
+	}
+
+	// Build dates
+	const validFrom = hasValidFromFields
+		? dayjs()
+				.year(validFromYear)
+				.month(validFromMonth - 1)
+				.date(validFromDay)
+				.startOf("day")
+				.format("YYYY-MM-DD")
+		: undefined;
+
+	const expiryDate = hasExpiryFields
+		? dayjs()
+				.year(expiryYear)
+				.month(expiryMonth - 1)
+				.date(expiryDay)
+				.startOf("day")
+				.format("YYYY-MM-DD")
+		: undefined;
+
+	return { validFrom, expiryDate };
+}
+
+function numberOrUndefined(value: number): number | undefined {
+	return Number.isFinite(value) && value > 0 ? value : undefined;
+}
+
+/**
+ * Compute years for validFrom and expiry dates
+ *
+ * Logic:
+ * - If extracted expiryYear is provided, use it
+ * - For year-crossing vouchers (e.g., Dec-Jan), determine appropriate years:
+ *   - If validFromMonth > testMonth: validFrom is in previous year (testYear - 1)
+ *   - Otherwise: validFrom is in testYear
+ *   - Expiry is always validFromYear or validFromYear + 1 for year-crossing
+ */
+function computeYears(
+	validFromMonth: number,
+	expiryMonth: number,
+	testYear: number,
+	testMonth: number,
+	extractedExpiryYear?: number,
+): { validFromYear: number; expiryYear: number } {
+	// If extracted year provided, derive validFromYear from it
+	if (extractedExpiryYear) {
+		const crossesYearBoundary = expiryMonth < validFromMonth;
+		const validFromYear = crossesYearBoundary
+			? extractedExpiryYear - 1
+			: extractedExpiryYear;
+		return { validFromYear, expiryYear: extractedExpiryYear };
+	}
+
+	// Determine validFrom year based on test date context
+	const crossesYearBoundary =
+		!Number.isNaN(expiryMonth) &&
+		!Number.isNaN(validFromMonth) &&
+		expiryMonth < validFromMonth;
+
+	if (crossesYearBoundary) {
+		// For Dec-Jan vouchers: if test is Jan and validFrom is Dec, validFrom is in previous year
+		const validFromYear = validFromMonth > testMonth ? testYear - 1 : testYear;
+		return { validFromYear, expiryYear: validFromYear + 1 };
+	}
+
+	// Same year voucher
+	return { validFromYear: testYear, expiryYear: testYear };
+}
+
+async function extractVoucherData(
+	imageBase64: string,
+	currentDate: string,
+	useOpenRouter = false,
+): Promise<{
+	type: number;
+	validFrom: string | undefined;
+	expiryDate: string | undefined;
+	barcode: string | undefined;
+	isThreePlus: boolean;
+	rawResponse: string;
+}> {
+	const currentYear = new Date(currentDate).getFullYear();
+	const prompt = buildPrompt(currentYear);
+
+	let result: { text: string; raw: string };
+
+	if (useOpenRouter) {
+		const openRouterApiKey = process.env.OPENROUTER_API_KEY;
+		if (!openRouterApiKey) {
+			throw new Error("OpenRouter API key not configured");
+		}
+		result = await callOpenRouterApi(imageBase64, prompt, openRouterApiKey);
+	} else {
+		try {
+			const geminiApiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+			if (!geminiApiKey) {
+				throw new Error("Gemini API key not configured");
+			}
+			result = await callGeminiApi(imageBase64, prompt, geminiApiKey);
+		} catch (geminiError) {
+			console.warn("Gemini extraction failed, trying OpenRouter:", geminiError);
+			const openRouterApiKey = process.env.OPENROUTER_API_KEY;
+			if (!openRouterApiKey) {
+				throw new Error("OpenRouter API key not configured and Gemini failed");
+			}
+			result = await callOpenRouterApi(imageBase64, prompt, openRouterApiKey);
+		}
+	}
+
+	const normalizedText = result.text.trim().replace(/(:\s*)0+(\d)/g, "$1$2");
+	const extracted: ExtractedData = JSON.parse(normalizedText);
+
+	console.log("Extracted (raw):", extracted);
+
+	const { validFrom, expiryDate } = parseVoucherDates(extracted, currentDate);
+
+	console.log("Extracted (final):", {
+		type: extracted.type,
+		validFrom,
+		expiryDate,
+		barcode: extracted.barcode,
+	});
+
+	return {
+		type: extracted.type,
+		validFrom,
+		expiryDate,
+		barcode: extracted.barcode,
+		isThreePlus: extracted.isThreePlus ?? false,
+		rawResponse: result.raw,
+	};
+}
+
+function buildPrompt(currentYear: number): string {
+	return `You are analyzing an image of a voucher.
+We are ONLY looking for specific Dunnes Stores vouchers (Ireland) of these exact types:
+- €5 off €20
+- €5 off €25
+- €10 off €40
+- €10 off €50
+- €20 off €80
+- €20 off €100
+
+Any other voucher type (e.g. "€1 off", "€3 off", product specific, or from other stores) is INVALID.
+
+Three+ vouchers are special: they are issued by Three mobile and say "with Three+" or "Three+" on them. They typically only have an expiry date ("valid until X") and NO start date. These ARE valid €5 off €25 vouchers and should return type "5".
+
+The date on the voucher is relative to the voucher issue date of ${currentYear}.
+
+The date format on the voucher can vary:
+- "Valid 30 Dec - 5 Jan" (day month)
+- "11/02/26 to 17/02/26" means day 11, month 02 (February), year 26 (DD/MM/YY format)
+- "Valid from 11/02/26 to 17/02/26" means validFrom is day 11, month 2, and expiry is day 17, month 2
+- "Valid until 31st March 2026" means ONLY an expiry date, no start date
+
+Extract ONLY the day and month numbers from the voucher validity range:
+1. **Type**: The discount amount (5, 10, or 20). For example, if the voucher says "SAVE €5" and "When you spend €25 or more", return "5". If it is NOT one of these specific amounts, return "0".
+2. **validFromDay**: Day of month for the START of validity range (e.g., "Valid 30 Dec - 5 Jan" → 30, "11/02/26" → 11). If there is no start date (e.g., "valid until X"), return null.
+3. **validFromMonth**: Month number for the START of validity range (e.g., "Valid 30 Dec - 5 Jan" → 12, "11/02/26" → 2 for February). If there is no start date, return null.
+4. **expiryDay**: Day of month for the END of validity range (e.g., "Valid 30 Dec - 5 Jan" → 5, "17/02/26" → 17, "valid until 31st March" → 31)
+5. **expiryMonth**: Month number for the END of validity range (e.g., "Valid 30 Dec - 5 Jan" → 1, "17/02/26" → 2 for February, "valid until 31st March" → 3)
+6. **expiryYear**: If the image shows a full date with year (e.g., "11/02/26"), extract the year (26). Otherwise leave as null.
+7. **barcode**: The number below the barcode.
+8. **isThreePlus**: true if this is a Three+ voucher (says "Three+" or "with Three+"), false otherwise.
+
+Return ONLY JSON:
+{"type": "10", "validFromDay": 11, "validFromMonth": 2, "expiryDay": 17, "expiryMonth": 2, "expiryYear": 2026, "barcode": "1234567890", "isThreePlus": false}
+
+If barcode is missing: null.
+If type is unknown or invalid: "0".
+If any date field is unknown: null.
+If the voucher only has "valid until" with no start date: set validFromDay and validFromMonth to null.`;
+}
+
+async function callGeminiApi(
+	imageBase64: string,
+	prompt: string,
+	apiKey: string,
+): Promise<{ text: string; raw: string }> {
+	const response = await fetch(
+		`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`,
+		{
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				contents: [
+					{
+						parts: [
+							{ text: prompt },
+							{
+								inlineData: {
+									mimeType: "image/jpeg",
+									data: imageBase64,
+								},
+							},
+						],
+					},
+				],
+				generationConfig: {
+					temperature: 0.0,
+					maxOutputTokens: 256,
+					responseMimeType: "application/json",
+				},
+			}),
+		},
+	);
+
+	if (!response.ok) {
+		const error = await response.text();
+		throw new Error(`Gemini API error: ${error}`);
+	}
+
+	const result = await response.json();
+	const rawResponse = JSON.stringify(result);
+
+	const textContent = result.candidates?.[0]?.content?.parts?.[0]?.text;
+	if (!textContent) {
+		throw new Error("No text in Gemini response");
+	}
+
+	return { text: textContent, raw: rawResponse };
+}
+
+async function callOpenRouterApi(
+	imageBase64: string,
+	prompt: string,
+	apiKey: string,
+): Promise<{ text: string; raw: string }> {
+	const response = await fetch(
+		"https://openrouter.ai/api/v1/chat/completions",
+		{
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				Authorization: `Bearer ${apiKey}`,
+				"HTTP-Referer": "https://open-voucher.com",
+				"X-Title": "Open Voucher",
+			},
+			body: JSON.stringify({
+				model: "moonshotai/kimi-k2.5",
+				messages: [
+					{
+						role: "user",
+						content: [
+							{ type: "text", text: prompt },
+							{
+								type: "image_url",
+								image_url: {
+									url: `data:image/jpeg;base64,${imageBase64}`,
+								},
+							},
+						],
+					},
+				],
+				response_format: { type: "json_object" },
+				temperature: 0.0,
+				max_tokens: 10000,
+			}),
+		},
+	);
+
+	if (!response.ok) {
+		const error = await response.text();
+		throw new Error(`OpenRouter API error: ${error}`);
+	}
+
+	const result = await response.json();
+	const rawResponse = JSON.stringify(result);
+	console.log("OpenRouter response:", rawResponse);
+
+	const textContent = result.choices?.[0]?.message?.content;
+	if (!textContent) {
+		throw new Error("No text in OpenRouter response");
+	}
+
+	return { text: textContent, raw: rawResponse };
+}
+
 export const extractFromImage = internalAction({
 	args: { imageStorageId: v.id("_storage") },
 	handler: async (ctx, { imageStorageId }) => {
@@ -24,130 +357,31 @@ export const extractFromImage = internalAction({
 		}
 
 		const imageBase64 = await fetchImageAsBase64(imageUrl);
+		const currentDate = new Date().toISOString().split("T")[0];
+		return extractVoucherData(imageBase64, currentDate);
+	},
+});
 
-		const geminiApiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
-		if (!geminiApiKey) {
-			throw new Error("Gemini API key not configured");
-		}
+export const extractFromUrl = internalAction({
+	args: {
+		imageUrl: v.string(),
+		currentDate: v.optional(v.string()),
+	},
+	handler: async (_ctx, { imageUrl, currentDate }) => {
+		const imageBase64 = await fetchImageAsBase64(imageUrl);
+		const dateToUse = currentDate ?? new Date().toISOString().split("T")[0];
+		return extractVoucherData(imageBase64, dateToUse);
+	},
+});
 
-		const currentYear = new Date().getFullYear();
-		const prompt = `You are analyzing an image of a voucher.
-We are ONLY looking for specific Dunnes Stores vouchers (Ireland) of these exact types:
-- €5 off €25
-- €10 off €40
-- €10 off €50
-- €20 off €80
-- €20 off €100
-
-Any other voucher type (e.g. "€1 off", "€3 off", product specific, or from other stores) is INVALID.
-
-The current year is ${currentYear}.
-The date format on the voucher can vary, examples:
-- Valid 23 Nov - 29 Nov
-- Coupon valid from 23/11/25 to 29/11/25
-- Expires 04-01-2025, Valid 18 Dec - 4 Jan
-- Expires Monday, Valid 30 Dec - 5 Jan
-
-IMPORTANT: Extract dates from the validity range (e.g., "Valid 30 Dec - 5 Jan"). If there's a conflict between a relative date like "Expires Monday" and an explicit date range, USE THE DATE RANGE.
-
-Extract:
-1. **Type**: The discount amount (5, 10, or 20). If it is NOT one of these specific amounts, return "0".
-2. **validFromDay**: The day of the month for the start date (e.g., in "Valid 30 Dec - 5 Jan", extract 30).
-3. **validFromMonth**: The month number for the start date (e.g., in "Valid 30 Dec - 5 Jan", extract 12 for December).
-4. **expiryDate**: Extract from the END of the validity range. If there's a full date with year (e.g., "Expires 04-01-2025"), use that. Otherwise, use the end date from the range (e.g., "Valid 30 Dec - 5 Jan" → use 5 Jan) and convert to YYYY-MM-DD using current year ${currentYear}.
-5. **Barcode**: The number below the barcode.
-
-Return ONLY JSON:
-{"type": "10", "validFromDay": 1, "validFromMonth": 1, "expiryDate": "2025-01-04", "barcode": "1234567890"}
-
-If barcode is missing: null.
-If type is unknown or invalid: "0".
-If validFromDay or validFromMonth is unknown: null.
-If expiry is unknown: null.`;
-
-		const response = await fetch(
-			`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${geminiApiKey}`,
-			{
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({
-					contents: [
-						{
-							parts: [
-								{ text: prompt },
-								{
-									inlineData: {
-										mimeType: "image/jpeg",
-										data: imageBase64,
-									},
-								},
-							],
-						},
-					],
-					generationConfig: {
-						temperature: 0.0,
-						maxOutputTokens: 256,
-						responseMimeType: "application/json",
-					},
-				}),
-			},
-		);
-
-		if (!response.ok) {
-			const error = await response.text();
-			throw new Error(`Gemini API error: ${error}`);
-		}
-
-		const result = await response.json();
-		const rawResponse = JSON.stringify(result);
-
-		const textContent = result.candidates?.[0]?.content?.parts?.[0]?.text;
-		if (!textContent) {
-			throw new Error("No text in Gemini response");
-		}
-
-		console.log("Text content:", textContent);
-		const extracted: ExtractedData = JSON.parse(textContent);
-		console.log("Extracted (raw):", extracted);
-
-		let validFrom: string | undefined;
-		const expiryDate = extracted.expiryDate;
-
-		if (extracted.validFromDay && extracted.validFromMonth && expiryDate) {
-			const expiryDateParsed = dayjs(expiryDate);
-			const expiryYear = expiryDateParsed.year();
-
-			let validFromDate = dayjs()
-				.year(expiryYear)
-				.month(extracted.validFromMonth - 1) // dayjs months are 0-indexed
-				.date(extracted.validFromDay)
-				.startOf("day");
-
-			// If validFrom is chronologically after expiryDate, use previous year
-			if (validFromDate.isAfter(expiryDateParsed)) {
-				validFromDate = validFromDate.subtract(1, "year");
-				console.log(
-					`Adjusted validFrom year to ${validFromDate.year()} (crosses year boundary)`,
-				);
-			}
-
-			validFrom = validFromDate.format("YYYY-MM-DD");
-		}
-
-		console.log("Extracted (final):", {
-			type: extracted.type,
-			validFrom,
-			expiryDate,
-			barcode: extracted.barcode,
-		});
-
-		return {
-			type: extracted.type,
-			validFrom,
-			expiryDate,
-			barcode: extracted.barcode,
-			rawResponse,
-		};
+export const extractFromBase64 = internalAction({
+	args: {
+		imageBase64: v.string(),
+		currentDate: v.string(),
+		useOpenRouter: v.optional(v.boolean()),
+	},
+	handler: async (_ctx, { imageBase64, currentDate, useOpenRouter }) => {
+		return extractVoucherData(imageBase64, currentDate, useOpenRouter);
 	},
 });
 

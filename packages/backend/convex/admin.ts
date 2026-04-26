@@ -7,6 +7,7 @@ import {
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import type { ActionCtx, QueryCtx } from "./_generated/server";
+import { MIN_COINS, UPLOAD_REWARDS } from "./constants";
 import {
 	action,
 	internalAction,
@@ -318,12 +319,12 @@ export const getAllFeedback = adminQuery({
 					createdAt: f.createdAt,
 					user: user
 						? {
-							telegramChatId: user.telegramChatId,
-							username: user.username,
-							firstName: user.firstName,
-							isBanned: user.isBanned,
-							id: user._id,
-						}
+								telegramChatId: user.telegramChatId,
+								username: user.username,
+								firstName: user.firstName,
+								isBanned: user.isBanned,
+								id: user._id,
+							}
 						: null,
 				};
 			}),
@@ -368,6 +369,7 @@ export const getUserDetails = adminQuery({
 		const uploadedVouchersWithDetails = await Promise.all(
 			uploadedVouchers.map(async (voucher) => {
 				const imageUrl = await ctx.storage.getUrl(voucher.imageStorageId);
+				const claimer = voucher.claimerId ? await ctx.db.get(voucher.claimerId) : null;
 				return {
 					_id: voucher._id,
 					type: voucher.type,
@@ -375,6 +377,14 @@ export const getUserDetails = adminQuery({
 					imageUrl,
 					expiryDate: voucher.expiryDate,
 					createdAt: voucher.createdAt,
+					claimer: claimer
+						? {
+								_id: claimer._id,
+								username: claimer.username,
+								firstName: claimer.firstName,
+								telegramChatId: claimer.telegramChatId,
+							}
+						: null,
 				};
 			}),
 		);
@@ -384,6 +394,7 @@ export const getUserDetails = adminQuery({
 		const claimedVouchersWithDetails = await Promise.all(
 			claimedVouchers.map(async (voucher) => {
 				const imageUrl = await ctx.storage.getUrl(voucher.imageStorageId);
+				const uploader = await ctx.db.get(voucher.uploaderId);
 				return {
 					_id: voucher._id,
 					type: voucher.type,
@@ -391,6 +402,14 @@ export const getUserDetails = adminQuery({
 					imageUrl,
 					expiryDate: voucher.expiryDate,
 					claimedAt: voucher.claimedAt,
+					uploader: uploader
+						? {
+								_id: uploader._id,
+								username: uploader.username,
+								firstName: uploader.firstName,
+								telegramChatId: uploader.telegramChatId,
+							}
+						: null,
 				};
 			}),
 		);
@@ -419,18 +438,19 @@ export const getUserDetails = adminQuery({
 					createdAt: report.createdAt,
 					voucher: voucher
 						? {
-							type: voucher.type,
-							status: voucher.status,
-							imageUrl,
-							expiryDate: voucher.expiryDate,
-						}
+								type: voucher.type,
+								status: voucher.status,
+								imageUrl,
+								expiryDate: voucher.expiryDate,
+							}
 						: null,
 					uploader: uploader
 						? {
-							username: uploader.username,
-							firstName: uploader.firstName,
-							telegramChatId: uploader.telegramChatId,
-						}
+								_id: uploader._id,
+								username: uploader.username,
+								firstName: uploader.firstName,
+								telegramChatId: uploader.telegramChatId,
+							}
 						: null,
 				};
 			}),
@@ -450,18 +470,19 @@ export const getUserDetails = adminQuery({
 					createdAt: report.createdAt,
 					voucher: voucher
 						? {
-							type: voucher.type,
-							status: voucher.status,
-							imageUrl,
-							expiryDate: voucher.expiryDate,
-						}
+								type: voucher.type,
+								status: voucher.status,
+								imageUrl,
+								expiryDate: voucher.expiryDate,
+							}
 						: null,
 					reporter: reporter
 						? {
-							username: reporter.username,
-							firstName: reporter.firstName,
-							telegramChatId: reporter.telegramChatId,
-						}
+								_id: reporter._id,
+								username: reporter.username,
+								firstName: reporter.firstName,
+								telegramChatId: reporter.telegramChatId,
+							}
 						: null,
 				};
 			}),
@@ -490,6 +511,32 @@ export const getUserDetails = adminQuery({
 			.order("desc")
 			.collect();
 
+		// Get failed uploads for this user
+		const failedUploadsRaw = await ctx.db
+			.query("failedUploads")
+			.withIndex("by_userId", (q) => q.eq("userId", userId))
+			.order("desc")
+			.collect();
+
+		const failedUploadsWithDetails = await Promise.all(
+			failedUploadsRaw.map(async (failedUpload) => {
+				const imageUrl = await ctx.storage.getUrl(failedUpload.imageStorageId);
+
+				return {
+					_id: failedUpload._id,
+					imageUrl,
+					failureType: failedUpload.failureType,
+					failureReason: failedUpload.failureReason,
+					errorMessage: failedUpload.errorMessage,
+					extractedType: failedUpload.extractedType,
+					extractedBarcode: failedUpload.extractedBarcode,
+					extractedExpiryDate: failedUpload.extractedExpiryDate,
+					extractedValidFrom: failedUpload.extractedValidFrom,
+					_creationTime: failedUpload._creationTime,
+				};
+			}),
+		);
+
 		return {
 			user: {
 				_id: user._id,
@@ -509,6 +556,7 @@ export const getUserDetails = adminQuery({
 			},
 			uploadedVouchers: uploadedVouchersWithDetails,
 			claimedVouchers: claimedVouchersWithDetails,
+			failedUploads: failedUploadsWithDetails,
 			reportsFiledByUser,
 			reportsAgainstUploads: reportsAgainstUserUploads,
 			feedbackAndSupport,
@@ -579,6 +627,52 @@ export const sendMessageToUser = adminMutation({
 		});
 
 		return { success: true };
+	},
+});
+
+export const expireVoucherAndDeductCoins = adminMutation({
+	args: {
+		voucherId: v.id("vouchers"),
+	},
+	handler: async (ctx, { voucherId }) => {
+		const voucher = await ctx.db.get(voucherId);
+		if (!voucher) {
+			throw new Error("Voucher not found");
+		}
+
+		if (voucher.status === "expired") {
+			throw new Error("Voucher is already expired");
+		}
+
+		const uploader = await ctx.db.get(voucher.uploaderId);
+		if (!uploader) {
+			throw new Error("Uploader not found");
+		}
+
+		const now = Date.now();
+		const deductionAmount = UPLOAD_REWARDS[voucher.type] ?? 0;
+		const newCoins = Math.max(MIN_COINS, uploader.coins - deductionAmount);
+
+		// Expire the voucher
+		await ctx.db.patch(voucherId, { status: "expired" });
+
+		// Deduct coins from uploader
+		await ctx.db.patch(voucher.uploaderId, { coins: newCoins });
+
+		// Record the transaction
+		await ctx.db.insert("transactions", {
+			userId: voucher.uploaderId,
+			type: "admin_expiry_deduction",
+			amount: -deductionAmount,
+			voucherId,
+			createdAt: now,
+		});
+
+		return {
+			success: true,
+			deductedAmount: deductionAmount,
+			newBalance: newCoins,
+		};
 	},
 });
 
@@ -785,15 +879,41 @@ export const clearUserData = internalMutation({
 });
 
 export const getFailedUploads = adminQuery({
-	args: {},
-	handler: async (ctx) => {
+	args: {
+		excludeReasons: v.optional(v.array(v.string())),
+		page: v.optional(v.number()),
+		pageSize: v.optional(v.number()),
+	},
+	handler: async (ctx, { excludeReasons, page, pageSize }) => {
+		const limit = pageSize ?? 12;
+		const pageNum = page ?? 1;
+
 		const failedUploads = await ctx.db
 			.query("failedUploads")
 			.order("desc")
-			.take(50);
+			.take(200);
+
+		const allReasons = [
+			...new Set(
+				failedUploads
+					.map((u) => u.failureReason)
+					.filter((r): r is string => !!r),
+			),
+		].sort();
+
+		const filtered = excludeReasons?.length
+			? failedUploads.filter(
+					(u) => !excludeReasons.includes(u.failureReason),
+				)
+			: failedUploads;
+
+		const total = filtered.length;
+		const start = (pageNum - 1) * limit;
+		const pageItems = filtered.slice(start, start + limit);
+		const hasMore = start + limit < total;
 
 		const failedUploadsWithDetails = await Promise.all(
-			failedUploads.map(async (failedUpload) => {
+			pageItems.map(async (failedUpload) => {
 				const user = await ctx.db.get(failedUpload.userId);
 				const imageUrl = await ctx.storage.getUrl(failedUpload.imageStorageId);
 
@@ -813,7 +933,14 @@ export const getFailedUploads = adminQuery({
 			}),
 		);
 
-		return { failedUploads: failedUploadsWithDetails };
+		return {
+			failedUploads: failedUploadsWithDetails,
+			allReasons,
+			total,
+			hasMore,
+			page: pageNum,
+			pageSize: limit,
+		};
 	},
 });
 
@@ -1014,5 +1141,72 @@ export const getUserGrowth = adminQuery({
 		}
 
 		return { data };
+	},
+});
+
+export const runOcrEvals = adminAction({
+	args: {
+		token: v.string(),
+		images: v.array(
+			v.object({
+				filename: v.string(),
+				imageBase64: v.string(),
+			}),
+		),
+		useOpenRouter: v.optional(v.boolean()),
+	},
+	handler: async (
+		ctx,
+		{ token, images, useOpenRouter },
+	): Promise<{
+		overallSuccess: boolean;
+		passed: number;
+		total: number;
+		results: Array<{
+			filename: string;
+			testDate: string;
+			success: boolean;
+			expectedValidFrom: string | undefined;
+			expectedExpiry: string;
+			actualValidFrom?: string;
+			actualExpiry?: string;
+			error?: string;
+		}>;
+	}> => {
+		return ctx.runAction(internal.ocr.evals.runOcrEvalsInternal, {
+			images,
+			useOpenRouter,
+		});
+	},
+});
+
+export const runSingleOcrEval = adminAction({
+	args: {
+		token: v.string(),
+		filename: v.string(),
+		imageBase64: v.string(),
+		useOpenRouter: v.optional(v.boolean()),
+	},
+	handler: async (
+		ctx,
+		{ token, filename, imageBase64, useOpenRouter },
+	): Promise<{
+		filename: string;
+		results: Array<{
+			filename: string;
+			testDate: string;
+			success: boolean;
+			expectedValidFrom: string | undefined;
+			expectedExpiry: string;
+			actualValidFrom?: string;
+			actualExpiry?: string;
+			error?: string;
+		}>;
+	}> => {
+		return ctx.runAction(internal.ocr.evals.runImageOcrEval, {
+			filename,
+			imageBase64,
+			useOpenRouter,
+		});
 	},
 });

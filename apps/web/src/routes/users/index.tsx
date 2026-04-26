@@ -1,5 +1,3 @@
-import { Button } from "@/components/ui/button";
-import { useAdminAuth } from "@/hooks/useAdminAuth";
 import { convexQuery } from "@convex-dev/react-query";
 import { api } from "@open-voucher/backend/convex/_generated/api";
 import type { Id } from "@open-voucher/backend/convex/_generated/dataModel";
@@ -7,6 +5,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useConvex } from "convex/react";
 import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { useAdminAuth } from "@/hooks/useAdminAuth";
 
 export const Route = createFileRoute("/users/")({
 	component: UsersPage,
@@ -18,14 +18,16 @@ type SortField =
 	| "claimCount"
 	| "uploadReportCount"
 	| "claimReportCount"
-	| "uploadReportRatio";
+	| "uploadReportRatio"
+	| "claimReportRatio"
+	| "banScore";
 type SortDirection = "asc" | "desc";
 
 function UsersPage() {
 	const { token } = useAdminAuth();
 	const convex = useConvex();
 	const queryClient = useQueryClient();
-	const [sortField, setSortField] = useState<SortField>("uploadCount");
+	const [sortField, setSortField] = useState<SortField>("banScore");
 	const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
 
 	const { data, isLoading, error } = useQuery(
@@ -62,15 +64,26 @@ function UsersPage() {
 	}
 
 	const users = (data?.users ?? [])
-		.map((user) => ({
-			...user,
-			uploadReportRatio:
-				user.uploadCount > 0
-					? user.uploadReportCount / user.uploadCount
-					: user.uploadReportCount > 0
-						? Number.POSITIVE_INFINITY
-						: 0,
-		}))
+		.map((user) => {
+			const uploadReportRatio =
+				user.uploadReportCount < 2
+					? 0
+					: user.uploadCount > 0
+						? user.uploadReportCount / user.uploadCount
+						: Number.POSITIVE_INFINITY;
+			const claimReportRatio =
+				user.claimReportCount < 2
+					? 0
+					: user.claimCount > 0
+						? user.claimReportCount / user.claimCount
+						: Number.POSITIVE_INFINITY;
+			return {
+				...user,
+				uploadReportRatio,
+				claimReportRatio,
+				banScore: uploadReportRatio + claimReportRatio,
+			};
+		})
 		.sort((a, b) => {
 			const aValue = a[sortField];
 			const bValue = b[sortField];
@@ -81,14 +94,14 @@ function UsersPage() {
 	return (
 		<div>
 			<div className="mb-6 flex items-center justify-between">
-				<h1 className="text-xl font-semibold">Users ({users.length})</h1>
+				<h1 className="font-semibold text-xl">Users ({users.length})</h1>
 			</div>
 			<div className="overflow-x-auto">
 				<table className="w-full border-collapse">
 					<thead>
 						<tr className="border-b text-left">
-							<th className="pb-3 pr-4 font-medium">User</th>
-							<th className="pb-3 pr-4 font-medium">
+							<th className="pr-4 pb-3 font-medium">User</th>
+							<th className="pr-4 pb-3 font-medium">
 								<button
 									onClick={() => handleSort("coins")}
 									className="flex items-center gap-1 hover:text-foreground"
@@ -105,7 +118,7 @@ function UsersPage() {
 									)}
 								</button>
 							</th>
-							<th className="pb-3 pr-4 font-medium">
+							<th className="pr-4 pb-3 font-medium">
 								<button
 									onClick={() => handleSort("uploadCount")}
 									className="flex items-center gap-1 hover:text-foreground"
@@ -122,7 +135,7 @@ function UsersPage() {
 									)}
 								</button>
 							</th>
-							<th className="pb-3 pr-4 font-medium">
+							<th className="pr-4 pb-3 font-medium">
 								<button
 									onClick={() => handleSort("claimCount")}
 									className="flex items-center gap-1 hover:text-foreground"
@@ -139,7 +152,7 @@ function UsersPage() {
 									)}
 								</button>
 							</th>
-							<th className="pb-3 pr-4 font-medium">
+							<th className="pr-4 pb-3 font-medium">
 								<button
 									onClick={() => handleSort("uploadReportCount")}
 									className="flex items-center gap-1 hover:text-foreground"
@@ -156,7 +169,7 @@ function UsersPage() {
 									)}
 								</button>
 							</th>
-							<th className="pb-3 pr-4 font-medium">
+							<th className="pr-4 pb-3 font-medium">
 								<button
 									onClick={() => handleSort("claimReportCount")}
 									className="flex items-center gap-1 hover:text-foreground"
@@ -173,13 +186,49 @@ function UsersPage() {
 									)}
 								</button>
 							</th>
-							<th className="pb-3 pr-4 font-medium">
+							<th className="pr-4 pb-3 font-medium">
 								<button
 									onClick={() => handleSort("uploadReportRatio")}
 									className="flex items-center gap-1 hover:text-foreground"
 								>
 									Upload Report Ratio
 									{sortField === "uploadReportRatio" ? (
+										sortDirection === "asc" ? (
+											<span>↑</span>
+										) : (
+											<span>↓</span>
+										)
+									) : (
+										<span className="opacity-30">⇅</span>
+									)}
+								</button>
+							</th>
+							<th className="pr-4 pb-3 font-medium">
+								<button
+								type="button"
+									onClick={() => handleSort("claimReportRatio")}
+									className="flex items-center gap-1 hover:text-foreground"
+								>
+									Claim Report Ratio
+									{sortField === "claimReportRatio" ? (
+										sortDirection === "asc" ? (
+											<span>↑</span>
+										) : (
+											<span>↓</span>
+										)
+									) : (
+										<span className="opacity-30">⇅</span>
+									)}
+								</button>
+							</th>
+							<th className="pr-4 pb-3 font-medium">
+								<button
+									type="button"
+									onClick={() => handleSort("banScore")}
+									className="flex items-center gap-1 hover:text-foreground"
+								>
+									Ban Score
+									{sortField === "banScore" ? (
 										sortDirection === "asc" ? (
 											<span>↑</span>
 										) : (
@@ -215,7 +264,7 @@ function UsersPage() {
 									<span
 										className={
 											user.uploadReportCount > 0
-												? "text-red-500 font-medium"
+												? "font-medium text-red-500"
 												: ""
 										}
 									>
@@ -226,7 +275,7 @@ function UsersPage() {
 									<span
 										className={
 											user.claimReportCount > 0
-												? "text-orange-500 font-medium"
+												? "font-medium text-orange-500"
 												: ""
 										}
 									>
@@ -237,17 +286,49 @@ function UsersPage() {
 									<span
 										className={
 											user.uploadReportRatio > 1.5
-												? "text-red-600 font-bold"
+												? "font-bold text-red-600"
 												: user.uploadReportRatio > 1.0
-													? "text-orange-500 font-medium"
+													? "font-medium text-orange-500"
 													: user.uploadReportRatio === Number.POSITIVE_INFINITY
-														? "text-red-600 font-bold"
+														? "font-bold text-red-600"
 														: ""
 										}
 									>
 										{user.uploadReportRatio === Number.POSITIVE_INFINITY
 											? "∞"
 											: user.uploadReportRatio.toFixed(2)}
+									</span>
+								</td>
+								<td className="py-3 pr-4">
+									<span
+										className={
+											user.claimReportRatio > 1.5
+												? "font-bold text-red-600"
+												: user.claimReportRatio > 1.0
+													? "font-medium text-orange-500"
+													: user.claimReportRatio === Number.POSITIVE_INFINITY
+														? "font-bold text-red-600"
+														: ""
+										}
+									>
+										{user.claimReportRatio === Number.POSITIVE_INFINITY
+											? "∞"
+											: user.claimReportRatio.toFixed(2)}
+									</span>
+								</td>
+								<td className="py-3 pr-4">
+									<span
+										className={
+											user.banScore > 3.0
+												? "font-bold text-red-600"
+												: user.banScore > 2.0
+													? "font-medium text-orange-500"
+													: ""
+										}
+									>
+										{user.banScore === Number.POSITIVE_INFINITY
+											? "∞"
+											: user.banScore.toFixed(2)}
 									</span>
 								</td>
 								<td className="py-3">

@@ -74,6 +74,15 @@ function UserDetailPage() {
 		onSuccess: () => queryClient.invalidateQueries(),
 	});
 
+	const expireVoucherMutation = useMutation({
+		mutationFn: (voucherId: Id<"vouchers">) =>
+			convex.mutation(api.admin.expireVoucherAndDeductCoins, {
+				token: token!,
+				voucherId,
+			}),
+		onSuccess: () => queryClient.invalidateQueries(),
+	});
+
 	if (isLoading) {
 		return <div className="text-muted-foreground">Loading user details...</div>;
 	}
@@ -84,13 +93,14 @@ function UserDetailPage() {
 
 	const user = data?.user;
 	const stats = data?.stats;
-	const uploadedVouchers = data?.uploadedVouchers ?? [];
-	const claimedVouchers = data?.claimedVouchers ?? [];
-	const reportsFiledByUser = data?.reportsFiledByUser ?? [];
-	const reportsAgainstUploads = data?.reportsAgainstUploads ?? [];
-	const feedbackAndSupport = data?.feedbackAndSupport ?? [];
-	const adminMessages = data?.adminMessages ?? [];
-	const transactions = data?.transactions ?? [];
+	const uploadedVouchers = [...(data?.uploadedVouchers ?? [])].sort((a, b) => b.createdAt - a.createdAt);
+	const claimedVouchers = [...(data?.claimedVouchers ?? [])].sort((a, b) => (b.claimedAt ?? 0) - (a.claimedAt ?? 0));
+	const failedUploads = [...(data?.failedUploads ?? [])].sort((a, b) => b._creationTime - a._creationTime);
+	const reportsFiledByUser = [...(data?.reportsFiledByUser ?? [])].sort((a, b) => b.createdAt - a.createdAt);
+	const reportsAgainstUploads = [...(data?.reportsAgainstUploads ?? [])].sort((a, b) => b.createdAt - a.createdAt);
+	const feedbackAndSupport = [...(data?.feedbackAndSupport ?? [])].sort((a, b) => b.createdAt - a.createdAt);
+	const adminMessages = [...(data?.adminMessages ?? [])].sort((a, b) => b.createdAt - a.createdAt);
+	const transactions = [...(data?.transactions ?? [])].sort((a, b) => b.createdAt - a.createdAt);
 
 	if (!user) {
 		return <div className="text-red-500">User not found</div>;
@@ -201,7 +211,11 @@ function UserDetailPage() {
 																? "bg-red-100 text-red-800"
 																: tx.type === "report_refund"
 																	? "bg-purple-100 text-purple-800"
-																	: "bg-amber-100 text-amber-800"
+																	: tx.type === "uploader_denied"
+																		? "bg-red-100 text-red-800"
+																		: tx.type === "admin_expiry_deduction"
+																			? "bg-rose-100 text-rose-800"
+																			: "bg-amber-100 text-amber-800"
 												}`}
 											>
 												{tx.type.replace(/_/g, " ")}
@@ -285,6 +299,32 @@ function UserDetailPage() {
 									<div className="text-muted-foreground text-sm">
 										Uploaded {new Date(voucher.createdAt).toLocaleString()}
 									</div>
+									{voucher.claimer && (
+										<div className="mt-2 text-sm">
+											<span className="text-muted-foreground">Claimed by: </span>
+											<Link
+												to="/users/$userId"
+												params={{ userId: voucher.claimer._id }}
+												className="text-blue-600 hover:underline"
+											>
+												{voucher.claimer.username || voucher.claimer.firstName || voucher.claimer.telegramChatId}
+											</Link>
+										</div>
+									)}
+									{voucher.status !== "expired" && (
+										<div className="mt-3">
+											<Button
+												size="sm"
+												variant="destructive"
+												onClick={() =>
+													expireVoucherMutation.mutate(voucher._id as Id<"vouchers">)
+												}
+												disabled={expireVoucherMutation.isPending}
+											>
+												Expire & Deduct Coins
+											</Button>
+										</div>
+									)}
 								</div>
 							</div>
 						))}
@@ -350,6 +390,105 @@ function UserDetailPage() {
 											Claimed {new Date(voucher.claimedAt).toLocaleString()}
 										</div>
 									)}
+									{voucher.uploader && (
+										<div className="mt-2 text-sm">
+											<span className="text-muted-foreground">Uploaded by: </span>
+											<Link
+												to="/users/$userId"
+												params={{ userId: voucher.uploader._id }}
+												className="text-blue-600 hover:underline"
+											>
+												{voucher.uploader.username || voucher.uploader.firstName || voucher.uploader.telegramChatId}
+											</Link>
+										</div>
+									)}
+								</div>
+							</div>
+						))}
+					</div>
+				)}
+			</div>
+
+			<div>
+				<h2 className="mb-4 font-semibold text-xl">
+					Failed Uploads ({failedUploads.length})
+				</h2>
+
+				{failedUploads.length === 0 ? (
+					<div className="rounded-lg border p-12 text-center text-muted-foreground">
+						No failed uploads
+					</div>
+				) : (
+					<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+						{failedUploads.map((upload) => (
+							<div key={upload._id} className="rounded-lg border p-4">
+								{upload.imageUrl ? (
+									<img
+										src={upload.imageUrl}
+										alt="Failed Upload"
+										className="mb-3 h-96 w-full rounded border bg-muted object-contain"
+									/>
+								) : (
+									<div className="mb-3 flex h-96 w-full items-center justify-center rounded bg-muted">
+										<span className="text-muted-foreground text-xs">
+											No image
+										</span>
+									</div>
+								)}
+								<div className="mb-3">
+									<div className="mb-2 flex items-center gap-2">
+										<span
+											className={`rounded-full px-2 py-1 font-medium text-xs ${
+												upload.failureType === "validation"
+													? "bg-yellow-100 text-yellow-800"
+													: "bg-red-100 text-red-800"
+											}`}
+										>
+											{upload.failureType}
+										</span>
+									</div>
+									<div className="mb-1 text-muted-foreground text-xs">
+										ID: {upload._id}
+									</div>
+									<div className="mb-1 text-sm">
+										<span className="font-medium">Reason: </span>
+										<span className="text-red-600">{upload.failureReason}</span>
+									</div>
+									{upload.errorMessage && (
+										<div className="mb-1 text-sm">
+											<span className="font-medium">Error: </span>
+											<span className="text-muted-foreground">
+												{upload.errorMessage}
+											</span>
+										</div>
+									)}
+									{upload.extractedType && (
+										<div className="mb-1 text-sm">
+											<span className="font-medium">Extracted Type: </span>
+											<span className="text-muted-foreground">
+												€{upload.extractedType}
+											</span>
+										</div>
+									)}
+									{upload.extractedBarcode && (
+										<div className="mb-1 text-sm">
+											<span className="font-medium">Extracted Barcode: </span>
+											<span className="text-muted-foreground">
+												{upload.extractedBarcode}
+											</span>
+										</div>
+									)}
+									{upload.extractedExpiryDate && (
+										<div className="mb-1 text-sm">
+											<span className="font-medium">Extracted Expiry: </span>
+											<span className="text-muted-foreground">
+												{upload.extractedExpiryDate}
+											</span>
+										</div>
+									)}
+									<div className="text-muted-foreground text-sm">
+										Failed {new Date(upload._creationTime).toLocaleString()}
+									</div>
 								</div>
 							</div>
 						))}
@@ -398,10 +537,15 @@ function UserDetailPage() {
 									</div>
 									<div className="text-muted-foreground text-sm">
 										Uploaded by{" "}
-										{report.uploader?.username ||
-											report.uploader?.firstName ||
-											"Unknown"}{" "}
-										({report.uploader?.telegramChatId})
+										{report.uploader ? (
+											<Link
+												to="/users/$userId"
+												params={{ userId: report.uploader._id }}
+												className="text-blue-600 hover:underline"
+											>
+												{report.uploader.username || report.uploader.firstName || report.uploader.telegramChatId}
+											</Link>
+										) : "Unknown"}
 									</div>
 								</div>
 								<div className="rounded bg-muted p-3">
@@ -487,10 +631,15 @@ function UserDetailPage() {
 									</div>
 									<div className="text-muted-foreground text-sm">
 										Reported by{" "}
-										{report.reporter?.username ||
-											report.reporter?.firstName ||
-											"Unknown"}{" "}
-										({report.reporter?.telegramChatId})
+										{report.reporter ? (
+											<Link
+												to="/users/$userId"
+												params={{ userId: report.reporter._id }}
+												className="text-blue-600 hover:underline"
+											>
+												{report.reporter.username || report.reporter.firstName || report.reporter.telegramChatId}
+											</Link>
+										) : "Unknown"}
 									</div>
 								</div>
 								<div className="rounded bg-muted p-3">

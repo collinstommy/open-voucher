@@ -248,6 +248,51 @@ async function handleImageUpload(
 	}
 }
 
+async function sendHelpMenu(chatId: string) {
+	await sendTelegramMessage(chatId, "Choose an option below", {
+		inline_keyboard: [
+			[
+				{ text: "Balance", callback_data: "help:balance" },
+				{ text: "FAQ", callback_data: "help:faq" },
+			],
+			[{ text: "Give feedback", callback_data: "help:feedback" }],
+			[
+				{
+					text: "Voucher Availability",
+					callback_data: "help:availability",
+				},
+			],
+			[
+				{ text: "How to upload?", callback_data: "help:upload" },
+				{ text: "How to claim?", callback_data: "help:claim" },
+			],
+			[{ text: "View Transactions", callback_data: "help:transactions" }],
+			[{ text: "View updates", callback_data: "help:updates" }],
+			[{ text: "☕ Donate", callback_data: "help:donate" }],
+		],
+	});
+}
+
+async function sendFaqMenu(chatId: string) {
+	await sendTelegramMessage(chatId, "Choose a FAQ question below", {
+		inline_keyboard: [
+			[
+				{
+					text: "Can I return/cancel a voucher?",
+					callback_data: "faq:return_cancel",
+				},
+			],
+			[
+				{
+					text: "Voucher processing failed",
+					callback_data: "faq:processing_failed",
+				},
+			],
+			[{ text: "Back to Help", callback_data: "faq:back" }],
+		],
+	});
+}
+
 async function handleCommand(
 	ctx: ActionCtx,
 	chatId: string,
@@ -261,26 +306,28 @@ async function handleCommand(
 	}
 
 	if (lowerText === "help") {
-		await sendTelegramMessage(chatId, "Choose an option below", {
-			inline_keyboard: [
-				[
-					{ text: "Balance", callback_data: "help:balance" },
-					{ text: "Support", callback_data: "help:support" },
-				],
-				[{ text: "Give feedback", callback_data: "help:feedback" }],
-				[
-					{
-						text: "Voucher Availability",
-						callback_data: "help:availability",
-					},
-				],
-				[
-					{ text: "How to upload?", callback_data: "help:upload" },
-					{ text: "How to claim?", callback_data: "help:claim" },
-				],
-				[{ text: "View Transactions", callback_data: "help:transactions" }],
-			],
-		});
+		await sendHelpMenu(chatId);
+		return true;
+	}
+
+	if (lowerText === "faq") {
+		await sendFaqMenu(chatId);
+		return true;
+	}
+
+	if (lowerText === "donate") {
+		await sendTelegramMessage(
+			chatId,
+			"☕ <b>Support Open Vouchers</b>\n\nThe service is free, but servers and AI-powered OCR aren't. Your support helps keep the lights on!\n\nhttps://buymeacoffee.com/openvouchers",
+		);
+		return true;
+	}
+
+	if (lowerText === "feedback") {
+		await sendTelegramMessage(
+			chatId,
+			"📝 To send feedback, include your message:\n<code>feedback your message here</code>",
+		);
 		return true;
 	}
 
@@ -328,7 +375,7 @@ async function handleVoucherRequest(
 	if (!result.success) {
 		await sendTelegramMessage(chatId, `❌ ${result.error}`);
 	} else {
-		await sendTelegramPhoto(
+		const sent = await sendTelegramPhoto(
 			chatId,
 			result.imageUrl!,
 			`✅ <b>Here is your €${type} voucher!</b>\n\nExpires: ${dayjs(result.expiryDate!).format("MMM Do")}\nRemaining coins: ${result.remainingCoins}`,
@@ -343,6 +390,24 @@ async function handleVoucherRequest(
 				],
 			},
 		);
+
+		if (!sent) {
+			const refundResult = await ctx.runMutation(
+				internal.vouchers.refundFailedClaimDelivery,
+				{
+					userId: user._id,
+					voucherId: result.voucherId as Id<"vouchers">,
+					type,
+				},
+			);
+
+			if (refundResult.refunded) {
+				await sendTelegramMessage(
+					chatId,
+					`⚠️ We couldn't deliver your voucher image right now. Your ${refundResult.refundAmount} coins were refunded automatically. Please try requesting again.`,
+				);
+			}
+		}
 	}
 	return true;
 }
@@ -406,7 +471,7 @@ export const handleTelegramMessage = internalAction({
 			return;
 		}
 
-		const lowerText = text.toLowerCase().trim();
+		const lowerText = text.toLowerCase().trim().replace(/^\//, "");
 
 		if (await handleCommand(ctx, chatId, lowerText, text, user)) return;
 
@@ -495,10 +560,10 @@ async function sendTelegramPhoto(
 	photoUrl: string,
 	caption?: string,
 	replyMarkup?: Record<string, unknown>,
-) {
+): Promise<boolean> {
 	const token = process.env.TELEGRAM_BOT_TOKEN;
 	if (!token) {
-		return;
+		return false;
 	}
 
 	if (photoUrl === "image") {
@@ -507,7 +572,7 @@ async function sendTelegramPhoto(
 			caption || "Sample image placeholder",
 			replyMarkup,
 		);
-		return;
+		return true;
 	}
 
 	const url = `https://api.telegram.org/bot${token}/sendPhoto`;
@@ -517,7 +582,7 @@ async function sendTelegramPhoto(
 			console.error(
 				`Failed to fetch image from storage URL: ${photoUrl} - ${imageRes.statusText}`,
 			);
-			return;
+			return false;
 		}
 		const imageBlob = await imageRes.blob();
 
@@ -541,11 +606,56 @@ async function sendTelegramPhoto(
 		if (!response.ok) {
 			const errorText = await response.text();
 			console.error("Failed to send Telegram photo:", errorText);
+			return false;
 		}
+
+		return true;
 	} catch (error) {
 		console.error("Network error sending Telegram photo:", error);
+		return false;
 	}
 }
+
+async function setBotCommands() {
+	const token = process.env.TELEGRAM_BOT_TOKEN;
+	if (!token) {
+		console.error("TELEGRAM_BOT_TOKEN is not set");
+		return;
+	}
+
+	const commands = [
+		{ command: "help", description: "Show help menu" },
+		{ command: "balance", description: "Check your coin balance" },
+		{ command: "faq", description: "Frequently asked questions" },
+		{ command: "feedback", description: "Send feedback" },
+		{ command: "donate", description: "Support the project" },
+	];
+
+	const url = `https://api.telegram.org/bot${token}/setMyCommands`;
+	try {
+		const response = await fetch(url, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ commands }),
+		});
+
+		if (!response.ok) {
+			const errorText = await response.text();
+			console.error("Failed to set bot commands:", errorText);
+		} else {
+			console.log("Bot commands registered successfully");
+		}
+	} catch (error) {
+		console.error("Network error setting bot commands:", error);
+	}
+}
+
+export const registerBotCommands = internalAction({
+	args: {},
+	handler: async () => {
+		await setBotCommands();
+	},
+});
 
 export const handleTelegramCallback = internalAction({
 	args: {
@@ -678,15 +788,9 @@ export const handleTelegramCallback = internalAction({
 					await sendTelegramMessage(chatId, `💰 You have ${user.coins} coins.`);
 					break;
 				}
-				case "support": {
-					await ctx.runMutation(internal.users.setUserTelegramState, {
-						userId: user._id,
-						state: "waiting_for_support_message",
-					});
-					await sendTelegramMessage(
-						chatId,
-						"Please reply with a message describing what you need help with",
-					);
+				case "support":
+				case "faq": {
+					await sendFaqMenu(chatId);
 					break;
 				}
 				case "feedback": {
@@ -731,42 +835,85 @@ export const handleTelegramCallback = internalAction({
 					);
 					break;
 				}
-				case "transactions": {
-					const transactions = await ctx.runQuery(
-						internal.users.getUserTransactions,
-						{ userId: user._id },
-					);
+			case "transactions": {
+				const transactions = await ctx.runQuery(
+					internal.users.getUserTransactions,
+					{ userId: user._id },
+				);
 
-					if (transactions.length === 0) {
-						await sendTelegramMessage(chatId, "📋 No transactions yet.");
-						break;
+				if (transactions.length === 0) {
+					await sendTelegramMessage(chatId, "📋 No transactions yet.");
+					break;
+				}
+
+				const formatType = (type: string) => {
+					switch (type) {
+						case "signup_bonus":
+							return "🎁 Signup Bonus";
+						case "upload_reward":
+							return "📤 Upload Reward";
+						case "claim_spend":
+							return "💳 Claim Spent";
+						case "refund":
+							return "↩️ Refund";
+						case "report_refund":
+							return "↩️ Refund";
+						case "uploader_denied":
+							return "❌ Upload Denied";
+						default:
+							return type;
 					}
+				};
 
-					const formatType = (type: string) => {
-						switch (type) {
-							case "signup_bonus":
-								return "🎁 Signup Bonus";
-							case "upload_reward":
-								return "📤 Upload Reward";
-							case "claim_spend":
-								return "💳 Claim Spent";
-							case "report_refund":
-								return "↩️ Refund";
-							default:
-								return type;
-						}
-					};
+				const transactionList = transactions.map((t) => {
+					const date = dayjs(t.createdAt).format("MMM D, YYYY");
+					const formattedType = formatType(t.type);
+					const amountPrefix = t.type === "claim_spend" ? "-" : "+";
+					return `${formattedType}: ${amountPrefix}${t.amount} (${date})`;
+				});
 
-					const transactionList = transactions.map((t) => {
-						const date = dayjs(t.createdAt).format("MMM D, YYYY");
-						const formattedType = formatType(t.type);
-						const amountPrefix = t.type === "claim_spend" ? "-" : "+";
-						return `${formattedType}: ${amountPrefix}${t.amount} (${date})`;
-					});
+				await sendTelegramMessage(
+					chatId,
+					`📋 <b>Your Last 25 Transactions:</b>\n\n${transactionList.join("\n")}`,
+				);
+				break;
+			}
+			case "updates": {
+				await sendTelegramMessage(
+					chatId,
+					"🆕 <b>Latest Updates</b>\n\nCheck out what's new:\nhttps://www.openvouchers.org#updates",
+				);
+				break;
+			}
+			case "donate": {
+				await sendTelegramMessage(
+					chatId,
+					"☕ <b>Support Open Vouchers</b>\n\nThe service is free, but servers and AI-powered OCR aren't. Your support helps keep the lights on!\n\nhttps://buymeacoffee.com/openvouchers",
+				);
+				break;
+			}
+		}
+	} else if (data.startsWith("faq:")) {
+			await answerTelegramCallback(callbackQuery.id);
 
+			const faqAction = data.split(":")[1];
+
+			switch (faqAction) {
+				case "back": {
+					await sendHelpMenu(chatId);
+					break;
+				}
+				case "return_cancel": {
 					await sendTelegramMessage(
 						chatId,
-						`📋 <b>Your Last 25 Transactions:</b>\n\n${transactionList.join("\n")}`,
+						"Voucher return/cancel is currently <b>not supported</b>.",
+					);
+					break;
+				}
+				case "processing_failed": {
+					await sendTelegramMessage(
+						chatId,
+						"If uploading a paper voucher, retake the photo with clear lighting, the full voucher visible, and no blur.",
 					);
 					break;
 				}
@@ -814,6 +961,20 @@ export const handleTelegramCallback = internalAction({
 				callbackQuery.message.message_id,
 				callbackQuery.message.text,
 			);
+
+			const uploadedVoucher = await ctx.runQuery(
+				internal.vouchers.getVoucherForUploaderConfirm,
+				{
+					voucherId: voucherId as Id<"vouchers">,
+				},
+			);
+
+			if (uploadedVoucher) {
+				await ctx.runMutation(internal.vouchers.recordUploaderDenied, {
+					uploaderId: uploadedVoucher.uploaderId,
+					voucherId: uploadedVoucher._id,
+				});
+			}
 
 			await sendTelegramMessage(
 				chatId,

@@ -158,6 +158,49 @@ export const requestVoucher = internalMutation({
 	},
 });
 
+export const refundFailedClaimDelivery = internalMutation({
+	args: {
+		userId: v.id("users"),
+		voucherId: v.id("vouchers"),
+		type: v.union(v.literal("5"), v.literal("10"), v.literal("20")),
+	},
+	handler: async (ctx, { userId, voucherId, type }) => {
+		const user = await ctx.db.get(userId);
+		const voucher = await ctx.db.get(voucherId);
+		if (!user || !voucher) {
+			return { refunded: false };
+		}
+
+		if (voucher.status !== "claimed" || voucher.claimerId !== userId) {
+			return { refunded: false };
+		}
+
+		const refundAmount = CLAIM_COSTS[type];
+		const now = Date.now();
+
+		await ctx.db.patch(userId, {
+			coins: user.coins + refundAmount,
+			claimCount: Math.max(0, (user.claimCount || 0) - 1),
+		});
+
+		await ctx.db.patch(voucherId, {
+			status: "available",
+			claimerId: undefined,
+			claimedAt: undefined,
+		});
+
+		await ctx.db.insert("transactions", {
+			userId,
+			type: "refund",
+			amount: refundAmount,
+			voucherId,
+			createdAt: now,
+		});
+
+		return { refunded: true, refundAmount };
+	},
+});
+
 export const reportVoucher = internalMutation({
 	args: {
 		userId: v.id("users"),
@@ -505,6 +548,24 @@ export const confirmUploaderUsedVoucher = internalMutation({
 			userId: uploaderId,
 			type: "uploader_refund",
 			amount: -amount,
+			voucherId,
+			createdAt: Date.now(),
+		});
+	},
+});
+
+export const recordUploaderDenied = internalMutation({
+	args: {
+		uploaderId: v.id("users"),
+		voucherId: v.id("vouchers"),
+	},
+	handler: async (ctx, { uploaderId, voucherId }) => {
+		await ctx.db.patch(voucherId, { status: "uploader_denied" });
+
+		await ctx.db.insert("transactions", {
+			userId: uploaderId,
+			type: "uploader_denied",
+			amount: 0,
 			voucherId,
 			createdAt: Date.now(),
 		});

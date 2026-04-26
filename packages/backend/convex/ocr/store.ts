@@ -50,6 +50,7 @@ export const storeVoucherFromOcr = internalMutation({
 		validFrom: v.optional(v.string()),
 		expiryDate: v.optional(v.string()),
 		barcode: v.optional(v.string()),
+		isThreePlus: v.optional(v.boolean()),
 		rawResponse: v.string(),
 	},
 	handler: async (ctx, args) => {
@@ -60,6 +61,7 @@ export const storeVoucherFromOcr = internalMutation({
 			validFrom,
 			expiryDate,
 			barcode,
+			isThreePlus,
 			rawResponse,
 		} = args;
 
@@ -79,8 +81,11 @@ export const storeVoucherFromOcr = internalMutation({
 		const isExpiryDateValid =
 			expiryDate && dayjsExpiry.isValid() && dayjsExpiry.valueOf() > oneYearAgo;
 		const isAlreadyExpired = dayjsExpiry.isBefore(now, "day");
-		const isTooLateToday = dayjsExpiry.isSame(now, "day") && now.hour() >= 21;
-		const expiryDateMs = dayjsExpiry.endOf("day").valueOf();
+		// Check if it's after 9 PM Irish time
+		const irishHour = Number(new Intl.DateTimeFormat("en-IE", { timeZone: "Europe/Dublin", hour: "numeric", hour12: false }).format(new Date()));
+		const isTooLateToday = dayjsExpiry.isSame(now, "day") && irishHour >= 21;
+		// Store at 22:59 UTC so it displays as the correct day in both UTC+0 and UTC+1
+		const expiryDateMs = Date.UTC(dayjsExpiry.year(), dayjsExpiry.month(), dayjsExpiry.date(), 22, 59, 0, 0);
 
 		// Parse validFrom for later validation
 		const dayjsValidFrom = dayjs(validFrom);
@@ -158,48 +163,51 @@ export const storeVoucherFromOcr = internalMutation({
 			};
 		}
 
-		if (!validFrom) {
-			await recordFailedUpload(
-				ctx,
-				userId,
-				imageStorageId,
-				"COULD_NOT_READ_VALID_FROM",
-				{
-					rawResponse,
-					type,
-					barcode,
-					expiryDate,
-					validFrom,
-				},
-			);
-			await sendErrorMessage(
-				ctx,
-				user.telegramChatId,
-				"COULD_NOT_READ_VALID_FROM",
-			);
-			return { success: false, reason: "COULD_NOT_READ_VALID_FROM" };
-		}
+		// Three+ vouchers don't have a validFrom date - skip this check for them
+		if (!isThreePlus) {
+			if (!validFrom) {
+				await recordFailedUpload(
+					ctx,
+					userId,
+					imageStorageId,
+					"COULD_NOT_READ_VALID_FROM",
+					{
+						rawResponse,
+						type,
+						barcode,
+						expiryDate,
+						validFrom,
+					},
+				);
+				await sendErrorMessage(
+					ctx,
+					user.telegramChatId,
+					"COULD_NOT_READ_VALID_FROM",
+				);
+				return { success: false, reason: "COULD_NOT_READ_VALID_FROM" };
+			}
 
-		if (!isValidFromValid) {
-			await recordFailedUpload(
-				ctx,
-				userId,
-				imageStorageId,
-				"COULD_NOT_READ_VALID_FROM",
-				{
-					rawResponse,
-					type,
-					barcode,
-					expiryDate,
-					validFrom,
-				},
-			);
-			await sendErrorMessage(
-				ctx,
-				user.telegramChatId,
-				"COULD_NOT_READ_VALID_FROM",
-			);
-			return { success: false, reason: "COULD_NOT_READ_VALID_FROM" };
+			if (!isValidFromValid) {
+				await recordFailedUpload(
+					ctx,
+					userId,
+					imageStorageId,
+					"COULD_NOT_READ_VALID_FROM",
+					{
+						rawResponse,
+						type,
+						barcode,
+						expiryDate,
+						validFrom,
+					},
+				);
+				await sendErrorMessage(
+					ctx,
+					user.telegramChatId,
+					"COULD_NOT_READ_VALID_FROM",
+				);
+				return { success: false, reason: "COULD_NOT_READ_VALID_FROM" };
+			}
 		}
 
 		if (!barcode) {
@@ -254,7 +262,9 @@ export const storeVoucherFromOcr = internalMutation({
 			imageStorageId,
 			uploaderId: userId,
 			expiryDate: expiryDateMs,
-			validFrom: dayjsValidFrom?.startOf("day").valueOf(),
+			validFrom: isThreePlus
+				? undefined
+				: Date.UTC(dayjsValidFrom.year(), dayjsValidFrom.month(), dayjsValidFrom.date(), 0, 0, 0, 0),
 			barcodeNumber: barcode,
 			ocrRawResponse: rawResponse,
 			createdAt: nowMs,

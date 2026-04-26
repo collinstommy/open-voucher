@@ -14,6 +14,7 @@ import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as HealthCheckRouteImport } from './routes/health-check'
 import { Route as FeedbackRouteImport } from './routes/feedback'
 import { Route as FailedUploadsRouteImport } from './routes/failed-uploads'
+import { Route as EvalsRouteImport } from './routes/evals'
 import { Route as BannedRouteImport } from './routes/banned'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as UsersIndexRouteImport } from './routes/users/index'
@@ -44,6 +45,11 @@ const FailedUploadsRoute = FailedUploadsRouteImport.update({
   path: '/failed-uploads',
   getParentRoute: () => rootRouteImport,
 } as any)
+const EvalsRoute = EvalsRouteImport.update({
+  id: '/evals',
+  path: '/evals',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const BannedRoute = BannedRouteImport.update({
   id: '/banned',
   path: '/banned',
@@ -68,6 +74,7 @@ const UsersUserIdRoute = UsersUserIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/banned': typeof BannedRoute
+  '/evals': typeof EvalsRoute
   '/failed-uploads': typeof FailedUploadsRoute
   '/feedback': typeof FeedbackRoute
   '/health-check': typeof HealthCheckRoute
@@ -79,6 +86,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/banned': typeof BannedRoute
+  '/evals': typeof EvalsRoute
   '/failed-uploads': typeof FailedUploadsRoute
   '/feedback': typeof FeedbackRoute
   '/health-check': typeof HealthCheckRoute
@@ -91,6 +99,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/banned': typeof BannedRoute
+  '/evals': typeof EvalsRoute
   '/failed-uploads': typeof FailedUploadsRoute
   '/feedback': typeof FeedbackRoute
   '/health-check': typeof HealthCheckRoute
@@ -104,6 +113,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/banned'
+    | '/evals'
     | '/failed-uploads'
     | '/feedback'
     | '/health-check'
@@ -115,6 +125,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/banned'
+    | '/evals'
     | '/failed-uploads'
     | '/feedback'
     | '/health-check'
@@ -126,6 +137,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/banned'
+    | '/evals'
     | '/failed-uploads'
     | '/feedback'
     | '/health-check'
@@ -138,6 +150,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   BannedRoute: typeof BannedRoute
+  EvalsRoute: typeof EvalsRoute
   FailedUploadsRoute: typeof FailedUploadsRoute
   FeedbackRoute: typeof FeedbackRoute
   HealthCheckRoute: typeof HealthCheckRoute
@@ -184,6 +197,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FailedUploadsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/evals': {
+      id: '/evals'
+      path: '/evals'
+      fullPath: '/evals'
+      preLoaderRoute: typeof EvalsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/banned': {
       id: '/banned'
       path: '/banned'
@@ -218,6 +238,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   BannedRoute: BannedRoute,
+  EvalsRoute: EvalsRoute,
   FailedUploadsRoute: FailedUploadsRoute,
   FeedbackRoute: FeedbackRoute,
   HealthCheckRoute: HealthCheckRoute,
