@@ -7,6 +7,7 @@ import {
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import type { ActionCtx, QueryCtx } from "./_generated/server";
+import { MIN_COINS, UPLOAD_REWARDS } from "./constants";
 import {
 	action,
 	internalAction,
@@ -626,6 +627,52 @@ export const sendMessageToUser = adminMutation({
 		});
 
 		return { success: true };
+	},
+});
+
+export const expireVoucherAndDeductCoins = adminMutation({
+	args: {
+		voucherId: v.id("vouchers"),
+	},
+	handler: async (ctx, { voucherId }) => {
+		const voucher = await ctx.db.get(voucherId);
+		if (!voucher) {
+			throw new Error("Voucher not found");
+		}
+
+		if (voucher.status === "expired") {
+			throw new Error("Voucher is already expired");
+		}
+
+		const uploader = await ctx.db.get(voucher.uploaderId);
+		if (!uploader) {
+			throw new Error("Uploader not found");
+		}
+
+		const now = Date.now();
+		const deductionAmount = UPLOAD_REWARDS[voucher.type] ?? 0;
+		const newCoins = Math.max(MIN_COINS, uploader.coins - deductionAmount);
+
+		// Expire the voucher
+		await ctx.db.patch(voucherId, { status: "expired" });
+
+		// Deduct coins from uploader
+		await ctx.db.patch(voucher.uploaderId, { coins: newCoins });
+
+		// Record the transaction
+		await ctx.db.insert("transactions", {
+			userId: voucher.uploaderId,
+			type: "admin_expiry_deduction",
+			amount: -deductionAmount,
+			voucherId,
+			createdAt: now,
+		});
+
+		return {
+			success: true,
+			deductedAmount: deductionAmount,
+			newBalance: newCoins,
+		};
 	},
 });
 

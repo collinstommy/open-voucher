@@ -74,6 +74,15 @@ function UserDetailPage() {
 		onSuccess: () => queryClient.invalidateQueries(),
 	});
 
+	const expireVoucherMutation = useMutation({
+		mutationFn: (voucherId: Id<"vouchers">) =>
+			convex.mutation(api.admin.expireVoucherAndDeductCoins, {
+				token: token!,
+				voucherId,
+			}),
+		onSuccess: () => queryClient.invalidateQueries(),
+	});
+
 	if (isLoading) {
 		return <div className="text-muted-foreground">Loading user details...</div>;
 	}
@@ -204,7 +213,9 @@ function UserDetailPage() {
 																	? "bg-purple-100 text-purple-800"
 																	: tx.type === "uploader_denied"
 																		? "bg-red-100 text-red-800"
-																		: "bg-amber-100 text-amber-800"
+																		: tx.type === "admin_expiry_deduction"
+																			? "bg-rose-100 text-rose-800"
+																			: "bg-amber-100 text-amber-800"
 												}`}
 											>
 												{tx.type.replace(/_/g, " ")}
@@ -298,6 +309,20 @@ function UserDetailPage() {
 											>
 												{voucher.claimer.username || voucher.claimer.firstName || voucher.claimer.telegramChatId}
 											</Link>
+										</div>
+									)}
+									{voucher.status !== "expired" && (
+										<div className="mt-3">
+											<Button
+												size="sm"
+												variant="destructive"
+												onClick={() =>
+													expireVoucherMutation.mutate(voucher._id as Id<"vouchers">)
+												}
+												disabled={expireVoucherMutation.isPending}
+											>
+												Expire & Deduct Coins
+											</Button>
 										</div>
 									)}
 								</div>
