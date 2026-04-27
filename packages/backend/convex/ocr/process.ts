@@ -53,7 +53,7 @@ export const processVoucherImage = internalAction({
 			if (user) {
 				await ctx.scheduler.runAfter(0, internal.telegram.sendMessageAction, {
 					chatId: user.telegramChatId,
-					text: `❌ <b>Voucher Processing Failed</b>\n\nWe encountered an error while processing your voucher. Please try again or contact support.`,
+					text: `❌ <b>Voucher Processing Failed</b>\n\nWe encountered an error while processing your voucher. Please try again.`,
 				});
 			}
 		}
