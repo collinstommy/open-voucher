@@ -144,4 +144,65 @@ describe("Reminder Flow", () => {
 
 		vi.useRealTimers();
 	});
+
+	test("skips reminder when user uploaded a voucher yesterday", async () => {
+		vi.useFakeTimers();
+
+		const now = Date.now();
+		const oneDayMs = 24 * 60 * 60 * 1000;
+		const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+		const yesterday = now - oneDayMs;
+		const futureExpiry = now + sevenDaysMs;
+
+		const t = convexTest(schema, modules);
+
+		const claimerId = await createUser(t, {
+			telegramChatId: "claimer123",
+			coins: 100,
+		});
+		const uploaderId = await createUser(t, {
+			telegramChatId: "uploader456",
+			coins: 50,
+		});
+
+		// Create voucher claimed yesterday
+		await createVoucher(t, {
+			type: "10",
+			uploaderId,
+			status: "claimed",
+			claimerId,
+			claimedAt: yesterday,
+			expiryDate: futureExpiry,
+			createdAt: yesterday,
+		});
+
+		// Claimer also uploads a voucher yesterday
+		await createVoucher(t, {
+			type: "5",
+			uploaderId: claimerId,
+			status: "available",
+			expiryDate: futureExpiry,
+			createdAt: yesterday,
+		});
+
+		const chatIds = await t.query(
+			internal.reminders.getUsersWhoClaimedYesterday,
+			{},
+		);
+
+		expect(chatIds).toHaveLength(0);
+
+		sentMessages.length = 0;
+		await t.action(internal.reminders.sendDailyUploadReminders, {});
+
+		vi.runAllTimers();
+		await t.finishInProgressScheduledFunctions();
+
+		const reminderMessage = sentMessages.find(
+			(m) => m.chatId === "claimer123",
+		);
+		expect(reminderMessage).toBeUndefined();
+
+		vi.useRealTimers();
+	});
 });

@@ -81,6 +81,7 @@ export default defineSchema({
 		.index("by_status_type", ["status", "type"])
 		.index("by_status_created", ["status", "createdAt"])
 		.index("by_claimed_at", ["claimedAt"])
+		.index("by_created_at", ["createdAt"])
 		.index("by_uploader", ["uploaderId"])
 		.index("by_uploader_created", ["uploaderId", "createdAt"])
 		.index("by_claimer_claimed_at", ["claimerId", "claimedAt"])

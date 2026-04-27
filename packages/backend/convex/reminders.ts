@@ -1,6 +1,6 @@
 import dayjs from "dayjs";
 import { internal } from "./_generated/api";
-import { Id } from "./_generated/dataModel";
+import type { Id } from "./_generated/dataModel";
 import { internalAction, internalQuery } from "./_generated/server";
 
 /**
@@ -24,7 +24,8 @@ export const sendDailyUploadReminders = internalAction({
 });
 
 /**
- * Query users who claimed at least one voucher yesterday.
+ * Query users who claimed at least one voucher yesterday
+ * and did NOT upload a voucher yesterday.
  * Returns deduplicated list of telegram chat IDs.
  */
 export const getUsersWhoClaimedYesterday = internalQuery({
@@ -36,16 +37,30 @@ export const getUsersWhoClaimedYesterday = internalQuery({
 			.valueOf();
 		const endOfYesterday = dayjs().startOf("day").valueOf();
 
-		const vouchers = await ctx.db
-			.query("vouchers")
-			.withIndex("by_claimed_at", (q) =>
-				q.gte("claimedAt", startOfYesterday).lt("claimedAt", endOfYesterday),
-			)
-			.collect();
+		const [claimedVouchers, uploadedVouchers] = await Promise.all([
+			ctx.db
+				.query("vouchers")
+				.withIndex("by_claimed_at", (q) =>
+					q.gte("claimedAt", startOfYesterday).lt("claimedAt", endOfYesterday),
+				)
+				.collect(),
+			ctx.db
+				.query("vouchers")
+				.withIndex("by_created_at", (q) =>
+					q.gte("createdAt", startOfYesterday).lt("createdAt", endOfYesterday),
+				)
+				.collect(),
+		]);
+
+		const uploaderIds = new Set(
+			uploadedVouchers
+				.map((v) => v.uploaderId)
+				.filter((id): id is Id<"users"> => id !== undefined),
+		);
 
 		const claimerIds = [
 			...new Set(
-				vouchers
+				claimedVouchers
 					.map((v) => v.claimerId)
 					.filter((id): id is Id<"users"> => id !== undefined),
 			),
@@ -53,6 +68,7 @@ export const getUsersWhoClaimedYesterday = internalQuery({
 
 		const chatIds = (await Promise.all(claimerIds.map((id) => ctx.db.get(id))))
 			.filter((user) => user !== null)
+			.filter((user) => !uploaderIds.has(user._id))
 			.map((user) => user.telegramChatId);
 
 		return chatIds;
