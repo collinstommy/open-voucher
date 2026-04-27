@@ -345,7 +345,7 @@ async function callOpenRouterApi(
 				"X-Title": "Open Voucher",
 			},
 			body: JSON.stringify({
-				model: "moonshotai/kimi-k2.5",
+				model: "openai/gpt-4o",
 				messages: [
 					{
 						role: "user",
