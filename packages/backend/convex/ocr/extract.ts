@@ -197,7 +197,7 @@ async function extractVoucherData(
 			if (!openRouterApiKey) {
 				throw new Error("OpenRouter API key not configured and Gemini failed");
 			}
-			result = await callOpenRouterApi(imageBase64, prompt, openRouterApiKey);
+			result = await callOpenRouterApi(imageBase64, prompt, openRouterApiKey, false);
 		}
 	}
 
@@ -333,7 +333,32 @@ async function callOpenRouterApi(
 	imageBase64: string,
 	prompt: string,
 	apiKey: string,
+	useSchema = true,
 ): Promise<{ text: string; raw: string }> {
+	const requestBody: Record<string, unknown> = {
+		model: "moonshotai/kimi-k2.5",
+		messages: [
+			{
+				role: "user",
+				content: [
+					{ type: "text", text: prompt },
+					{
+						type: "image_url",
+						image_url: {
+							url: `data:image/jpeg;base64,${imageBase64}`,
+						},
+					},
+				],
+			},
+		],
+		temperature: 0.0,
+		max_tokens: 10000,
+	};
+
+	if (useSchema) {
+		requestBody.response_format = { type: "json_object" };
+	}
+
 	const response = await fetch(
 		"https://openrouter.ai/api/v1/chat/completions",
 		{
@@ -344,26 +369,7 @@ async function callOpenRouterApi(
 				"HTTP-Referer": "https://open-voucher.com",
 				"X-Title": "Open Voucher",
 			},
-			body: JSON.stringify({
-				model: "moonshotai/kimi-k2.5",
-				messages: [
-					{
-						role: "user",
-						content: [
-							{ type: "text", text: prompt },
-							{
-								type: "image_url",
-								image_url: {
-									url: `data:image/jpeg;base64,${imageBase64}`,
-								},
-							},
-						],
-					},
-				],
-				response_format: { type: "json_object" },
-				temperature: 0.0,
-				max_tokens: 10000,
-			}),
+			body: JSON.stringify(requestBody),
 		},
 	);
 
