@@ -75,6 +75,8 @@ export default defineSchema({
 		claimedAt: v.optional(v.number()),
 		createdAt: v.number(),
 		ocrRawResponse: v.optional(v.string()),
+		imageMarkedForDeletionAt: v.optional(v.number()),
+		imageDeletedAt: v.optional(v.number()),
 	})
 		.index("by_status_type", ["status", "type"])
 		.index("by_status_created", ["status", "createdAt"])
