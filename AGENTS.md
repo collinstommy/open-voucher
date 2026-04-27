@@ -1,3 +1,7 @@
+# ⚠️ IMPORTANT: NEVER DEPLOY UNLESS EXPLICITLY ASKED
+
+Do not run `bun run deploy:all`, `bun run deploy:web`, `bun run deploy:server`, or `bunx convex deploy` unless the user explicitly asks you to deploy. Always commit and push first, then wait for the user to decide when to deploy.
+
 # Project Overview
 
 This project, `open-voucher`, is a modern TypeScript monorepo built with Better-T-Stack. It combines React, TanStack Start, and Convex to provide a full-stack application development experience.
