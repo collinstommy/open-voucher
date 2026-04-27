@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { convexQuery } from "@convex-dev/react-query";
 import { api } from "@open-voucher/backend/convex/_generated/api";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
+import { formatDateTime } from "@/lib/utils";
 
 export const Route = createFileRoute("/banned")({
 	component: BannedUsers,
@@ -64,7 +65,7 @@ function BannedUsers() {
 								</div>
 								{user.bannedAt && (
 									<div className="text-sm text-muted-foreground">
-										Banned: {new Date(user.bannedAt).toLocaleString()}
+										Banned: {formatDateTime(user.bannedAt)}
 									</div>
 								)}
 							</div>

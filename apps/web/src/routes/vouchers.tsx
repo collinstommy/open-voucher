@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
+import { formatDate, formatDateTime } from "@/lib/utils";
 
 import { api } from "@open-voucher/backend/convex/_generated/api";
 import { createFileRoute, Link } from "@tanstack/react-router";
@@ -105,10 +106,10 @@ function VouchersPage() {
 								</span>
 							</div>
 							<div className="text-muted-foreground mb-1 text-sm">
-								Expires {new Date(voucher.expiryDate).toLocaleDateString()}
+								Expires {formatDate(voucher.expiryDate)}
 							</div>
 							<div className="text-muted-foreground text-sm">
-								Uploaded {new Date(voucher.createdAt).toLocaleString()}
+								Uploaded {formatDateTime(voucher.createdAt)}
 							</div>
 						</div>
 					</div>

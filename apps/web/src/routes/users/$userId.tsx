@@ -8,6 +8,7 @@ import { ArrowLeft } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
+import { formatDate, formatDateTime } from "@/lib/utils";
 
 export const Route = createFileRoute("/users/$userId")({
 	component: UserDetailPage,
@@ -232,7 +233,7 @@ function UserDetailPage() {
 											</span>
 										</td>
 										<td className="p-3 text-muted-foreground">
-											{new Date(tx.createdAt).toLocaleString()}
+											{formatDateTime(tx.createdAt)}
 										</td>
 									</tr>
 								))}
@@ -294,10 +295,10 @@ function UserDetailPage() {
 										</span>
 									</div>
 									<div className="mb-1 text-muted-foreground text-sm">
-										Expires {new Date(voucher.expiryDate).toLocaleDateString()}
+										Expires {formatDate(voucher.expiryDate)}
 									</div>
 									<div className="text-muted-foreground text-sm">
-										Uploaded {new Date(voucher.createdAt).toLocaleString()}
+										Uploaded {formatDateTime(voucher.createdAt)}
 									</div>
 									{voucher.claimer && (
 										<div className="mt-2 text-sm">
@@ -382,12 +383,12 @@ function UserDetailPage() {
 									{voucher.expiryDate && (
 										<div className="mb-1 text-muted-foreground text-sm">
 											Expires{" "}
-											{new Date(voucher.expiryDate).toLocaleDateString()}
+											{formatDate(voucher.expiryDate)}
 										</div>
 									)}
 									{voucher.claimedAt && (
 										<div className="text-muted-foreground text-sm">
-											Claimed {new Date(voucher.claimedAt).toLocaleString()}
+											Claimed {formatDateTime(voucher.claimedAt)}
 										</div>
 									)}
 									{voucher.uploader && (
@@ -487,7 +488,7 @@ function UserDetailPage() {
 										</div>
 									)}
 									<div className="text-muted-foreground text-sm">
-										Failed {new Date(upload._creationTime).toLocaleString()}
+										Failed {formatDateTime(upload._creationTime)}
 									</div>
 								</div>
 							</div>
@@ -533,7 +534,7 @@ function UserDetailPage() {
 										Report ID: {report._id}
 									</div>
 									<div className="mb-1 text-muted-foreground text-sm">
-										Reported on {new Date(report.createdAt).toLocaleString()}
+										Reported on {formatDateTime(report.createdAt)}
 									</div>
 									<div className="text-muted-foreground text-sm">
 										Uploaded by{" "}
@@ -627,7 +628,7 @@ function UserDetailPage() {
 										Report ID: {report._id}
 									</div>
 									<div className="mb-1 text-muted-foreground text-sm">
-										Reported on {new Date(report.createdAt).toLocaleString()}
+										Reported on {formatDateTime(report.createdAt)}
 									</div>
 									<div className="text-muted-foreground text-sm">
 										Reported by{" "}
@@ -721,7 +722,7 @@ function UserDetailPage() {
 											)}
 										</div>
 										<div className="text-muted-foreground text-xs">
-											{new Date(item.createdAt).toLocaleString()}
+											{formatDateTime(item.createdAt)}
 										</div>
 									</div>
 									<span
@@ -758,7 +759,7 @@ function UserDetailPage() {
 								<div className="max-w-xs rounded-lg bg-blue-500 p-3 text-white shadow-sm">
 									<p className="whitespace-pre-wrap text-sm">{message.text}</p>
 									<p className="mt-1 text-xs opacity-75">
-										{new Date(message.createdAt).toLocaleString()}
+										{formatDateTime(message.createdAt)}
 									</p>
 								</div>
 							</div>

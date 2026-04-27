@@ -7,6 +7,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { CheckIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 import { useCallback, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { formatDateTime } from "@/lib/utils";
 import {
 	DropdownMenu,
 	DropdownMenuCheckboxItem,
@@ -194,7 +195,7 @@ function FailedUploadsPage() {
 							)}
 							<div className="text-muted-foreground text-sm">
 								Failed at{" "}
-								{new Date(failedUpload._creationTime).toLocaleString()}
+								{formatDateTime(failedUpload._creationTime)}
 							</div>
 						</div>
 					</div>

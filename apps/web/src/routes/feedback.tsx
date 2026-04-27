@@ -7,6 +7,7 @@ import { useConvex } from "convex/react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
+import { formatDateTime } from "@/lib/utils";
 
 export const Route = createFileRoute("/feedback")({
 	component: FeedbackPage,
@@ -150,7 +151,7 @@ function FeedbackPage() {
 									</div>
 									<div className="text-muted-foreground text-xs">
 										{item.user?.telegramChatId} •{" "}
-										{new Date(item.createdAt).toLocaleString()}
+										{formatDateTime(item.createdAt)}
 									</div>
 								</div>
 								<div className="flex gap-2">
