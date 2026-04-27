@@ -19,6 +19,28 @@ type ParsedDates = {
 };
 
 /**
+ * Clean up Gemini response to extract valid JSON
+ * Handles: markdown wrapping, conversational text, trailing text
+ */
+function cleanJsonResponse(text: string): string {
+	let cleaned = text.trim();
+
+	// Remove markdown code blocks
+	cleaned = cleaned.replace(/^```(?:json)?\s*/i, "");
+	cleaned = cleaned.replace(/```\s*$/i, "");
+
+	// Extract JSON object - find first { and last }
+	const start = cleaned.indexOf("{");
+	const end = cleaned.lastIndexOf("}");
+
+	if (start === -1 || end === -1 || end <= start) {
+		throw new Error("No valid JSON object found in response");
+	}
+
+	return cleaned.slice(start, end + 1).trim();
+}
+
+/**
  * Parse raw extracted dates into actual dates
  * Uses extracted year if available, otherwise computes from test date
  */
@@ -179,7 +201,8 @@ async function extractVoucherData(
 		}
 	}
 
-	const normalizedText = result.text.trim().replace(/(:\s*)0+(\d)/g, "$1$2");
+	const cleanedText = cleanJsonResponse(result.text);
+	const normalizedText = cleanedText.replace(/(:\s*)0+(\d)/g, "$1$2");
 	const extracted: ExtractedData = JSON.parse(normalizedText);
 
 	console.log("Extracted (raw):", extracted);
@@ -272,6 +295,19 @@ async function callGeminiApi(
 					temperature: 0.0,
 					maxOutputTokens: 2048,
 					responseMimeType: "application/json",
+					responseSchema: {
+						type: "OBJECT",
+						properties: {
+							type: { type: "STRING" },
+							validFromDay: { type: "INTEGER", nullable: true },
+							validFromMonth: { type: "INTEGER", nullable: true },
+							expiryDay: { type: "INTEGER", nullable: true },
+							expiryMonth: { type: "INTEGER", nullable: true },
+							expiryYear: { type: "INTEGER", nullable: true },
+							barcode: { type: "STRING", nullable: true },
+							isThreePlus: { type: "BOOLEAN", nullable: true },
+						},
+					},
 				},
 			}),
 		},
