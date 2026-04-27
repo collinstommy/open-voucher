@@ -165,6 +165,8 @@ export interface CreateUserParams {
 	firstName?: string;
 	coins?: number;
 	isBanned?: boolean;
+	bannedAt?: number;
+	flaggedForReviewAt?: number;
 	createdAt?: number;
 	lastActiveAt?: number;
 }
@@ -184,6 +186,8 @@ export async function createUser(
 			firstName: params.firstName,
 			coins: params.coins ?? 0,
 			isBanned: params.isBanned ?? false,
+			bannedAt: params.bannedAt,
+			flaggedForReviewAt: params.flaggedForReviewAt,
 			createdAt: params.createdAt ?? Date.now(),
 			lastActiveAt: params.lastActiveAt ?? Date.now(),
 		});

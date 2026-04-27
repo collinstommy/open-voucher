@@ -46,6 +46,15 @@ function UserDetailPage() {
 		onSuccess: () => queryClient.invalidateQueries(),
 	});
 
+	const dismissFlagMutation = useMutation({
+		mutationFn: () =>
+			convex.mutation(api.admin.dismissFlag, {
+				token: token!,
+				userId: userId as Id<"users">,
+			}),
+		onSuccess: () => queryClient.invalidateQueries(),
+	});
+
 	const sendMessageMutation = useMutation({
 		mutationFn: (text: string) =>
 			convex.mutation(api.admin.sendMessageToUser, {
@@ -121,30 +130,53 @@ function UserDetailPage() {
 			<div className="rounded-lg border p-6">
 				<div className="mb-4 flex items-start justify-between">
 					<div>
-						<h1 className="font-semibold text-2xl">
-							{user.username || user.firstName || "Unknown User"}
-						</h1>
+						<div className="flex items-center gap-2">
+							<h1 className="font-semibold text-2xl">
+								{user.username || user.firstName || "Unknown User"}
+							</h1>
+							{user.isBanned && (
+								<span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
+									Banned
+								</span>
+							)}
+							{user.flaggedForReviewAt && !user.isBanned && (
+								<span className="rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-700">
+									Flagged for Review
+								</span>
+							)}
+						</div>
 						<p className="text-muted-foreground text-sm">
 							{user.telegramChatId}
 						</p>
 					</div>
-					{user.isBanned ? (
-						<Button
-							variant="outline"
-							onClick={() => unbanMutation.mutate()}
-							disabled={unbanMutation.isPending}
-						>
-							Unban User
-						</Button>
-					) : (
-						<Button
-							variant="destructive"
-							onClick={() => banMutation.mutate()}
-							disabled={banMutation.isPending}
-						>
-							Ban User
-						</Button>
-					)}
+					<div className="flex gap-2">
+						{user.flaggedForReviewAt && !user.isBanned && (
+							<Button
+								variant="outline"
+								onClick={() => dismissFlagMutation.mutate()}
+								disabled={dismissFlagMutation.isPending}
+							>
+								Dismiss Flag
+							</Button>
+						)}
+						{user.isBanned ? (
+							<Button
+								variant="outline"
+								onClick={() => unbanMutation.mutate()}
+								disabled={unbanMutation.isPending}
+							>
+								Unban User
+							</Button>
+						) : (
+							<Button
+								variant="destructive"
+								onClick={() => banMutation.mutate()}
+								disabled={banMutation.isPending}
+							>
+								Ban User
+							</Button>
+						)}
+					</div>
 				</div>
 
 				<div className="grid grid-cols-2 gap-4 sm:grid-cols-5">

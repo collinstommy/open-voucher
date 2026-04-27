@@ -272,9 +272,9 @@ export const reportVoucher = internalMutation({
 			const last5Reported = reporterReports.filter((r) =>
 				last5ClaimIds.includes(r.voucherId),
 			);
-			if (last5Reported.length >= 3) {
+			if (last5Reported.length >= 3 && !user.flaggedForReviewAt) {
 				console.log(
-					`🚫 REPORTER BAN: User ${user._id} (${user.telegramChatId}) banned for excessive reporting. ` +
+					`🚫 REPORTER FLAG: User ${user._id} (${user.telegramChatId}) flagged for excessive reporting. ` +
 						`Reported ${last5Reported.length} of last 5 claims. ` +
 						`Total claims: ${last5Claims.length}, Total reports: ${reporterReports.length}`,
 				);
@@ -288,14 +288,8 @@ export const reportVoucher = internalMutation({
 					})),
 				);
 				await ctx.db.patch(user._id, {
-					isBanned: true,
-					bannedAt: Date.now(),
+					flaggedForReviewAt: Date.now(),
 				});
-				return {
-					status: "banned",
-					message:
-						"You have been banned for reporting 3 or more of your last 5 claims.",
-				};
 			}
 		}
 
@@ -377,34 +371,28 @@ export const reportVoucher = internalMutation({
 				recentUploadIds.includes(r.voucherId),
 			);
 
-			const shouldBan = recentReported.length >= reportsThreshold;
+			const shouldFlag = recentReported.length >= reportsThreshold;
 
-			if (shouldBan) {
-				console.log(
-					`🚫 UPLOADER BAN: User ${voucher.uploaderId} banned for bad uploads. ` +
-						`${recentReported.length} of last ${uploadsToCheck} uploads reported. ` +
-						`Total uploads: ${totalUploadCount}, Valid reports (non-banned): ${validReports.length}`,
-				);
-				console.log(
-					`Last ${uploadsToCheck} uploads:`,
-					recentUploads.map((v) => ({
-						voucherId: v._id,
-						type: v.type,
-						status: v.status,
-						createdAt: new Date(v.createdAt).toISOString(),
-						wasReported: recentReported.some((r) => r.voucherId === v._id),
-					})),
-				);
-				await ctx.db.patch(voucher.uploaderId, {
-					isBanned: true,
-					bannedAt: Date.now(),
-				});
-
+			if (shouldFlag) {
 				const uploader = await ctx.db.get(voucher.uploaderId);
-				if (uploader) {
-					await ctx.scheduler.runAfter(0, internal.telegram.sendMessageAction, {
-						chatId: uploader.telegramChatId,
-						text: `🚫 <b>Account Banned</b>\n\nYour account has been banned because ${reportsThreshold} or more of your last ${uploadsToCheck} uploads were reported as not working.`,
+				if (uploader && !uploader.flaggedForReviewAt) {
+					console.log(
+						`🚫 UPLOADER FLAG: User ${voucher.uploaderId} flagged for bad uploads. ` +
+							`${recentReported.length} of last ${uploadsToCheck} uploads reported. ` +
+							`Total uploads: ${totalUploadCount}, Valid reports (non-banned): ${validReports.length}`,
+					);
+					console.log(
+						`Last ${uploadsToCheck} uploads:`,
+						recentUploads.map((v) => ({
+							voucherId: v._id,
+							type: v.type,
+							status: v.status,
+							createdAt: new Date(v.createdAt).toISOString(),
+							wasReported: recentReported.some((r) => r.voucherId === v._id),
+						})),
+					);
+					await ctx.db.patch(voucher.uploaderId, {
+						flaggedForReviewAt: Date.now(),
 					});
 				}
 			}

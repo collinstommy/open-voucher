@@ -27,6 +27,7 @@ export default defineSchema({
 		uploadReportCount: v.optional(v.number()),
 		claimReportCount: v.optional(v.number()),
 		lastReportAt: v.optional(v.number()),
+		flaggedForReviewAt: v.optional(v.number()),
 		onboardingStep: v.optional(v.number()),
 		telegramState: v.optional(
 			v.union(

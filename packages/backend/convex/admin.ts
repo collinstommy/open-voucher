@@ -193,7 +193,11 @@ export const banUser = adminMutation({
 		userId: v.id("users"),
 	},
 	handler: async (ctx, { userId }) => {
-		await ctx.db.patch(userId, { isBanned: true });
+		await ctx.db.patch(userId, {
+			isBanned: true,
+			bannedAt: Date.now(),
+			flaggedForReviewAt: undefined,
+		});
 		return { success: true };
 	},
 });
@@ -203,7 +207,50 @@ export const unbanUser = adminMutation({
 		userId: v.id("users"),
 	},
 	handler: async (ctx, { userId }) => {
-		await ctx.db.patch(userId, { isBanned: false });
+		await ctx.db.patch(userId, {
+			isBanned: false,
+			bannedAt: undefined,
+			flaggedForReviewAt: undefined,
+		});
+		return { success: true };
+	},
+});
+
+export const getFlaggedUsers = adminQuery({
+	args: {},
+	handler: async (ctx) => {
+		const users = await ctx.db
+			.query("users")
+			.filter((q) =>
+				q.and(
+					q.neq(q.field("flaggedForReviewAt"), undefined),
+					q.eq(q.field("isBanned"), false),
+				),
+			)
+			.collect();
+
+		return users
+			.sort((a, b) => (b.flaggedForReviewAt || 0) - (a.flaggedForReviewAt || 0))
+			.map((user) => ({
+				_id: user._id,
+				telegramChatId: user.telegramChatId,
+				username: user.username,
+				firstName: user.firstName,
+				flaggedForReviewAt: user.flaggedForReviewAt,
+				uploadCount: user.uploadCount || 0,
+				claimCount: user.claimCount || 0,
+				uploadReportCount: user.uploadReportCount || 0,
+				claimReportCount: user.claimReportCount || 0,
+			}));
+	},
+});
+
+export const dismissFlag = adminMutation({
+	args: {
+		userId: v.id("users"),
+	},
+	handler: async (ctx, { userId }) => {
+		await ctx.db.patch(userId, { flaggedForReviewAt: undefined });
 		return { success: true };
 	},
 });
@@ -545,6 +592,7 @@ export const getUserDetails = adminQuery({
 				firstName: user.firstName,
 				coins: user.coins,
 				isBanned: user.isBanned,
+				flaggedForReviewAt: user.flaggedForReviewAt,
 				createdAt: user.createdAt,
 				lastActiveAt: user.lastActiveAt,
 			},

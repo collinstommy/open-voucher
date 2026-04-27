@@ -4,7 +4,7 @@
 
 import { convexTest } from "convex-test";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { internal } from "../../convex/_generated/api";
+import { api, internal } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import schema from "../../convex/schema";
 import { modules } from "../test.setup";
@@ -153,7 +153,7 @@ describe("Ban Flow", () => {
 		vi.unstubAllEnvs();
 	});
 
-	test("uploader gets banned when 3 of last 5 uploads reported", async () => {
+	test("uploader gets flagged when 3 of last 5 uploads reported", async () => {
 		vi.useFakeTimers();
 		const t = convexTest(schema, modules);
 		const uploaderChatId = "uploader_ban_test";
@@ -198,39 +198,28 @@ describe("Ban Flow", () => {
 			voucherId: voucherIds[1],
 		});
 
-		// Verify uploader is NOT banned yet
+		// Verify uploader is NOT flagged yet
 		let uploader = await t.run(async (ctx) => {
 			return await ctx.db.get(uploaderId);
 		});
-		expect(uploader?.isBanned).toBe(false);
+		expect(uploader?.flaggedForReviewAt).toBeUndefined();
 
-		// Advance to Day 3 and report third voucher - this should trigger ban (3 of 5)
+		// Advance to Day 3 and report third voucher - this should trigger flag (3 of 5)
 		vi.advanceTimersByTime(24 * 60 * 60 * 1000); // 1 day
 		await t.mutation(internal.vouchers.reportVoucher, {
 			userId: reporterId,
 			voucherId: voucherIds[2],
 		});
 
-		// Wait for scheduled functions (ban notification) to complete
-		vi.runAllTimers();
-		await t.finishInProgressScheduledFunctions();
-
-		// Verify the uploader is now banned
+		// Verify the uploader is now flagged for review
 		uploader = await t.run(async (ctx) => {
 			return await ctx.db.get(uploaderId);
 		});
-		expect(uploader?.isBanned).toBe(true);
-		expect(uploader?.bannedAt).toBeDefined();
+		expect(uploader?.flaggedForReviewAt).toBeDefined();
+		expect(uploader?.isBanned).toBe(false);
 
-		// Verify ban notification was sent to uploader
-		const banNotification = sentMessages.find(
-			(m) => m.chatId === uploaderChatId && m.text?.includes("Account Banned"),
-		);
-		expect(banNotification).toBeDefined();
-		expect(banNotification?.text).toContain(
-			"3 or more of your last 5 uploads were reported",
-		);
-
+		vi.runAllTimers();
+		await t.finishInProgressScheduledFunctions();
 		vi.useRealTimers();
 	});
 
@@ -285,7 +274,7 @@ describe("Ban Flow Tests", () => {
 		vi.unstubAllEnvs();
 	});
 
-	test("reporter banned when 3+ of last 5 claims are reported", async () => {
+	test("reporter flagged when 3+ of last 5 claims are reported", async () => {
 		vi.useFakeTimers();
 		const t = convexTest(schema, modules);
 		const now = Date.now();
@@ -330,7 +319,7 @@ describe("Ban Flow Tests", () => {
 		let reporter = await t.run(async (ctx) => {
 			return await ctx.db.get(reporterId);
 		});
-		expect(reporter?.isBanned).toBe(false);
+		expect(reporter?.flaggedForReviewAt).toBeUndefined();
 
 		// Advance to Day 3 and report third voucher
 		vi.advanceTimersByTime(24 * 60 * 60 * 1000); // 1 day
@@ -342,29 +331,30 @@ describe("Ban Flow Tests", () => {
 		reporter = await t.run(async (ctx) => {
 			return await ctx.db.get(reporterId);
 		});
-		expect(reporter?.isBanned).toBe(false);
+		expect(reporter?.flaggedForReviewAt).toBeUndefined();
 
-		// Advance to Day 4 and report fourth voucher - this should trigger ban (3 existing + this one)
+		// Advance to Day 4 and report fourth voucher - this should trigger flag (3 existing + this one)
 		vi.advanceTimersByTime(24 * 60 * 60 * 1000); // 1 day
 		const result4 = await t.mutation(internal.vouchers.reportVoucher, {
 			userId: reporterId,
 			voucherId: voucherIds[3],
 		});
 
-		expect(result4.status).toBe("banned");
-		expect(result4.message).toContain("3 or more of your last 5 claims");
+		expect(result4.status).toBe("refunded");
 
 		await t.finishAllScheduledFunctions(vi.runAllTimers);
 
 		reporter = await t.run(async (ctx) => {
 			return await ctx.db.get(reporterId);
 		});
-		expect(reporter?.isBanned).toBe(true);
-		expect(reporter?.bannedAt).toBeDefined();
+		expect(reporter?.flaggedForReviewAt).toBeDefined();
+		expect(reporter?.isBanned).toBe(false);
+
+		await t.finishAllScheduledFunctions(vi.runAllTimers);
 		vi.useRealTimers();
 	});
 
-	test("uploader banned when 3+ of last 5 uploads are reported", async () => {
+	test("uploader flagged when 3+ of last 5 uploads are reported", async () => {
 		vi.useFakeTimers();
 		const t = convexTest(schema, modules);
 		const now = Date.now();
@@ -409,26 +399,26 @@ describe("Ban Flow Tests", () => {
 		let uploader = await t.run(async (ctx) => {
 			return await ctx.db.get(uploaderId);
 		});
-		expect(uploader?.isBanned).toBe(false);
+		expect(uploader?.flaggedForReviewAt).toBeUndefined();
 
-		// Advance to Day 3 and report third voucher - this should trigger uploader ban (3 of 5)
+		// Advance to Day 3 and report third voucher - this should trigger uploader flag (3 of 5)
 		vi.advanceTimersByTime(24 * 60 * 60 * 1000); // 1 day
 		await t.mutation(internal.vouchers.reportVoucher, {
 			userId: reporterId,
 			voucherId: voucherIds[2],
 		});
 
-		await t.finishAllScheduledFunctions(vi.runAllTimers);
-
 		uploader = await t.run(async (ctx) => {
 			return await ctx.db.get(uploaderId);
 		});
-		expect(uploader?.isBanned).toBe(true);
-		expect(uploader?.bannedAt).toBeDefined();
+		expect(uploader?.flaggedForReviewAt).toBeDefined();
+		expect(uploader?.isBanned).toBe(false);
+
+		await t.finishAllScheduledFunctions(vi.runAllTimers);
 		vi.useRealTimers();
 	});
 
-	test("high volume uploader (20+ uploads) banned when 5+ of last 10 uploads are reported", async () => {
+	test("high volume uploader (20+ uploads) flagged when 5+ of last 10 uploads are reported", async () => {
 		vi.useFakeTimers();
 		const t = convexTest(schema, modules);
 		const now = Date.now();
@@ -469,22 +459,22 @@ describe("Ban Flow Tests", () => {
 		let uploader = await t.run(async (ctx) => {
 			return await ctx.db.get(uploaderId);
 		});
-		expect(uploader?.isBanned).toBe(false);
+		expect(uploader?.flaggedForReviewAt).toBeUndefined();
 
-		// Report 5th voucher of the last 10 - this should trigger ban (5 of last 10)
+		// Report 5th voucher of the last 10 - this should trigger flag (5 of last 10)
 		vi.advanceTimersByTime(24 * 60 * 60 * 1000); // 1 day
 		await t.mutation(internal.vouchers.reportVoucher, {
 			userId: reporterId,
 			voucherId: voucherIds[16],
 		});
 
-		await t.finishAllScheduledFunctions(vi.runAllTimers);
-
 		uploader = await t.run(async (ctx) => {
 			return await ctx.db.get(uploaderId);
 		});
-		expect(uploader?.isBanned).toBe(true);
-		expect(uploader?.bannedAt).toBeDefined();
+		expect(uploader?.flaggedForReviewAt).toBeDefined();
+		expect(uploader?.isBanned).toBe(false);
+
+		await t.finishAllScheduledFunctions(vi.runAllTimers);
 		vi.useRealTimers();
 	});
 
@@ -551,7 +541,7 @@ describe("Ban Flow Tests", () => {
 		vi.useRealTimers();
 	});
 
-	test("uploader admission removes report and prevents ban", async () => {
+	test("uploader admission removes report but still gets flagged at threshold", async () => {
 		vi.useFakeTimers();
 		const t = convexTest(schema, modules);
 		const now = Date.now();
@@ -625,12 +615,14 @@ describe("Ban Flow Tests", () => {
 			voucherId: voucherIds[3],
 		});
 
-		// Verify uploader IS banned (3 reports meets threshold)
+		// Verify uploader IS flagged (3 reports meets threshold)
 		const uploader = await t.run(async (ctx) => {
 			return await ctx.db.get(uploaderId);
 		});
-		expect(uploader?.isBanned).toBe(true);
+		expect(uploader?.flaggedForReviewAt).toBeDefined();
+		expect(uploader?.isBanned).toBe(false);
 
+		await t.finishAllScheduledFunctions(vi.runAllTimers);
 		vi.useRealTimers();
 	});
 });
@@ -766,5 +758,177 @@ describe("Report Confirmation Flow", () => {
 				m.text?.includes("No replacement vouchers available"),
 		);
 		expect(reportMsg).toBeDefined();
+	});
+});
+
+// ============================================================================
+// Review System
+// ============================================================================
+
+describe("Review System", () => {
+	beforeEach(() => {
+		vi.stubEnv("ADMIN_PASSWORD", "test-admin-password");
+	});
+
+	afterEach(() => {
+		vi.unstubAllEnvs();
+	});
+
+	test("getFlaggedUsers returns only flagged non-banned users", async () => {
+		const t = convexTest(schema, modules);
+
+		const flaggedUserId = await createUser(t, {
+			telegramChatId: "flagged1",
+			flaggedForReviewAt: Date.now(),
+		});
+		await createUser(t, {
+			telegramChatId: "banned1",
+			isBanned: true,
+			flaggedForReviewAt: Date.now(),
+		});
+		await createUser(t, {
+			telegramChatId: "normal1",
+		});
+
+		const loginResult = await t.mutation(api.admin.login, {
+			password: "test-admin-password",
+		});
+
+		const flagged = await t.query(api.admin.getFlaggedUsers, {
+			token: loginResult.token,
+		});
+
+		expect(flagged).toHaveLength(1);
+		expect(flagged[0]._id).toBe(flaggedUserId);
+		expect(flagged[0].telegramChatId).toBe("flagged1");
+	});
+
+	test("banUser bans user and clears flag", async () => {
+		const t = convexTest(schema, modules);
+
+		const userId = await createUser(t, {
+			telegramChatId: "toban",
+			flaggedForReviewAt: Date.now(),
+		});
+
+		const loginResult = await t.mutation(api.admin.login, {
+			password: "test-admin-password",
+		});
+
+		await t.mutation(api.admin.banUser, {
+			token: loginResult.token,
+			userId,
+		});
+
+		const user = await t.run(async (ctx) => {
+			return await ctx.db.get(userId);
+		});
+
+		expect(user?.isBanned).toBe(true);
+		expect(user?.bannedAt).toBeDefined();
+		expect(user?.flaggedForReviewAt).toBeUndefined();
+	});
+
+	test("unbanUser unbans user and clears flag", async () => {
+		const t = convexTest(schema, modules);
+
+		const userId = await createUser(t, {
+			telegramChatId: "tounban",
+			isBanned: true,
+			bannedAt: Date.now(),
+			flaggedForReviewAt: Date.now(),
+		});
+
+		const loginResult = await t.mutation(api.admin.login, {
+			password: "test-admin-password",
+		});
+
+		await t.mutation(api.admin.unbanUser, {
+			token: loginResult.token,
+			userId,
+		});
+
+		const user = await t.run(async (ctx) => {
+			return await ctx.db.get(userId);
+		});
+
+		expect(user?.isBanned).toBe(false);
+		expect(user?.bannedAt).toBeUndefined();
+		expect(user?.flaggedForReviewAt).toBeUndefined();
+	});
+
+	test("dismissFlag clears flag without banning", async () => {
+		const t = convexTest(schema, modules);
+
+		const userId = await createUser(t, {
+			telegramChatId: "todismiss",
+			flaggedForReviewAt: Date.now(),
+		});
+
+		const loginResult = await t.mutation(api.admin.login, {
+			password: "test-admin-password",
+		});
+
+		await t.mutation(api.admin.dismissFlag, {
+			token: loginResult.token,
+			userId,
+		});
+
+		const user = await t.run(async (ctx) => {
+			return await ctx.db.get(userId);
+		});
+
+		expect(user?.isBanned).toBe(false);
+		expect(user?.flaggedForReviewAt).toBeUndefined();
+	});
+
+	test("already flagged user is not re-flagged", async () => {
+		const t = convexTest(schema, modules);
+		const now = Date.now();
+
+		const uploaderId = await createUser(t, {
+			telegramChatId: "already_flagged",
+			coins: 0,
+			flaggedForReviewAt: now - 10000,
+		});
+		const reporterId = await createUser(t, {
+			telegramChatId: "reporter_reflag",
+			coins: 100,
+		});
+
+		const voucherIds: Id<"vouchers">[] = [];
+		for (let i = 0; i < 5; i++) {
+			const voucherId = await createVoucher(t, {
+				type: "5",
+				uploaderId,
+				status: "claimed",
+				claimerId: reporterId,
+				expiryDate: now + 7 * 24 * 60 * 60 * 1000,
+				claimedAt: now - (5 - i) * 1000,
+				createdAt: now - (5 - i) * 2000,
+			});
+			voucherIds.push(voucherId);
+		}
+
+		// Report 3 vouchers - should not update flaggedForReviewAt since already flagged
+		await t.mutation(internal.vouchers.reportVoucher, {
+			userId: reporterId,
+			voucherId: voucherIds[0],
+		});
+		await t.mutation(internal.vouchers.reportVoucher, {
+			userId: reporterId,
+			voucherId: voucherIds[1],
+		});
+		await t.mutation(internal.vouchers.reportVoucher, {
+			userId: reporterId,
+			voucherId: voucherIds[2],
+		});
+
+		const uploader = await t.run(async (ctx) => {
+			return await ctx.db.get(uploaderId);
+		});
+
+		expect(uploader?.flaggedForReviewAt).toBe(now - 10000);
+		expect(uploader?.isBanned).toBe(false);
 	});
 });

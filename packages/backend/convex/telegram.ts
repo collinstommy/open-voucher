@@ -461,7 +461,7 @@ export const handleTelegramMessage = internalAction({
 			});
 			await sendTelegramMessage(
 				chatId,
-				"🚫 Your account has been banned from this service.\n\nPlease reply with a message describing why you think this is an error.",
+				"🚫 Your account has been banned for misuse.\n\nPlease reply with a message describing if you think this is an error.",
 			);
 			return;
 		}
@@ -756,7 +756,7 @@ export const handleTelegramCallback = internalAction({
 				});
 				await sendTelegramMessage(
 					chatId,
-					"🚫 Your account has been banned from this service.\n\nPlease reply with a message describing why you think this is an error.",
+					"🚫 Your account has been banned for misuse.\n\nPlease reply with a message describing if you think this is an error.",
 				);
 				return;
 			}
