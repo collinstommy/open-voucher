@@ -46,8 +46,8 @@ export const getUsersWhoClaimedYesterday = internalQuery({
 				.collect(),
 			ctx.db
 				.query("vouchers")
-				.withIndex("by_created_at", (q) =>
-					q.gte("createdAt", startOfYesterday).lt("createdAt", endOfYesterday),
+				.withIndex("by_creation_time", (q) =>
+					q.gte("_creationTime", startOfYesterday).lt("_creationTime", endOfYesterday),
 				)
 				.collect(),
 		]);
