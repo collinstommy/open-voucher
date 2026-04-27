@@ -345,7 +345,7 @@ async function callOpenRouterApi(
 				"X-Title": "Open Voucher",
 			},
 			body: JSON.stringify({
-				model: "openai/gpt-4o",
+				model: "openai/gpt-5-mini",
 				messages: [
 					{
 						role: "user",
