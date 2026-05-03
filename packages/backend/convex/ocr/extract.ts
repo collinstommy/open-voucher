@@ -161,6 +161,37 @@ function computeYears(
 	return { validFromYear: testYear, expiryYear: testYear };
 }
 
+async function callApiForExtraction(
+	imageBase64: string,
+	prompt: string,
+	useOpenRouter: boolean,
+	geminiModel = "gemini-2.5-flash-lite",
+): Promise<{ text: string; raw: string }> {
+	if (useOpenRouter) {
+		const openRouterApiKey = process.env.OPENROUTER_API_KEY;
+		if (!openRouterApiKey) {
+			throw new Error("OpenRouter API key not configured");
+		}
+		return callOpenRouterApi(imageBase64, prompt, openRouterApiKey);
+	}
+
+	const geminiApiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+	if (!geminiApiKey) {
+		throw new Error("Gemini API key not configured");
+	}
+
+	try {
+		return await callGeminiApi(imageBase64, prompt, geminiApiKey, geminiModel);
+	} catch (geminiError) {
+		console.warn("Gemini extraction failed, trying OpenRouter:", geminiError);
+		const openRouterApiKey = process.env.OPENROUTER_API_KEY;
+		if (!openRouterApiKey) {
+			throw new Error("OpenRouter API key not configured and Gemini failed");
+		}
+		return callOpenRouterApi(imageBase64, prompt, openRouterApiKey);
+	}
+}
+
 async function extractVoucherData(
 	imageBase64: string,
 	currentDate: string,
@@ -176,53 +207,94 @@ async function extractVoucherData(
 	const currentYear = new Date(currentDate).getFullYear();
 	const prompt = buildPrompt(currentYear);
 
-	let result: { text: string; raw: string };
-
-	if (useOpenRouter) {
-		const openRouterApiKey = process.env.OPENROUTER_API_KEY;
-		if (!openRouterApiKey) {
-			throw new Error("OpenRouter API key not configured");
-		}
-		result = await callOpenRouterApi(imageBase64, prompt, openRouterApiKey);
-	} else {
+	for (let attempt = 0; attempt < 2; attempt++) {
+		let result: { text: string; raw: string };
 		try {
-			const geminiApiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
-			if (!geminiApiKey) {
-				throw new Error("Gemini API key not configured");
+			if (attempt === 0) {
+				result = await callApiForExtraction(imageBase64, prompt, useOpenRouter);
+			} else {
+				// Retry with Gemini 2.5 Flash (more capable model) for a second attempt
+				result = await callApiForExtraction(imageBase64, prompt, false, "gemini-2.5-flash");
 			}
-			result = await callGeminiApi(imageBase64, prompt, geminiApiKey);
-		} catch (geminiError) {
-			console.warn("Gemini extraction failed, trying OpenRouter:", geminiError);
-			const openRouterApiKey = process.env.OPENROUTER_API_KEY;
-			if (!openRouterApiKey) {
-				throw new Error("OpenRouter API key not configured and Gemini failed");
+		} catch (apiError) {
+			if (attempt < 1) {
+				console.warn(
+					`API call failed (attempt ${attempt + 1}), retrying:`,
+					apiError,
+				);
+				continue;
 			}
-			result = await callOpenRouterApi(imageBase64, prompt, openRouterApiKey);
+			throw apiError;
+		}
+
+		try {
+			const cleanedText = cleanJsonResponse(result.text);
+			const normalizedText = cleanedText.replace(/(:\s*)0+(\d)/g, "$1$2");
+			const extracted: ExtractedData = JSON.parse(normalizedText);
+
+			console.log("Extracted (raw):", extracted);
+
+			const { validFrom, expiryDate } = parseVoucherDates(
+				extracted,
+				currentDate,
+			);
+
+			// Retry if we got no useful data (type=0 or no expiry date)
+			if (extracted.type === 0 || !expiryDate) {
+				if (attempt < 1) {
+					console.warn(
+						`Attempt ${attempt + 1} returned no valid data (type=${extracted.type}, expiryDate=${expiryDate}), retrying with Gemini 2.5 Flash...`,
+					);
+					continue;
+				}
+			}
+
+			console.log("Extracted (final):", {
+				type: extracted.type,
+				validFrom,
+				expiryDate,
+				barcode: extracted.barcode,
+			});
+
+			return {
+				type: extracted.type,
+				validFrom,
+				expiryDate,
+				barcode: extracted.barcode,
+				isThreePlus: extracted.isThreePlus ?? false,
+				rawResponse: result.raw,
+			};
+		} catch (parseError) {
+			console.error(
+				`JSON parse failed (attempt ${attempt + 1}):`,
+				parseError,
+			);
+			console.error("Raw AI text:", result.text);
+			if (attempt < 1) {
+				console.warn("Retrying with Gemini 2.5 Flash...");
+				continue;
+			}
+			// All attempts exhausted — return type 0 so raw response
+			// gets saved to failedUploads via storeVoucherFromOcr
+			return {
+				type: 0,
+				validFrom: undefined,
+				expiryDate: undefined,
+				barcode: undefined,
+				isThreePlus: false,
+				rawResponse: result.raw,
+			};
 		}
 	}
 
-	const cleanedText = cleanJsonResponse(result.text);
-	const normalizedText = cleanedText.replace(/(:\s*)0+(\d)/g, "$1$2");
-	const extracted: ExtractedData = JSON.parse(normalizedText);
-
-	console.log("Extracted (raw):", extracted);
-
-	const { validFrom, expiryDate } = parseVoucherDates(extracted, currentDate);
-
-	console.log("Extracted (final):", {
-		type: extracted.type,
-		validFrom,
-		expiryDate,
-		barcode: extracted.barcode,
-	});
-
+	// Unreachable (the loop always returns or throws)
 	return {
-		type: extracted.type,
-		validFrom,
-		expiryDate,
-		barcode: extracted.barcode,
-		isThreePlus: extracted.isThreePlus ?? false,
-		rawResponse: result.raw,
+		type: 0,
+		validFrom: undefined,
+		expiryDate: undefined,
+		barcode: undefined,
+		isThreePlus: false,
+		rawResponse: "",
 	};
 }
 
@@ -271,9 +343,10 @@ async function callGeminiApi(
 	imageBase64: string,
 	prompt: string,
 	apiKey: string,
+	modelName = "gemini-2.5-flash-lite",
 ): Promise<{ text: string; raw: string }> {
 	const response = await fetch(
-		`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`,
+		`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
 		{
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
@@ -293,7 +366,7 @@ async function callGeminiApi(
 				],
 				generationConfig: {
 					temperature: 0.0,
-					maxOutputTokens: 2048,
+					maxOutputTokens: 8192,
 					responseMimeType: "application/json",
 					responseSchema: {
 						type: "OBJECT",
