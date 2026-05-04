@@ -110,6 +110,38 @@ To set up the sample voucher image shown to users:
 
 ## Admin CLI Tools
 
+## Backups
+
+Daily backups of Convex table data and file storage (voucher images) can be run locally via the included backup script.
+
+### Running a Backup
+
+```bash
+# Backup dev deployment
+./scripts/backup.sh dev
+
+# Backup production deployment
+./scripts/backup.sh prd
+```
+
+Backups are saved to `~/backups/open-voucher/` with human-readable names like:
+- `open-voucher-backup-dev-2026-05-04.zip`
+- `open-voucher-backup-prd-2026-05-04.zip`
+
+Logs are written to `~/backups/open-voucher/logs/backup-YYYY-MM-DD-{dev|prd}.log`.
+
+### Automated Daily Backups
+
+Add to your crontab (`crontab -e`). Make sure `PATH` includes your Node.js binaries:
+
+```cron
+0 3 * * * /path-to-script prod
+```
+
+- Runs daily at **03:00 UTC**
+- Keeps **7 days** of backups and logs (older ones auto-deleted)
+- Includes all table data and file storage images
+
 ## Ban Rules
 
 ### Reporter Ban
