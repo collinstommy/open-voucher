@@ -165,7 +165,7 @@ async function callApiForExtraction(
 	imageBase64: string,
 	prompt: string,
 	useOpenRouter: boolean,
-	geminiModel = "gemini-2.5-flash-lite",
+	geminiModel = "gemini-3.1-flash-lite",
 ): Promise<{ text: string; raw: string }> {
 	if (useOpenRouter) {
 		const openRouterApiKey = process.env.OPENROUTER_API_KEY;
@@ -213,8 +213,8 @@ async function extractVoucherData(
 			if (attempt === 0) {
 				result = await callApiForExtraction(imageBase64, prompt, useOpenRouter);
 			} else {
-				// Retry with Gemini 2.5 Flash (more capable model) for a second attempt
-				result = await callApiForExtraction(imageBase64, prompt, false, "gemini-2.5-flash");
+				// Retry with Gemini 3.1 Flash (more capable model) for a second attempt
+				result = await callApiForExtraction(imageBase64, prompt, false, "gemini-3.1-flash");
 			}
 		} catch (apiError) {
 			if (attempt < 1) {
@@ -326,7 +326,7 @@ Extract ONLY the day and month numbers from the voucher validity range:
 3. **validFromMonth**: Month number for the START of validity range (e.g., "Valid 30 Dec - 5 Jan" → 12, "11/02/26" → 2 for February). If there is no start date, return null.
 4. **expiryDay**: Day of month for the END of validity range (e.g., "Valid 30 Dec - 5 Jan" → 5, "17/02/26" → 17, "valid until 31st March" → 31)
 5. **expiryMonth**: Month number for the END of validity range (e.g., "Valid 30 Dec - 5 Jan" → 1, "17/02/26" → 2 for February, "valid until 31st March" → 3)
-6. **expiryYear**: If the image shows a full date with year (e.g., "11/02/26"), extract the year (26). Otherwise leave as null.
+6. **expiryYear**: If the image shows a full date with year (e.g., "11/02/26"), extract the full year as 2026. Otherwise leave as null.
 7. **barcode**: The number below the barcode.
 8. **isThreePlus**: true if this is a Three+ voucher (says "Three+" or "with Three+"), false otherwise.
 
@@ -343,7 +343,7 @@ async function callGeminiApi(
 	imageBase64: string,
 	prompt: string,
 	apiKey: string,
-	modelName = "gemini-2.5-flash-lite",
+	modelName = "gemini-3.1-flash-lite",
 ): Promise<{ text: string; raw: string }> {
 	const response = await fetch(
 		`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
@@ -460,11 +460,12 @@ export const extractFromUrl = internalAction({
 	args: {
 		imageUrl: v.string(),
 		currentDate: v.optional(v.string()),
+		useOpenRouter: v.optional(v.boolean()),
 	},
-	handler: async (_ctx, { imageUrl, currentDate }) => {
+	handler: async (_ctx, { imageUrl, currentDate, useOpenRouter }) => {
 		const imageBase64 = await fetchImageAsBase64(imageUrl);
 		const dateToUse = currentDate ?? new Date().toISOString().split("T")[0];
-		return extractVoucherData(imageBase64, dateToUse);
+		return extractVoucherData(imageBase64, dateToUse, useOpenRouter ?? false);
 	},
 });
 
