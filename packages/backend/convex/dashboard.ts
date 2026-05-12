@@ -109,6 +109,9 @@ export const getWeeklyFailureStats = query({
 		}
 
 		for (const f of failedUploads) {
+			// Ignore duplicate barcode failures
+			if (f.failureReason === "DUPLICATE_BARCODE") continue;
+
 			const monday = getWeekStart(f._creationTime);
 			const key = monday.toISOString().split("T")[0];
 			const existing = weeks.get(key);
@@ -125,8 +128,8 @@ export const getWeeklyFailureStats = query({
 			}
 		}
 
-		const sorted = Array.from(weeks.values()).sort(
-			(a, b) => a.weekStart.localeCompare(b.weekStart),
+		let sorted = Array.from(weeks.values()).sort(
+			(a, b) => b.weekStart.localeCompare(a.weekStart),
 		);
 
 		// Include current week even if empty
@@ -134,13 +137,16 @@ export const getWeeklyFailureStats = query({
 		const currentMonday = getWeekStart(now);
 		const currentKey = currentMonday.toISOString().split("T")[0];
 		if (!weeks.has(currentKey)) {
-			sorted.push({
+			sorted.unshift({
 				weekStart: currentKey,
 				label: formatWeekLabel(currentMonday),
 				total: 0,
 				failed: 0,
 			});
 		}
+
+		// Limit to last 12 weeks
+		sorted = sorted.slice(0, 12);
 
 		return sorted.map((w) => ({
 			...w,
