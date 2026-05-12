@@ -73,6 +73,9 @@ const TEST_CONFIG: Record<
 		"2026-03-31": { validFrom: undefined, expiry: "2026-03-31" },
 		"2026-04-01": { validFrom: undefined, expiry: "2026-03-31" },
 	},
+	"apr23-may9": {
+		"2026-05-09": { validFrom: "2026-04-23", expiry: "2026-05-09" },
+	},
 };
 
 /**

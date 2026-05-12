@@ -109,6 +109,7 @@ const TEST_IMAGE_FILES = [
 	"mar15-mar21.png",
 	"mar23-mar-29-paper.png",
 	"threeplus-expire-mar-31.png",
+	"apr23-may9",
 ];
 
 async function fetchImageAsBase64(url: string): Promise<string> {
