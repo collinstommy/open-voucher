@@ -67,6 +67,88 @@ export const getExpiringVouchers = internalQuery({
 	},
 });
 
+function getWeekStart(ts: number): Date {
+	const date = new Date(ts);
+	const day = date.getUTCDay(); // 0 = Sun, 1 = Mon
+	const diff = date.getUTCDate() - day + (day === 0 ? -6 : 1);
+	return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), diff));
+}
+
+function formatWeekLabel(monday: Date): string {
+	const month = monday.toLocaleDateString("en-US", { month: "short" });
+	const day = monday.getUTCDate();
+	return `${month} ${day}`;
+}
+
+export const getWeeklyFailureStats = query({
+	handler: async (ctx) => {
+		const [vouchers, failedUploads] = await Promise.all([
+			ctx.db.query("vouchers").collect(),
+			ctx.db.query("failedUploads").collect(),
+		]);
+
+		const weeks = new Map<
+			string,
+			{ weekStart: string; label: string; total: number; failed: number }
+		>();
+
+		for (const v of vouchers) {
+			const monday = getWeekStart(v._creationTime);
+			const key = monday.toISOString().split("T")[0];
+			const existing = weeks.get(key);
+			if (existing) {
+				existing.total++;
+			} else {
+				weeks.set(key, {
+					weekStart: key,
+					label: formatWeekLabel(monday),
+					total: 1,
+					failed: 0,
+				});
+			}
+		}
+
+		for (const f of failedUploads) {
+			const monday = getWeekStart(f._creationTime);
+			const key = monday.toISOString().split("T")[0];
+			const existing = weeks.get(key);
+			if (existing) {
+				existing.total++;
+				existing.failed++;
+			} else {
+				weeks.set(key, {
+					weekStart: key,
+					label: formatWeekLabel(monday),
+					total: 1,
+					failed: 1,
+				});
+			}
+		}
+
+		const sorted = Array.from(weeks.values()).sort(
+			(a, b) => a.weekStart.localeCompare(b.weekStart),
+		);
+
+		// Include current week even if empty
+		const now = Date.now();
+		const currentMonday = getWeekStart(now);
+		const currentKey = currentMonday.toISOString().split("T")[0];
+		if (!weeks.has(currentKey)) {
+			sorted.push({
+				weekStart: currentKey,
+				label: formatWeekLabel(currentMonday),
+				total: 0,
+				failed: 0,
+			});
+		}
+
+		return sorted.map((w) => ({
+			...w,
+			rate: w.total > 0 ? Math.round((w.failed / w.total) * 100) : 0,
+		}));
+	},
+});
+
 export const getWeeklyVouchers = query({
 	handler: async (ctx) => {
 		const now = new Date();

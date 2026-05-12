@@ -39,6 +39,9 @@ function HomeComponent() {
 	const weeklyVouchers = useQuery(
 		convexQuery(api.dashboard.getWeeklyVouchers, {}),
 	);
+	const weeklyFailures = useQuery(
+		convexQuery(api.dashboard.getWeeklyFailureStats, {}),
+	);
 
 	const cleanupMutation = useMutation({
 		mutationFn: () =>
@@ -112,6 +115,52 @@ function HomeComponent() {
 									{stats.data?.userCount ?? 0}
 								</div>
 							</div>
+						</div>
+
+						<div className="mt-6">
+							<h3 className="mb-3 text-sm font-medium text-muted-foreground">
+								Weekly Upload Failure Rate
+							</h3>
+							{weeklyFailures.isLoading ? (
+								<div className="text-muted-foreground text-sm">Loading...</div>
+							) : weeklyFailures.error ? (
+								<div className="text-red-500 text-sm">Error loading data</div>
+							) : (
+								<div className="overflow-x-auto">
+									<table className="w-full text-sm">
+										<thead>
+											<tr className="border-b">
+												<th className="pb-2 text-left font-medium">Week</th>
+												<th className="pb-2 text-right font-medium">Total</th>
+												<th className="pb-2 text-right font-medium">Failed</th>
+												<th className="pb-2 text-right font-medium">Rate</th>
+											</tr>
+										</thead>
+										<tbody>
+											{weeklyFailures.data?.map((week) => (
+												<tr key={week.weekStart} className="border-b">
+													<td className="py-2">{week.label}</td>
+													<td className="py-2 text-right">{week.total}</td>
+													<td className="py-2 text-right">{week.failed}</td>
+													<td className="py-2 text-right">
+														<span
+															className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${
+																week.rate >= 30
+																	? "bg-red-100 text-red-700"
+																	: week.rate >= 15
+																		? "bg-yellow-100 text-yellow-700"
+																		: "bg-green-100 text-green-700"
+															}`}
+														>
+															{week.rate}%
+														</span>
+													</td>
+												</tr>
+											))}
+										</tbody>
+									</table>
+								</div>
+							)}
 						</div>
 					</div>
 				)}

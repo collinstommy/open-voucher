@@ -367,20 +367,6 @@ async function callGeminiApi(
 				generationConfig: {
 					temperature: 0.0,
 					maxOutputTokens: 8192,
-					responseMimeType: "application/json",
-					responseSchema: {
-						type: "OBJECT",
-						properties: {
-							type: { type: "STRING" },
-							validFromDay: { type: "INTEGER", nullable: true },
-							validFromMonth: { type: "INTEGER", nullable: true },
-							expiryDay: { type: "INTEGER", nullable: true },
-							expiryMonth: { type: "INTEGER", nullable: true },
-							expiryYear: { type: "INTEGER", nullable: true },
-							barcode: { type: "STRING", nullable: true },
-							isThreePlus: { type: "BOOLEAN", nullable: true },
-						},
-					},
 				},
 			}),
 		},
