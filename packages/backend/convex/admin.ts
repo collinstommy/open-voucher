@@ -1277,6 +1277,7 @@ export const getExpiredVouchersForCleanup = internalQuery({
 			// Find vouchers (expired, claimed, or uploader_admitted_used) older than 90 days
 			// that haven't been marked yet. We always use expiryDate so we never delete
 			// non-expired vouchers regardless of their current status.
+			// No batch limit here — marking is just a cheap DB patch.
 			const cutoff = now - MARK_DELAY_DAYS * MS_PER_DAY;
 			const vouchers = await ctx.db
 				.query("vouchers")
@@ -1292,7 +1293,7 @@ export const getExpiredVouchersForCleanup = internalQuery({
 						q.eq(q.field("imageDeletedAt"), undefined),
 					),
 				)
-				.take(BATCH_SIZE);
+				.collect();
 
 			return vouchers.map((v) => ({
 				_id: v._id,

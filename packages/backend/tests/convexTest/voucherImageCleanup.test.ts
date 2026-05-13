@@ -191,7 +191,7 @@ describe("Voucher Image Cleanup", () => {
 			expect(result).toHaveLength(0);
 		});
 
-		test("respects batch size limit of 100", async () => {
+		test("mark phase returns ALL matching vouchers (no batch limit)", async () => {
 			const t = convexTest(schema, modules);
 			const userId = await createUser(t, { telegramChatId: "777" });
 			const now = Date.now();
@@ -210,7 +210,7 @@ describe("Voucher Image Cleanup", () => {
 				{ mode: "mark" },
 			);
 
-			expect(result).toHaveLength(100);
+			expect(result).toHaveLength(105);
 		});
 	});
 
