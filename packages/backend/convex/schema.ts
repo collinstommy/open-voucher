@@ -110,6 +110,7 @@ export default defineSchema({
 			v.literal("uploader_refund"),
 			v.literal("uploader_denied"),
 			v.literal("admin_expiry_deduction"),
+			v.literal("claim_reversed"),
 		),
 		amount: v.number(),
 		voucherId: v.optional(v.id("vouchers")),

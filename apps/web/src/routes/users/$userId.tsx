@@ -93,6 +93,15 @@ function UserDetailPage() {
 		onSuccess: () => queryClient.invalidateQueries(),
 	});
 
+	const reverseClaimMutation = useMutation({
+		mutationFn: (voucherId: Id<"vouchers">) =>
+			convex.mutation(api.admin.reverseClaim, {
+				token: token!,
+				voucherId,
+			}),
+		onSuccess: () => queryClient.invalidateQueries(),
+	});
+
 	if (isLoading) {
 		return <div className="text-muted-foreground">Loading user details...</div>;
 	}
@@ -248,7 +257,9 @@ function UserDetailPage() {
 																		? "bg-red-100 text-red-800"
 																		: tx.type === "admin_expiry_deduction"
 																			? "bg-rose-100 text-rose-800"
-																			: "bg-amber-100 text-amber-800"
+																			: tx.type === "claim_reversed"
+																				? "bg-teal-100 text-teal-800"
+																				: "bg-amber-100 text-amber-800"
 												}`}
 											>
 												{tx.type.replace(/_/g, " ")}
@@ -435,6 +446,18 @@ function UserDetailPage() {
 											</Link>
 										</div>
 									)}
+									<div className="mt-3">
+										<Button
+											size="sm"
+											variant="outline"
+											onClick={() =>
+												reverseClaimMutation.mutate(voucher._id as Id<"vouchers">)
+											}
+											disabled={reverseClaimMutation.isPending}
+										>
+											Make Available
+										</Button>
+									</div>
 								</div>
 							</div>
 						))}
