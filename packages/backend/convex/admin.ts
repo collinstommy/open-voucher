@@ -7,7 +7,7 @@ import {
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import type { ActionCtx, QueryCtx } from "./_generated/server";
-import { MIN_COINS, UPLOAD_REWARDS } from "./constants";
+import { MIN_COINS, UPLOAD_REWARDS, CLAIM_COSTS } from "./constants";
 import {
 	action,
 	internalAction,
@@ -720,6 +720,62 @@ export const expireVoucherAndDeductCoins = adminMutation({
 			success: true,
 			deductedAmount: deductionAmount,
 			newBalance: newCoins,
+		};
+	},
+});
+
+export const reverseClaim = adminMutation({
+	args: {
+		voucherId: v.id("vouchers"),
+	},
+	handler: async (ctx, { voucherId }) => {
+		const voucher = await ctx.db.get(voucherId);
+		if (!voucher) {
+			throw new Error("Voucher not found");
+		}
+
+		if (voucher.status !== "claimed") {
+			throw new Error("Voucher must be claimed to reverse");
+		}
+
+		if (!voucher.claimerId) {
+			throw new Error("Voucher has no claimer");
+		}
+
+		const claimer = await ctx.db.get(voucher.claimerId);
+		if (!claimer) {
+			throw new Error("Claimer not found");
+		}
+
+		const refundAmount = CLAIM_COSTS[voucher.type] ?? 0;
+		const now = Date.now();
+
+		// Reverse the claim on the voucher
+		await ctx.db.patch(voucherId, {
+			status: "available",
+			claimerId: undefined,
+			claimedAt: undefined,
+		});
+
+		// Refund coins to claimer
+		await ctx.db.patch(voucher.claimerId, {
+			coins: claimer.coins + refundAmount,
+			claimCount: Math.max(0, (claimer.claimCount || 0) - 1),
+		});
+
+		// Record the reversal transaction
+		await ctx.db.insert("transactions", {
+			userId: voucher.claimerId,
+			type: "claim_reversed",
+			amount: refundAmount,
+			voucherId,
+			createdAt: now,
+		});
+
+		return {
+			success: true,
+			refundAmount,
+			newClaimerBalance: claimer.coins + refundAmount,
 		};
 	},
 });
