@@ -5,7 +5,7 @@ import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { CheckCircle2, XCircle, RefreshCw, Activity } from "lucide-react";
 
-export const Route = createFileRoute("/health-check")({
+export const Route = createFileRoute("/admin/health-check")({
 	component: HealthCheckPage,
 });
 

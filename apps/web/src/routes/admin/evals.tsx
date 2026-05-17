@@ -5,7 +5,7 @@ import { CheckCircle2, ClipboardCheck, RefreshCw, XCircle } from "lucide-react";
 import { useState } from "react";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
 
-export const Route = createFileRoute("/evals")({
+export const Route = createFileRoute("/admin/evals")({
 	component: EvalsPage,
 });
 

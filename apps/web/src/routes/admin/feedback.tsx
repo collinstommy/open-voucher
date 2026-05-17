@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
 import { formatDateTime } from "@/lib/utils";
 
-export const Route = createFileRoute("/feedback")({
+export const Route = createFileRoute("/admin/feedback")({
 	component: FeedbackPage,
 });
 
@@ -128,7 +128,7 @@ function FeedbackPage() {
 									<div className="flex items-center gap-2">
 										{item.user?.id ? (
 											<Link
-												to="/users/$userId"
+												to="/admin/users/$userId"
 												params={{ userId: item.user.id }}
 												className="font-medium hover:text-blue-600 hover:underline"
 											>

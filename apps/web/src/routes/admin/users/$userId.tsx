@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
 import { formatDate, formatDateTime } from "@/lib/utils";
 
-export const Route = createFileRoute("/users/$userId")({
+export const Route = createFileRoute("/admin/users/$userId")({
 	component: UserDetailPage,
 });
 
@@ -161,7 +161,7 @@ function UserDetailPage() {
 	return (
 		<div className="space-y-6">
 			<div className="flex items-center gap-4">
-				<Link to="/users">
+				<Link to="/admin/users">
 					<Button variant="ghost" size="sm">
 						<ArrowLeft className="mr-2 h-4 w-4" />
 						Back
@@ -399,7 +399,7 @@ function UserDetailPage() {
 											<div className="mt-2 text-sm">
 												<span className="text-muted-foreground">Claimed by: </span>
 												<Link
-													to="/users/$userId"
+													to="/admin/users/$userId"
 													params={{ userId: voucher.claimer._id }}
 													className="text-blue-600 hover:underline"
 												>
@@ -489,7 +489,7 @@ function UserDetailPage() {
 											<div className="mt-2 text-sm">
 												<span className="text-muted-foreground">Uploaded by: </span>
 												<Link
-													to="/users/$userId"
+													to="/admin/users/$userId"
 													params={{ userId: voucher.uploader._id }}
 													className="text-blue-600 hover:underline"
 												>
@@ -644,7 +644,7 @@ function UserDetailPage() {
 											Uploaded by{" "}
 											{report.uploader ? (
 												<Link
-													to="/users/$userId"
+													to="/admin/users/$userId"
 													params={{ userId: report.uploader._id }}
 													className="text-blue-600 hover:underline"
 												>
@@ -737,7 +737,7 @@ function UserDetailPage() {
 											Reported by{" "}
 											{report.reporter ? (
 												<Link
-													to="/users/$userId"
+													to="/admin/users/$userId"
 													params={{ userId: report.reporter._id }}
 													className="text-blue-600 hover:underline"
 												>
