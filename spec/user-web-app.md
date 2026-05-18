@@ -4,6 +4,39 @@
 
 Add a user-facing web app to the existing `apps/web` TanStack Start application, allowing Telegram-authenticated users to view and return their claimed vouchers. The app serves **three personas** from a single Cloudflare Worker deployment at `openvouchers.org`.
 
+## Status
+
+### ✅ Done
+- [x] Route refactor — split into `routes/admin.tsx`, `routes/app.tsx`, `routes/index.tsx`
+- [x] Admin routes moved under `/admin/*` with password auth in `admin.tsx`
+- [x] Landing page migrated from `apps/landing/public/index.html` to React components
+- [x] App placeholder routes at `/app/` (vouchers placeholder)
+
+### 🔲 Todo — Backend
+- [ ] Add `userSessions` table to `packages/backend/convex/schema.ts`
+- [ ] Create `packages/backend/convex/userApp.ts` with:
+  - `validateInitData` (verify HMAC-SHA-256, create session, return user + token)
+  - `validateSession` (check token → user or null)
+  - `getClaimedVouchers` (return vouchers where claimerId = user and status = "claimed")
+  - `returnVoucher` (set voucher → available, refund coins, insert transaction)
+  - `logoutUser` (delete session row)
+  - `cleanupExpiredUserSessions` (internal, delete rows where expiresAt < now)
+- [ ] Add cron entry in `crons.ts` for `cleanupExpiredUserSessions`
+
+### 🔲 Todo — Frontend
+- [ ] Create `hooks/useUserAuth.ts` — reads `WebApp.initData`, sends to `validateInitData`, stores session token
+- [ ] Update `routes/app.tsx` — Telegram auth gate (show "Open in Telegram" if no session)
+- [ ] Update `routes/app/index.tsx` — fetch claimed vouchers via `getClaimedVouchers`, render `VoucherCard` list
+- [ ] Create `components/VoucherCard.tsx` — voucher image, type badge, expiry date, return button
+- [ ] Create `components/ReturnConfirmDialog.tsx` — confirmation before returning
+- [ ] Add dual CTAs to landing page when session token is detected ("View your vouchers" + Telegram bot link)
+
+### 🔲 Todo — Cleanup
+- [ ] Delete `apps/landing/` directory (static HTML no longer needed)
+- [ ] Register `openvouchers.org/app` as Telegram Mini App via @BotFather
+
+---
+
 ## Decision Log
 
 ### 1. App Architecture
@@ -343,8 +376,8 @@ crons.daily(
 
 ---
 
-### 11. Refactoring Admin Routes
-**Question:** What moves where?
+### 11. Refactoring Admin Routes (✅ Done)
+**Question:** What moved where?
 
 **Answer:**
 
@@ -362,7 +395,7 @@ crons.daily(
 | `routes/feedback.tsx` | `admin/feedback.tsx` |
 | `routes/health-check.tsx` | `admin/health-check.tsx` |
 | `routes/settings.tsx` | `admin/settings.tsx` |
-| `apps/landing/public/index.html` | `routes/index.tsx` (rebuilt as React, then delete `apps/landing/`) |
+| `apps/landing/public/index.html` | `routes/index.tsx` (rebuilt as React) ✅ |
 
 ---
 
@@ -441,10 +474,13 @@ bun run deploy:web
 ```
 
 **Rollout steps:**
-1. Backend: Add `userSessions` table, create `convex/userApp.ts`, deploy
-2. Frontend: Create `app/` routes, refactor admin routes into `admin/`, rebuild landing page at `/`, deploy
-3. Delete `apps/landing/` directory
-4. Register `openvouchers.org/app` as a Telegram Mini App via @BotFather
+
+1. ✅ Frontend route refactor — admin routes under `/admin/*`, app routes under `/app/*`
+2. ✅ Landing page migrated from static HTML to React
+3. 🔲 Backend — `userSessions` table + `convex/userApp.ts` + cron
+4. 🔲 Frontend — Telegram auth hook + voucher listing + return flow
+5. 🔲 Delete `apps/landing/` directory
+6. 🔲 Register `openvouchers.org/app` as Telegram Mini App via @BotFather
 
 ---
 
@@ -452,11 +488,11 @@ bun run deploy:web
 
 | Decision | Choice |
 |----------|--------|
-| Architecture | Extend `apps/web` (Option 2) |
-| Routes | `/` public, `/app/*` user, `/admin/*` admin |
+| Architecture | Extend `apps/web` (Option 2) ✅ |
+| Routes | `/` public ✅, `/app/*` user (placeholder), `/admin/*` admin ✅ |
 | Auth | Manual initData verification + session tokens |
 | Convex Auth | Not used |
 | Initial features | View claimed vouchers + return |
 | Session duration | 30 days, daily cron cleanup |
-| Landing page | At `/` with conditional dual CTAs |
-| Landing page migration | Rebuild as React, delete `apps/landing/` |
+| Landing page | At `/` with conditional dual CTAs — migrated ✅, dual CTAs 🔲 |
+| Landing page migration | Rebuild as React — ✅; delete `apps/landing/` — 🔲 |
