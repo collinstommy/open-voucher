@@ -124,7 +124,7 @@ function HowItWorks() {
 	);
 }
 
-function CoinEconomy() {
+function CoinEconomy()  {
 	const earnRows = [
 		{ label: "Join Bonus", amount: "+10 Coins" },
 		{ label: "Upload €5 Voucher", amount: "+15 Coins" },
