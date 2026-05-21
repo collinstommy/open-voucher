@@ -143,9 +143,16 @@ export default defineSchema({
 		value: v.string(),
 	}).index("by_key", ["key"]),
 
-	adminSessions: defineTable({
-		token: v.string(),
-		createdAt: v.number(),
-		expiresAt: v.number(),
-	}).index("by_token", ["token"]),
+  adminSessions: defineTable({
+    token: v.string(),
+    createdAt: v.number(),
+    expiresAt: v.number(),
+  }).index("by_token", ["token"]),
+
+  userSessions: defineTable({
+    token: v.string(),
+    userId: v.id("users"),
+    createdAt: v.number(),
+    expiresAt: v.number(),
+  }).index("by_token", ["token"]),
 });

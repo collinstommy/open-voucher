@@ -1,148 +1,119 @@
+import { api } from "@open-voucher/backend/convex/_generated/api";
+import type { Id } from "@open-voucher/backend/convex/_generated/dataModel";
+import { useConvex } from "convex/react";
 import { useCallback, useEffect, useState } from "react";
+import { getDeployment } from "@/components/EnvironmentDropdown";
 
 export interface UserSession {
-	userId: string;
+	_id: Id<"users">;
 	telegramChatId: string;
-	firstName: string;
+	firstName: string | undefined;
+	username: string | undefined;
 	coins: number;
 	isBanned: boolean;
 	sessionToken: string;
 }
 
 function getTokenKey(): string {
-	return "user-session-dev";
+	return "user-session";
 }
 
-/**
- * Reads ?mode= from URL to simulate auth states during development.
- *
- * Modes:
- *   telegram   — pretends WebApp.initData is present (auto-authenticated)
- *   browser    — pretends we're in a regular browser with no token
- *   returning  — pretends a valid session token exists in localStorage
- *   (none)     — real auth flow (requires backend + Telegram Mini App)
- */
-function getDevMode(): "telegram" | "browser" | "returning" | null {
-	if (typeof window === "undefined") return null;
-	const params = new URLSearchParams(window.location.search);
-	const mode = params.get("mode");
-	if (mode === "telegram" || mode === "browser" || mode === "returning") {
-		return mode;
-	}
-	return null;
+function getConvexHttpUrl(): string {
+	const deployment = getDeployment();
+	const urls: Record<string, string> = {
+		dev: "https://fastidious-okapi-116.convex.cloud",
+		prod: "https://whimsical-kudu-895.convex.cloud",
+	};
+	return urls[deployment] || urls.prod;
 }
-
-/** Mock user data returned when in dev mode. */
-const MOCK_USER: Omit<UserSession, "sessionToken"> = {
-	userId: "mock-user-1",
-	telegramChatId: "123456789",
-	firstName: "TestUser",
-	coins: 25,
-	isBanned: false,
-};
-
-/** Mock voucher data for the vouchers list. */
-export interface MockVoucher {
-	_id: string;
-	type: "5" | "10" | "20";
-	expiryDate: number;
-	claimedAt: number;
-	imageUrl: string;
-}
-
-export const MOCK_VOUCHERS: MockVoucher[] = [
-	{
-		_id: "v1",
-		type: "10",
-		expiryDate: Date.now() + 7 * 24 * 60 * 60 * 1000,
-		claimedAt: Date.now() - 2 * 60 * 60 * 1000,
-		imageUrl: "",
-	},
-	{
-		_id: "v2",
-		type: "20",
-		expiryDate: Date.now() + 3 * 24 * 60 * 60 * 1000,
-		claimedAt: Date.now() - 1 * 24 * 60 * 60 * 1000,
-		imageUrl: "",
-	},
-	{
-		_id: "v3",
-		type: "5",
-		expiryDate: Date.now() + 14 * 24 * 60 * 60 * 1000,
-		claimedAt: Date.now() - 5 * 60 * 60 * 1000,
-		imageUrl: "",
-	},
-];
 
 export function useUserAuth() {
+	const convex = useConvex();
 	const [user, setUser] = useState<UserSession | null>(null);
 	const [isLoading, setIsLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
-	const devMode = getDevMode();
 
 	useEffect(() => {
-		// ---- DEV / MOCK MODE ----
-		if (devMode) {
-			if (devMode === "telegram") {
-				// Pretend initData was verified, create a fresh session
-				const token = `mock-session-${Date.now()}`;
-				const session: UserSession = { ...MOCK_USER, sessionToken: token };
-				localStorage.setItem(getTokenKey(), token);
-				setUser(session);
-				setIsLoading(false);
-				return;
-			}
+		async function authenticate() {
+			try {
+				// 1. Check for stored session token
+				const storedToken = localStorage.getItem(getTokenKey());
+				if (storedToken) {
+					const sessionUser = await convex.query(
+						api.userApp.validateSession,
+						{ sessionToken: storedToken },
+					);
+					if (sessionUser) {
+						setUser({ ...sessionUser, sessionToken: storedToken });
+						setIsLoading(false);
+						return;
+					}
+					// Invalid/expired token — clear it
+					localStorage.removeItem(getTokenKey());
+				}
 
-			if (devMode === "returning") {
-				// Pretend a valid token exists in localStorage
-				const token = `mock-session-returning`;
-				localStorage.setItem(getTokenKey(), token);
-				const session: UserSession = { ...MOCK_USER, sessionToken: token };
-				setUser(session);
-				setIsLoading(false);
-				return;
-			}
+				// 2. Localhost dev mode
+				if (
+					typeof window !== "undefined" &&
+					window.location.hostname === "localhost"
+				) {
+					const result = await convex.mutation(api.userApp.devAuth, {});
+					localStorage.setItem(getTokenKey(), result.sessionToken);
+					setUser({ ...result.user, sessionToken: result.sessionToken });
+					setIsLoading(false);
+					return;
+				}
 
-			if (devMode === "browser") {
-				// No WebApp, no token
-				localStorage.removeItem(getTokenKey());
+				// 3. Telegram WebApp initData
+				const tg = (window as any).Telegram?.WebApp;
+				if (tg?.initData) {
+					const response = await fetch(
+						`${getConvexHttpUrl()}/api/telegram-auth`,
+						{
+							method: "POST",
+							headers: { "Content-Type": "application/json" },
+							body: JSON.stringify({ initData: tg.initData }),
+						},
+					);
+					const result = await response.json();
+					if (!response.ok) {
+						throw new Error(result.error || "Authentication failed");
+					}
+					localStorage.setItem(getTokenKey(), result.sessionToken);
+					setUser({ ...result.user, sessionToken: result.sessionToken });
+					setIsLoading(false);
+					return;
+				}
+
+				// No auth available
 				setIsLoading(false);
-				return;
+			} catch (err) {
+				setError(
+					err instanceof Error
+						? err.message
+						: "Authentication failed",
+				);
+				setIsLoading(false);
 			}
 		}
 
-		// ---- REAL AUTH FLOW ----
-		// Check for stored session token first
-		const storedToken = localStorage.getItem(getTokenKey());
-		if (storedToken) {
-			// TODO: call validateSession({ sessionToken: storedToken })
-			// For now, no backend → fall through to error
-			setError("Backend not available (no real auth yet)");
-			setIsLoading(false);
-			return;
+		authenticate();
+	}, [convex]);
+
+	const logout = useCallback(async () => {
+		const token = localStorage.getItem(getTokenKey());
+		if (token) {
+			try {
+				await convex.mutation(api.userApp.logoutUser, {
+					sessionToken: token,
+				});
+			} catch {
+				// ignore
+			}
 		}
-
-		// Check for Telegram WebApp initData
-		if (
-			typeof window !== "undefined" &&
-			"Telegram" in window &&
-			(window as any).Telegram?.WebApp?.initData
-		) {
-			// TODO: send initData to validateInitData
-			// For now, no backend → fall through to error
-			setError("Backend not available (no real auth yet)");
-			setIsLoading(false);
-			return;
-		}
-
-		// Neither token nor WebApp
-		setIsLoading(false);
-	}, [devMode]);
-
-	const logout = useCallback(() => {
 		localStorage.removeItem(getTokenKey());
 		setUser(null);
-	}, []);
+	}, [convex]);
 
-	return { user, isLoading, error, logout, devMode };
+	return { user, isLoading, error, logout };
 }

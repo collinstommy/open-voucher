@@ -6,29 +6,10 @@ export const Route = createFileRoute("/app")({
 });
 
 function AppLayout() {
-	const { user, isLoading, error, logout, devMode } = useUserAuth();
+	const { user, isLoading, error, logout } = useUserAuth();
 
 	return (
 		<div className="min-h-screen bg-background text-foreground">
-			{/* Dev mode badge */}
-			{devMode && (
-				<div className="bg-amber-500 text-black text-xs text-center py-1 font-medium">
-					DEV MODE: {devMode}
-					{" — "}
-					<a href="/app?mode=telegram" className="underline">
-						telegram
-					</a>
-					{" | "}
-					<a href="/app?mode=browser" className="underline">
-						browser
-					</a>
-					{" | "}
-					<a href="/app?mode=returning" className="underline">
-						returning
-					</a>
-				</div>
-			)}
-
 			{/* Loading */}
 			{isLoading && (
 				<div className="flex min-h-[60vh] items-center justify-center">
@@ -36,23 +17,17 @@ function AppLayout() {
 				</div>
 			)}
 
-			{/* Error (couldn't auth, no backend yet) */}
+			{/* Error */}
 			{!isLoading && error && (
 				<div className="flex min-h-[60vh] items-center justify-center px-4">
 					<div className="max-w-sm text-center space-y-4">
 						<div className="text-3xl">⚠️</div>
 						<p className="text-muted-foreground">{error}</p>
-						<p className="text-sm text-muted-foreground">
-							Try a dev mode:{" "}
-							<a href="/app?mode=telegram" className="underline text-blue-400">
-								/app?mode=telegram
-							</a>
-						</p>
 					</div>
 				</div>
 			)}
 
-			{/* Not authenticated (regular browser, no token) */}
+			{/* Not authenticated */}
 			{!isLoading && !error && !user && (
 				<div className="flex min-h-[60vh] items-center justify-center px-4">
 					<div className="max-w-sm text-center space-y-4">
@@ -61,8 +36,8 @@ function AppLayout() {
 							Open this page in Telegram
 						</h2>
 						<p className="text-muted-foreground text-sm">
-							This page is a Telegram Mini App. Open the bot and
-							tap the button to access your vouchers.
+							This page is a Telegram Mini App. Open the bot and tap
+							the button to access your vouchers.
 						</p>
 						<a
 							href="https://t.me/DunnesVoucherBot"
@@ -94,7 +69,8 @@ function AppLayout() {
 									My Vouchers
 								</h1>
 								<p className="text-sm text-muted-foreground">
-									Hi, {user.firstName} · 🪙 {user.coins} coins
+									Hi, {user.firstName ?? user.username ?? "User"} · 🪙{" "}
+									{user.coins} coins
 								</p>
 							</div>
 							<button
@@ -106,6 +82,32 @@ function AppLayout() {
 							</button>
 						</div>
 					</div>
+
+					{/* User info display */}
+					<div className="px-4 py-4">
+						<div className="rounded-lg border bg-card p-4 space-y-3">
+							<h2 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
+								Account Info
+							</h2>
+							<div className="grid gap-2 text-sm">
+								<div className="flex justify-between">
+									<span className="text-muted-foreground">User ID</span>
+									<span className="font-mono">{user._id}</span>
+								</div>
+								<div className="flex justify-between">
+									<span className="text-muted-foreground">
+										Telegram ID
+									</span>
+									<span className="font-mono">{user.telegramChatId}</span>
+								</div>
+								<div className="flex justify-between">
+									<span className="text-muted-foreground">Username</span>
+									<span>{user.username ?? "—"}</span>
+								</div>
+							</div>
+						</div>
+					</div>
+
 					<Outlet />
 				</>
 			)}

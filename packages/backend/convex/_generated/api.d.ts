@@ -13,6 +13,7 @@ import type * as constants from "../constants.js";
 import type * as crons from "../crons.js";
 import type * as dashboard from "../dashboard.js";
 import type * as http from "../http.js";
+import type * as lib_telegramAuth from "../lib/telegramAuth.js";
 import type * as ocr_evals from "../ocr/evals.js";
 import type * as ocr_extract from "../ocr/extract.js";
 import type * as ocr_process from "../ocr/process.js";
@@ -20,6 +21,8 @@ import type * as ocr_store from "../ocr/store.js";
 import type * as reminders from "../reminders.js";
 import type * as settings from "../settings.js";
 import type * as telegram from "../telegram.js";
+import type * as userApp from "../userApp.js";
+import type * as userAppInternal from "../userAppInternal.js";
 import type * as users from "../users.js";
 import type * as vouchers from "../vouchers.js";
 
@@ -35,6 +38,7 @@ declare const fullApi: ApiFromModules<{
   crons: typeof crons;
   dashboard: typeof dashboard;
   http: typeof http;
+  "lib/telegramAuth": typeof lib_telegramAuth;
   "ocr/evals": typeof ocr_evals;
   "ocr/extract": typeof ocr_extract;
   "ocr/process": typeof ocr_process;
@@ -42,6 +46,8 @@ declare const fullApi: ApiFromModules<{
   reminders: typeof reminders;
   settings: typeof settings;
   telegram: typeof telegram;
+  userApp: typeof userApp;
+  userAppInternal: typeof userAppInternal;
   users: typeof users;
   vouchers: typeof vouchers;
 }>;
