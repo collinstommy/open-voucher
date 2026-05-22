@@ -21,4 +21,10 @@ crons.daily(
 	internal.admin.cleanupExpiredSessions,
 );
 
+crons.daily(
+	"cleanup user sessions",
+	{ hourUTC: 2, minuteUTC: 15 },
+	internal.auth.cleanupExpiredUserSessions,
+);
+
 export default crons;

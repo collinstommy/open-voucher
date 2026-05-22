@@ -21,3 +21,7 @@ export const MIN_COINS = 0;
 // Valid voucher types
 export const VOUCHER_TYPES = ["5", "10", "20"] as const;
 export type VoucherType = (typeof VOUCHER_TYPES)[number];
+
+export const USER_SESSION_DURATION_MS = 365 * 24 * 60 * 60 * 1000; // 1 year
+
+export const USER_SESSION_CLEANUP_BATCH_SIZE = 100;

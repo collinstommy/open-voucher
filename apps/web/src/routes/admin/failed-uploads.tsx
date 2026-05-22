@@ -16,7 +16,7 @@ import {
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-export const Route = createFileRoute("/failed-uploads")({
+export const Route = createFileRoute("/admin/failed-uploads")({
 	component: FailedUploadsPage,
 });
 
@@ -168,7 +168,7 @@ function FailedUploadsPage() {
 							<div className="mb-1 text-xs">
 								Username:{" "}
 								<Link
-									to="/users/$userId"
+									to="/admin/users/$userId"
 									params={{ userId: failedUpload.userId }}
 									className="text-blue-600 hover:text-blue-800 hover:underline"
 								>

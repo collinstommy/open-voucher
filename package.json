@@ -21,7 +21,7 @@
 		"format": "biome format --write .",
 		"format:check": "biome format .",
 		"deploy:web": "turbo -F web deploy",
-		"deploy:backend": "turbo -F @open-voucher/backend deploy",
+		"deploy:backend": "turbo -F @open-voucher/backend deploy && bun run -F @open-voucher/backend register-commands",
 		"deploy:all": "turbo deploy"
 	},
 	"dependencies": {},

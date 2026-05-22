@@ -323,6 +323,24 @@ async function handleCommand(
 		return true;
 	}
 
+	if (lowerText === "app") {
+		await sendTelegramMessage(
+			chatId,
+			"📋 <b>My Vouchers</b>\n\nView and manage your vouchers in the web app.",
+			{
+				inline_keyboard: [
+					[
+						{
+							text: "📋 Open My Vouchers",
+							web_app: { url: "https://openvouchers.org/app" },
+						},
+					],
+				],
+			},
+		);
+		return true;
+	}
+
 	if (lowerText === "feedback") {
 		await sendTelegramMessage(
 			chatId,

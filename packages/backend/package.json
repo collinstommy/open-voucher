@@ -8,7 +8,8 @@
 		"test:watch": "vitest",
 		"test:e2e": "bun test tests/convex-test/",
 		"check-types": "tsc --noEmit",
-		"deploy": "convex deploy",
+		"deploy": "convex deploy -y",
+		"register-commands": "convex run telegram:registerBotCommands --prod",
 		"expiring": "convex run dashboard:getExpiringVouchers --prod",
 		"expiring:dev": "convex run dashboard:getExpiringVouchers"
 	},
@@ -24,6 +25,7 @@
 		"vitest": "^4.0.15"
 	},
 	"dependencies": {
+		"@telegram-apps/init-data-node": "^2.0.10",
 		"convex": "^1.31.7",
 		"convex-helpers": "^0.1.108",
 		"dayjs": "^1.11.19"

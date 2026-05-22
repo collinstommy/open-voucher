@@ -8,7 +8,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
 
-export const Route = createFileRoute("/users/")({
+export const Route = createFileRoute("/admin/users/")({
 	component: UsersPage,
 });
 
@@ -246,7 +246,7 @@ function UsersPage() {
 						{users.map((user) => (
 							<tr key={user._id} className="border-b">
 								<td className="py-3 pr-4">
-									<Link to="/users/$userId" params={{ userId: user._id }}>
+									<Link to="/admin/users/$userId" params={{ userId: user._id }}>
 										<div className="cursor-pointer hover:underline">
 											<div className="font-medium">
 												{user.username || user.firstName || "Unknown"}

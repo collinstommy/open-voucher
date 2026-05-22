@@ -1,6 +1,4 @@
 import { Toaster } from "@/components/ui/sonner";
-import { NavigationLayout } from "@/components/NavigationLayout";
-import { AdminApp } from "@/components/AdminApp";
 
 import {
 	HeadContent,
@@ -31,13 +29,18 @@ export const Route = createRootRouteWithContext<RouterAppContext>()({
 				content: "width=device-width, initial-scale=1",
 			},
 			{
-				title: "My App",
+				title: "Open Vouchers",
 			},
 		],
 		links: [
 			{
 				rel: "stylesheet",
 				href: appCss,
+			},
+		],
+		scripts: [
+			{
+				src: "https://telegram.org/js/telegram-web-app.js",
 			},
 		],
 	}),
@@ -52,12 +55,7 @@ function RootDocument() {
 				<HeadContent />
 			</head>
 			<body>
-				<AdminApp>
-					<div className="px-4 py-2">
-						<NavigationLayout />
-						<Outlet />
-					</div>
-				</AdminApp>
+				<Outlet />
 				<Toaster richColors />
 				<TanStackRouterDevtools position="bottom-left" />
 				<Scripts />

@@ -19,54 +19,54 @@ export function NavigationLayout() {
 	return (
 		<div className="mb-6 flex items-center justify-between">
 			<nav className="flex gap-6 text-lg">
-				<Link to="/" className="font-semibold">
+				<Link to="/admin" className="font-semibold">
 					Home
 				</Link>
 				<Link
-					to="/health-check"
+					to="/admin/health-check"
 					className="text-muted-foreground hover:text-foreground"
 				>
 					Health Check
 				</Link>
 				<Link
-					to="/evals"
+					to="/admin/evals"
 					className="text-muted-foreground hover:text-foreground"
 				>
 					Evals
 				</Link>
 
 				<Link
-					to="/vouchers"
+					to="/admin/vouchers"
 					className="text-muted-foreground hover:text-foreground"
 				>
 					Vouchers
 				</Link>
 				<Link
-					to="/failed-uploads"
+					to="/admin/failed-uploads"
 					className="text-muted-foreground hover:text-foreground"
 				>
 					Failed Uploads
 				</Link>
 				<Link
-					to="/users"
+					to="/admin/users"
 					className="text-muted-foreground hover:text-foreground"
 				>
 					Users
 				</Link>
 				<Link
-					to="/feedback"
+					to="/admin/feedback"
 					className="text-muted-foreground hover:text-foreground"
 				>
 					Feedback
 				</Link>
 				<Link
-					to="/banned"
+					to="/admin/banned"
 					className="text-muted-foreground hover:text-foreground"
 				>
 					Banned
 				</Link>
 				<Link
-					to="/settings"
+					to="/admin/settings"
 					className="text-muted-foreground hover:text-foreground"
 				>
 					Settings
