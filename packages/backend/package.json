@@ -9,6 +9,7 @@
 		"test:e2e": "bun test tests/convex-test/",
 		"check-types": "tsc --noEmit",
 		"deploy": "convex deploy",
+		"register-commands": "convex run telegram:registerBotCommands --prod",
 		"expiring": "convex run dashboard:getExpiringVouchers --prod",
 		"expiring:dev": "convex run dashboard:getExpiringVouchers"
 	},

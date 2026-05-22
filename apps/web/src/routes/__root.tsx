@@ -38,6 +38,11 @@ export const Route = createRootRouteWithContext<RouterAppContext>()({
 				href: appCss,
 			},
 		],
+		scripts: [
+			{
+				src: "https://telegram.org/js/telegram-web-app.js",
+			},
+		],
 	}),
 
 	component: RootDocument,
