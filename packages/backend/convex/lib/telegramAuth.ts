@@ -1,3 +1,12 @@
+import {
+	validate,
+	parse,
+	isSignatureInvalidError,
+	isSignatureMissingError,
+	isExpiredError,
+	isAuthDateInvalidError,
+} from "@telegram-apps/init-data-node/web";
+
 interface TelegramUser {
 	id: number;
 	first_name?: string;
@@ -22,77 +31,41 @@ export async function verifyTelegramInitData(
 	initData: string,
 	botToken: string,
 ): Promise<VerifyResult | VerifyError> {
-	const params = new URLSearchParams(initData);
-	const receivedHash = params.get("hash");
-	if (!receivedHash) {
-		return { success: false, error: "Missing hash in initData", status: 400 };
-	}
-	params.delete("hash");
+	try {
+		await validate(initData, botToken, {
+			expiresIn: 3600,
+		});
 
-	const authDate = params.get("auth_date");
-	if (!authDate) {
+		// Parse the validated init data to extract the user
+		const parsed = parse(initData);
+		const user = parsed.user;
+
+		if (!user) {
+			return { success: false, error: "Missing user in initData", status: 400 };
+		}
+
 		return {
-			success: false,
-			error: "Missing auth_date in initData",
-			status: 400,
+			success: true,
+			user: {
+				id: user.id,
+				first_name: user.first_name,
+				last_name: user.last_name,
+				username: user.username,
+				language_code: user.language_code,
+				is_premium: user.is_premium,
+			},
 		};
+	} catch (err) {
+		if (isSignatureInvalidError(err)) {
+			return { success: false, error: "Invalid initData hash", status: 403 };
+		}
+		if (isSignatureMissingError(err)) {
+			return { success: false, error: "Missing initData hash", status: 400 };
+		}
+		if (isExpiredError(err) || isAuthDateInvalidError(err)) {
+			return { success: false, error: "initData expired", status: 400 };
+		}
+		const message = err instanceof Error ? err.message : "Validation failed";
+		return { success: false, error: message, status: 400 };
 	}
-
-	// Check auth_date freshness (1 hour)
-	const authDateMs = Number.parseInt(authDate, 10) * 1000;
-	const now = Date.now();
-	if (now - authDateMs > 60 * 60 * 1000) {
-		return { success: false, error: "initData expired", status: 400 };
-	}
-
-	const entries = Array.from(params.entries()).sort(([a], [b]) =>
-		a.localeCompare(b),
-	);
-	const dataCheckString = entries
-		.map(([key, value]) => `${key}=${value}`)
-		.join("\n");
-
-	const encoder = new TextEncoder();
-
-	const secretKeyData = await crypto.subtle.importKey(
-		"raw",
-		encoder.encode(botToken),
-		{ name: "HMAC", hash: "SHA-256" },
-		false,
-		["sign"],
-	);
-	const secretKey = await crypto.subtle.sign(
-		"HMAC",
-		secretKeyData,
-		encoder.encode("WebAppData"),
-	);
-
-	const computedHashKey = await crypto.subtle.importKey(
-		"raw",
-		secretKey,
-		{ name: "HMAC", hash: "SHA-256" },
-		false,
-		["sign"],
-	);
-	const computedHash = await crypto.subtle.sign(
-		"HMAC",
-		computedHashKey,
-		encoder.encode(dataCheckString),
-	);
-	const computedHashHex = Array.from(new Uint8Array(computedHash))
-		.map((b) => b.toString(16).padStart(2, "0"))
-		.join("");
-
-	if (computedHashHex !== receivedHash) {
-		return { success: false, error: "Invalid initData hash", status: 403 };
-	}
-
-	// Extract user
-	const userJson = params.get("user");
-	if (!userJson) {
-		return { success: false, error: "Missing user in initData", status: 400 };
-	}
-
-	const user = JSON.parse(userJson) as TelegramUser;
-	return { success: true, user };
 }

@@ -4,7 +4,7 @@ import { useConvex } from "convex/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 import { getDeployment } from "@/components/EnvironmentDropdown";
-import { CONVEX_URLS } from "@/lib/convexConfig";
+import { CONVEX_SITE_URLS } from "@/lib/convexConfig";
 
 export interface UserSession {
 	_id: Id<"users">;
@@ -22,7 +22,7 @@ function getTokenKey(): string {
 
 function getConvexHttpUrl(): string {
 	const deployment = getDeployment();
-	return CONVEX_URLS[deployment] || CONVEX_URLS.prod;
+	return CONVEX_SITE_URLS[deployment] || CONVEX_SITE_URLS.prod;
 }
 
 async function authenticate(convex: ReturnType<typeof useConvex>): Promise<UserSession | null> {
