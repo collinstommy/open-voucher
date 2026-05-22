@@ -6,17 +6,13 @@ import { ConvexProvider, ConvexReactClient } from "convex/react";
 import { routeTree } from "./routeTree.gen";
 import Loader from "./components/loader";
 import { getDeployment } from "@/components/EnvironmentDropdown";
+import { CONVEX_URLS } from "@/lib/convexConfig";
 import "./index.css";
-
-const DEPLOYMENTS = {
-	dev: "https://fastidious-okapi-116.convex.cloud",
-	prod: "https://whimsical-kudu-895.convex.cloud",
-};
 
 export function getRouter() {
 	const deployment = getDeployment();
 	const CONVEX_URL =
-		DEPLOYMENTS[deployment] || (import.meta as any).env.VITE_CONVEX_URL!;
+		CONVEX_URLS[deployment] || (import.meta as any).env.VITE_CONVEX_URL!;
 	if (!CONVEX_URL) {
 		console.error("missing convex URL");
 	}

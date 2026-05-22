@@ -26,6 +26,7 @@ Add a user-facing web app to the existing `apps/web` TanStack Start application,
 ### 🔲 Todo — Frontend
 - [ ] Create `hooks/useUserAuth.ts` — reads `WebApp.initData`, sends to `validateInitData`, stores session token
 - [ ] Update `routes/app.tsx` — Telegram auth gate (show "Open in Telegram" if no session)
+- [ ] Add banned-user check in `routes/app.tsx` — show appropriate message when `user.isBanned` (decide on UX: full-page ban notice, restricted mode, etc.)
 - [ ] Update `routes/app/index.tsx` — fetch claimed vouchers via `getClaimedVouchers`, render `VoucherCard` list
 - [ ] Create `components/VoucherCard.tsx` — voucher image, type badge, expiry date, return button
 - [ ] Create `components/ReturnConfirmDialog.tsx` — confirmation before returning

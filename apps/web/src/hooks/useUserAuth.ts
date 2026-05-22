@@ -1,8 +1,10 @@
 import { api } from "@open-voucher/backend/convex/_generated/api";
 import type { Id } from "@open-voucher/backend/convex/_generated/dataModel";
 import { useConvex } from "convex/react";
-import { useCallback, useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback } from "react";
 import { getDeployment } from "@/components/EnvironmentDropdown";
+import { CONVEX_URLS } from "@/lib/convexConfig";
 
 export interface UserSession {
 	_id: Id<"users">;
@@ -15,105 +17,88 @@ export interface UserSession {
 }
 
 function getTokenKey(): string {
-	return "user-session";
+	return `user-session-${getDeployment()}`;
 }
 
 function getConvexHttpUrl(): string {
 	const deployment = getDeployment();
-	const urls: Record<string, string> = {
-		dev: "https://fastidious-okapi-116.convex.cloud",
-		prod: "https://whimsical-kudu-895.convex.cloud",
-	};
-	return urls[deployment] || urls.prod;
+	return CONVEX_URLS[deployment] || CONVEX_URLS.prod;
+}
+
+async function authenticate(convex: ReturnType<typeof useConvex>): Promise<UserSession | null> {
+	const storedToken = localStorage.getItem(getTokenKey());
+	if (storedToken) {
+		const sessionUser = await convex.query(
+			api.auth.validateSession,
+			{ sessionToken: storedToken },
+		);
+		if (sessionUser) {
+			return { ...sessionUser, sessionToken: storedToken };
+		}
+		localStorage.removeItem(getTokenKey());
+	}
+
+	// dev override
+	if (
+		typeof window !== "undefined" &&
+		window.location.hostname === "localhost"
+	) {
+		const result = await convex.mutation(api.auth.devAuth, {});
+		localStorage.setItem(getTokenKey(), result.sessionToken);
+		return { ...result.user, sessionToken: result.sessionToken };
+	}
+
+	const tg = (window as any).Telegram?.WebApp;
+	if (tg?.initData) {
+		const response = await fetch(
+			`${getConvexHttpUrl()}/api/telegram-auth`,
+			{
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ initData: tg.initData }),
+			},
+		);
+		const result = await response.json();
+		if (!response.ok) {
+			throw new Error(result.error || "Authentication failed");
+		}
+		localStorage.setItem(getTokenKey(), result.sessionToken);
+		return { ...result.user, sessionToken: result.sessionToken };
+	}
+
+	return null;
 }
 
 export function useUserAuth() {
 	const convex = useConvex();
-	const [user, setUser] = useState<UserSession | null>(null);
-	const [isLoading, setIsLoading] = useState(true);
-	const [error, setError] = useState<string | null>(null);
+	const queryClient = useQueryClient();
+	const authQueryKey = ["userAuth", getDeployment()] as const;
 
-	useEffect(() => {
-		async function authenticate() {
-			try {
-				// 1. Check for stored session token
-				const storedToken = localStorage.getItem(getTokenKey());
-				if (storedToken) {
-					const sessionUser = await convex.query(
-						api.userApp.validateSession,
-						{ sessionToken: storedToken },
-					);
-					if (sessionUser) {
-						setUser({ ...sessionUser, sessionToken: storedToken });
-						setIsLoading(false);
-						return;
-					}
-					// Invalid/expired token — clear it
-					localStorage.removeItem(getTokenKey());
-				}
+	const { data: user, isLoading, error } = useQuery({
+		queryKey: authQueryKey,
+		queryFn: () => authenticate(convex),
+		staleTime: Infinity,
+		retry: false,
+	});
 
-				// 2. Localhost dev mode
-				if (
-					typeof window !== "undefined" &&
-					window.location.hostname === "localhost"
-				) {
-					const result = await convex.mutation(api.userApp.devAuth, {});
-					localStorage.setItem(getTokenKey(), result.sessionToken);
-					setUser({ ...result.user, sessionToken: result.sessionToken });
-					setIsLoading(false);
-					return;
-				}
-
-				// 3. Telegram WebApp initData
-				const tg = (window as any).Telegram?.WebApp;
-				if (tg?.initData) {
-					const response = await fetch(
-						`${getConvexHttpUrl()}/api/telegram-auth`,
-						{
-							method: "POST",
-							headers: { "Content-Type": "application/json" },
-							body: JSON.stringify({ initData: tg.initData }),
-						},
-					);
-					const result = await response.json();
-					if (!response.ok) {
-						throw new Error(result.error || "Authentication failed");
-					}
-					localStorage.setItem(getTokenKey(), result.sessionToken);
-					setUser({ ...result.user, sessionToken: result.sessionToken });
-					setIsLoading(false);
-					return;
-				}
-
-				// No auth available
-				setIsLoading(false);
-			} catch (err) {
-				setError(
-					err instanceof Error
-						? err.message
-						: "Authentication failed",
-				);
-				setIsLoading(false);
-			}
-		}
-
-		authenticate();
-	}, [convex]);
-
-	const logout = useCallback(async () => {
-		const token = localStorage.getItem(getTokenKey());
-		if (token) {
-			try {
-				await convex.mutation(api.userApp.logoutUser, {
+	const logoutMutation = useMutation({
+		mutationFn: async () => {
+			const token = localStorage.getItem(getTokenKey());
+			if (token) {
+				await convex.mutation(api.auth.logoutUser, {
 					sessionToken: token,
-				});
-			} catch {
-				// ignore
+				}).catch(() => {});
 			}
-		}
-		localStorage.removeItem(getTokenKey());
-		setUser(null);
-	}, [convex]);
+		},
+		onSuccess: () => {
+			localStorage.removeItem(getTokenKey());
+			queryClient.setQueryData(authQueryKey, null);
+		},
+	});
 
-	return { user, isLoading, error, logout };
+	const logout = useCallback(() => {
+		logoutMutation.mutate();
+	}, [logoutMutation]);
+
+	return { user: user ?? null, isLoading, error, logout };
 }

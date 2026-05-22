@@ -24,7 +24,7 @@ crons.daily(
 crons.daily(
 	"cleanup user sessions",
 	{ hourUTC: 2, minuteUTC: 15 },
-	internal.userApp.cleanupExpiredUserSessions,
+	internal.auth.cleanupExpiredUserSessions,
 );
 
 export default crons;

@@ -9,6 +9,7 @@
  */
 
 import type * as admin from "../admin.js";
+import type * as auth from "../auth.js";
 import type * as constants from "../constants.js";
 import type * as crons from "../crons.js";
 import type * as dashboard from "../dashboard.js";
@@ -21,8 +22,6 @@ import type * as ocr_store from "../ocr/store.js";
 import type * as reminders from "../reminders.js";
 import type * as settings from "../settings.js";
 import type * as telegram from "../telegram.js";
-import type * as userApp from "../userApp.js";
-import type * as userAppInternal from "../userAppInternal.js";
 import type * as users from "../users.js";
 import type * as vouchers from "../vouchers.js";
 
@@ -34,6 +33,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   admin: typeof admin;
+  auth: typeof auth;
   constants: typeof constants;
   crons: typeof crons;
   dashboard: typeof dashboard;
@@ -46,8 +46,6 @@ declare const fullApi: ApiFromModules<{
   reminders: typeof reminders;
   settings: typeof settings;
   telegram: typeof telegram;
-  userApp: typeof userApp;
-  userAppInternal: typeof userAppInternal;
   users: typeof users;
   vouchers: typeof vouchers;
 }>;

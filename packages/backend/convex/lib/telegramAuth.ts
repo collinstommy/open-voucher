@@ -29,16 +29,22 @@ export async function verifyTelegramInitData(
 	}
 	params.delete("hash");
 
-	// Check auth_date freshness (1 hour)
 	const authDate = params.get("auth_date");
-	if (authDate) {
-		const authDateMs = Number.parseInt(authDate, 10) * 1000;
-		const now = Date.now();
-		if (now - authDateMs > 60 * 60 * 1000) {
-			return { success: false, error: "initData expired", status: 400 };
-		}
+	if (!authDate) {
+		return {
+			success: false,
+			error: "Missing auth_date in initData",
+			status: 400,
+		};
+	}
 
-	// Build data_check_string
+	// Check auth_date freshness (1 hour)
+	const authDateMs = Number.parseInt(authDate, 10) * 1000;
+	const now = Date.now();
+	if (now - authDateMs > 60 * 60 * 1000) {
+		return { success: false, error: "initData expired", status: 400 };
+	}
+
 	const entries = Array.from(params.entries()).sort(([a], [b]) =>
 		a.localeCompare(b),
 	);
@@ -46,10 +52,8 @@ export async function verifyTelegramInitData(
 		.map(([key, value]) => `${key}=${value}`)
 		.join("\n");
 
-	// Compute HMAC
 	const encoder = new TextEncoder();
 
-	// secret_key = HMAC_SHA256(bot_token, "WebAppData")
 	const secretKeyData = await crypto.subtle.importKey(
 		"raw",
 		encoder.encode(botToken),
@@ -63,7 +67,6 @@ export async function verifyTelegramInitData(
 		encoder.encode("WebAppData"),
 	);
 
-	// computed_hash = HMAC_SHA256(data_check_string, secret_key)
 	const computedHashKey = await crypto.subtle.importKey(
 		"raw",
 		secretKey,
