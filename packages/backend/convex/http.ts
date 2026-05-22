@@ -22,10 +22,6 @@ function getCorsHeaders(request: Request): Record<string, string> {
 	};
 }
 
-/**
- * Telegram Mini App auth endpoint.
- * Verifies initData from Telegram WebApp and creates a user session.
- */
 http.route({
 	path: "/api/telegram-auth",
 	method: "POST",

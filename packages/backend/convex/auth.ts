@@ -101,11 +101,6 @@ export const logoutUser = mutation({
 	},
 });
 
-/**
- * Atomic mutation: look up user by telegramChatId and create a session in one call.
- * Used by the HTTP action for Telegram Mini App auth to avoid
- * non-atomic runQuery + runMutation.
- */
 export const createSessionForTelegramUser = internalMutation({
 	args: { telegramChatId: v.string() },
 	handler: async (ctx, { telegramChatId }) => {
