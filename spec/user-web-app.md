@@ -30,7 +30,7 @@ Add a user-facing web app to the existing `apps/web` TanStack Start application,
 - [ ] Update `routes/app/index.tsx` — fetch claimed vouchers via `getClaimedVouchers`, render `VoucherCard` list
 - [ ] Create `components/VoucherCard.tsx` — voucher image, type badge, expiry date, return button
 - [ ] Create `components/ReturnConfirmDialog.tsx` — confirmation before returning
-- [ ] Add dual CTAs to landing page when session token is detected ("View your vouchers" + Telegram bot link)
+- [x] ~~Add dual CTAs to landing page when session token is detected ("View your vouchers" + Telegram bot link)~~ — REMOVED. Landing page now uses a single CTA.
 
 ### 🔲 Todo — Cleanup
 - [ ] Delete `apps/landing/` directory (static HTML no longer needed)
@@ -170,7 +170,7 @@ We use the **Mini App initData** flow as the primary auth path, with session tok
 | Scenario | Auth mechanism |
 |----------|---------------|
 | User opens `/app` inside Telegram | `WebApp.initData` verified → session token stored |
-| User visits `/` in a regular browser (returning) | Session token checked in localStorage → dual CTAs shown |
+| User visits `/` in a regular browser (returning) | Session token checked in localStorage (can navigate to `/app`) |
 | User visits `/` for the first time | No token → "Open Bot in Telegram" CTA only |
 
 **Why not the Telegram Login Widget (OIDC):**
@@ -228,7 +228,12 @@ We use the **Mini App initData** flow as the primary auth path, with session tok
 ### 5. Landing Page Behavior
 **Question:** What happens when a returning user visits `/`?
 
-**Answer:** The landing page checks for a stored session token. If valid, it shows **two CTAs**:
+**Answer:** ~~The landing page checks for a stored session token. If valid, it shows **two CTAs**.~~
+
+**⚠️ DEPRECATED — Dual CTAs removed.** The landing page now uses a **single CTA** for all visitors ("Open Bot in Telegram"), regardless of session state. Returning users can navigate directly to `/app` using the nav bar or a bookmark. The dual-CTA design below is kept for historical reference only.
+
+<details>
+<summary>Original dual-CTA design (deprecated)</summary>
 
 ```
 ┌──────────────────────────────────────┐
@@ -247,6 +252,8 @@ We use the **Mini App initData** flow as the primary auth path, with session tok
 ```
 
 **First-time visitor** sees only the Telegram CTA. No silent redirect — the landing page stays a proper marketing surface.
+
+</details>
 
 ---
 
@@ -299,15 +306,15 @@ Step 5: UI updates — voucher removed from list, balance updated
 
 **Answer:** Absolute expiry + daily cleanup cron (same pattern as admin sessions).
 
-- **Duration:** 30 days from creation (not forever). Admin sessions use 24 hours; user sessions get a longer window since re-auth requires opening Telegram.
+- **Duration:** 365 days (1 year) from creation (matches `USER_SESSION_DURATION_MS` in `constants.ts`). Admin sessions use 24 hours; user sessions get a longer window since re-auth requires opening Telegram.
 - **Storage:** `localStorage` key `user-session-{deployment}` (same pattern as `admin-token-{deployment}`)
-- **Creation:** When user first visits `/app` and verifies `initData` → `expiresAt = now + 30 days`
+- **Creation:** When user first visits `/app` and verifies `initData` → `expiresAt = now + 365 days`
 - **Validation:** `/` and `/app` check on load; `expiresAt < now` → clear token, show unauthenticated state
 - **Logout:** Deletes the `userSessions` row immediately (same as `admin.logout`)
 - **Cleanup:** Daily cron runs `cleanupExpiredUserSessions` → `DELETE FROM userSessions WHERE expiresAt < now`
 - **Sharing:** Same token works for the landing page and `/app` routes
 
-**Why not sliding expiry:** Adds a write on every request. For a voucher-viewing app, 30-day fixed expiry is generous enough and keeps reads cheap.
+**Why not sliding expiry:** Adds a write on every request. For a voucher-viewing app, 365-day (1 year) fixed expiry is generous enough and keeps reads cheap.
 
 **Why not forever:** Unbounded DB growth. Even at modest scale, abandoned sessions accumulate indefinitely.
 
@@ -494,6 +501,6 @@ bun run deploy:web
 | Auth | Manual initData verification + session tokens |
 | Convex Auth | Not used |
 | Initial features | View claimed vouchers + return |
-| Session duration | 30 days, daily cron cleanup |
-| Landing page | At `/` with conditional dual CTAs — migrated ✅, dual CTAs 🔲 |
+| Session duration | 365 days (1 year), daily cron cleanup |
+| Landing page | At `/` with single CTA ("Open Bot in Telegram") — migrated ✅, dual CTAs removed |
 | Landing page migration | Rebuild as React — ✅; delete `apps/landing/` — 🔲 |

@@ -1,6 +1,8 @@
 import { v } from "convex/values";
-import { internalMutation, mutation, query } from "./_generated/server";
+import { internalMutation, mutation, query, type QueryCtx } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
 import { USER_SESSION_DURATION_MS, USER_SESSION_CLEANUP_BATCH_SIZE } from "./constants";
+import { customQuery } from "convex-helpers/server/customFunctions";
 
 export const devAuth = mutation({
 	args: {},
@@ -164,5 +166,33 @@ export const cleanupExpiredUserSessions = internalMutation({
 		}
 
 		return { deletedCount };
+	},
+});
+
+export async function verifyUserSession(
+	ctx: QueryCtx,
+	sessionToken: string,
+): Promise<Id<"users">> {
+	const session = await ctx.db
+		.query("userSessions")
+		.withIndex("by_token", (q) => q.eq("token", sessionToken))
+		.first();
+
+	if (!session) {
+		throw new Error("Unauthorized: Invalid session token");
+	}
+
+	if (session.expiresAt < Date.now()) {
+		throw new Error("Unauthorized: Session expired");
+	}
+
+	return session.userId;
+}
+
+export const userQuery = customQuery(query, {
+	args: { sessionToken: v.string() },
+	input: async (ctx, { sessionToken }) => {
+		const userId = await verifyUserSession(ctx, sessionToken);
+		return { ctx: {}, args: { userId } };
 	},
 });
