@@ -653,7 +653,6 @@ async function setBotCommands() {
 	const commands = [
 		{ command: "help", description: "Show help menu" },
 		{ command: "balance", description: "Check your coin balance" },
-		{ command: "app", description: "Transactions & voucher info" },
 		{ command: "donate", description: "Support the project" },
 	];
 

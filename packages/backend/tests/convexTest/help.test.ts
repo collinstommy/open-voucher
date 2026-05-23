@@ -95,11 +95,13 @@ describe("Help Command", () => {
 		const buttonTexts = buttons.map((b: any) => b.text);
 
 		expect(buttonTexts).toContain("💰 Balance");
-		expect(buttonTexts).toContain("📊 Open Voucher App");
-		expect(buttonTexts).toContain("📸 How to Upload");
-		expect(buttonTexts).toContain("🎫 How to Claim");
 		expect(buttonTexts).toContain("❓ FAQ");
 		expect(buttonTexts).toContain("💬 Give Feedback");
+		expect(buttonTexts).toContain("📊 Voucher Availability");
+		expect(buttonTexts).toContain("📸 How to Upload");
+		expect(buttonTexts).toContain("🎫 How to Claim");
+		expect(buttonTexts).toContain("📋 View Transactions");
+		expect(buttonTexts).toContain("🆕 View updates");
 		expect(buttonTexts).toContain("☕ Donate");
 		expect(buttonTexts).not.toContain("Support");
 	});
@@ -201,6 +203,50 @@ describe("Help Callback Responses", () => {
 		expect(claimMsg).toBeDefined();
 		expect(claimMsg?.text).toContain("5") ||
 			claimMsg?.text?.toLowerCase().includes("send");
+	});
+
+	test("voucher availability callback shows none for €5, low for €10, good for €20", async () => {
+		const t = convexTest(schema, modules);
+		const chatId = "123456";
+		const userId = await createUser(t, { telegramChatId: chatId, coins: 100 });
+
+		// €5: 0 available → none
+		// €10: 5 available → low
+		// €20: 10 available → good
+		for (let i = 0; i < 5; i++) {
+			await createVoucher(t, { type: "10", uploaderId: userId, status: "available" });
+		}
+		for (let i = 0; i < 10; i++) {
+			await createVoucher(t, { type: "20", uploaderId: userId, status: "available" });
+		}
+
+		await t.action(internal.telegram.handleTelegramCallback, {
+			callbackQuery: createTelegramCallback({ data: "help:availability", chatId }),
+		});
+
+		const availMsg = sentMessages.find(
+			(m) => m.chatId === chatId && m.text?.includes("€5"),
+		);
+		expect(availMsg).toBeDefined();
+		expect(availMsg?.text).toContain("none");
+		expect(availMsg?.text).toContain("low");
+		expect(availMsg?.text).toContain("good");
+	});
+
+	test("updates callback sends link to updates page", async () => {
+		const t = convexTest(schema, modules);
+		const chatId = "123456";
+		await createUser(t, { telegramChatId: chatId, coins: 100 });
+
+		await t.action(internal.telegram.handleTelegramCallback, {
+			callbackQuery: createTelegramCallback({ data: "help:updates", chatId }),
+		});
+
+		const updatesMsg = sentMessages.find(
+			(m) => m.chatId === chatId && m.text?.includes("Latest Updates"),
+		);
+		expect(updatesMsg).toBeDefined();
+		expect(updatesMsg?.text).toContain("openvouchers.org");
 	});
 
 });
