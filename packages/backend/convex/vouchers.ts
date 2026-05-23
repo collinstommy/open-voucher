@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import dayjs from "dayjs";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
-import { internalMutation, internalQuery } from "./_generated/server";
+import { internalMutation, internalQuery, query } from "./_generated/server";
 import { CLAIM_COSTS, MIN_COINS, UPLOAD_REWARDS } from "./constants";
 
 export const getVoucherByBarcode = internalQuery({
@@ -485,6 +485,22 @@ export const expireOldVouchers = internalMutation({
 });
 
 export const getAvailableVoucherCount = internalQuery({
+	args: {},
+	handler: async (ctx) => {
+		const availableVouchers = await ctx.db
+			.query("vouchers")
+			.withIndex("by_status_type", (q) => q.eq("status", "available"))
+			.collect();
+
+		const counts: Record<string, number> = { "5": 0, "10": 0, "20": 0 };
+		for (const v of availableVouchers) {
+			counts[v.type] = (counts[v.type] || 0) + 1;
+		}
+		return counts;
+	},
+});
+
+export const getVoucherAvailability = query({
 	args: {},
 	handler: async (ctx) => {
 		const availableVouchers = await ctx.db

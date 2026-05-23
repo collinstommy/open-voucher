@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { internalMutation, internalQuery, query } from "./_generated/server";
 import { SIGNUP_BONUS } from "./constants";
+import { userQuery } from "./auth";
 
 /**
  * Create a new user.
@@ -187,6 +188,17 @@ export const clearOnboardingTutorial = internalMutation({
 
 export const getUserTransactions = internalQuery({
 	args: { userId: v.id("users") },
+	handler: async (ctx, { userId }) => {
+		const transactions = await ctx.db
+			.query("transactions")
+			.withIndex("by_user", (q) => q.eq("userId", userId))
+			.collect();
+		return transactions.sort((a, b) => b.createdAt - a.createdAt).slice(0, 25);
+	},
+});
+
+export const getTransactionHistory = userQuery({
+	args: {},
 	handler: async (ctx, { userId }) => {
 		const transactions = await ctx.db
 			.query("transactions")
