@@ -34,11 +34,15 @@ function FeedbackPage() {
 
 	return (
 		<div className="flex flex-col flex-1 min-h-0">
-			<AppHeader variant="back" title="Feedback" />
+			<AppHeader title="Feedback" />
 			<div className="flex-1 overflow-auto bg-slate-50 p-4 flex flex-col gap-4">
-				<p className="text-xs text-slate-500">
-					We read every message. Share bugs, ideas, or praise.
-				</p>
+				<div className="space-y-2 text-xs text-slate-500">
+					<p>We read every message. Share bugs, ideas, or praise.</p>
+					<p>
+						We do not offer support for individual transactions. For claim or
+						upload issues, use the report flow in the bot chat.
+					</p>
+				</div>
 				<div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm flex-1 flex flex-col gap-3 min-h-[280px]">
 					<textarea
 						value={text}

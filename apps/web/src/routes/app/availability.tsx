@@ -45,7 +45,7 @@ function AvailabilityPage() {
 
 	return (
 		<div className="flex flex-col flex-1 min-h-0">
-			<AppHeader variant="back" title="Availability" />
+			<AppHeader title="Availability" />
 			<div className="flex-1 overflow-auto bg-slate-50 p-4">
 				{isPending && (
 					<p className="text-sm text-slate-500 text-center py-8">Loading...</p>

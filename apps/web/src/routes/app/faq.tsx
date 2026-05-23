@@ -10,7 +10,7 @@ export const Route = createFileRoute("/app/faq")({
 function FaqPage() {
 	return (
 		<div className="flex flex-col flex-1 min-h-0">
-			<AppHeader variant="back" title="FAQ" />
+			<AppHeader title="FAQ" />
 			<div className="flex-1 overflow-auto bg-slate-50 p-4">
 				<FaqAccordion items={APP_FAQ_ITEMS} />
 			</div>

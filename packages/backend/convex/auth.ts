@@ -1,11 +1,27 @@
 import { v } from "convex/values";
-import { internalMutation, mutation, query, type QueryCtx } from "./_generated/server";
+import {
+	internalMutation,
+	mutation,
+	query,
+	type MutationCtx,
+	type QueryCtx,
+} from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { USER_SESSION_DURATION_MS, USER_SESSION_CLEANUP_BATCH_SIZE } from "./constants";
 import {
 	customMutation,
 	customQuery,
 } from "convex-helpers/server/customFunctions";
+
+async function revokeAllUserSessions(ctx: MutationCtx, userId: Id<"users">) {
+	const existingSessions = await ctx.db
+		.query("userSessions")
+		.withIndex("by_user", (q) => q.eq("userId", userId))
+		.collect();
+	for (const session of existingSessions) {
+		await ctx.db.delete(session._id);
+	}
+}
 
 export const devAuth = mutation({
 	args: {},
@@ -31,14 +47,7 @@ export const devAuth = mutation({
 			throw new Error("User not found. Please start the bot first.");
 		}
 
-		// Clean up existing sessions for this user before creating a new one
-		const existingSessions = await ctx.db
-			.query("userSessions")
-			.withIndex("by_user", (q) => q.eq("userId", user._id))
-			.collect();
-		for (const session of existingSessions) {
-			await ctx.db.delete(session._id);
-		}
+		await revokeAllUserSessions(ctx, user._id);
 
 		const token = crypto.randomUUID();
 		const now = Date.now();
@@ -119,6 +128,8 @@ export const createSessionForTelegramUser = internalMutation({
 		if (!user) {
 			return null;
 		}
+
+		await revokeAllUserSessions(ctx, user._id);
 
 		const token = crypto.randomUUID();
 		const now = Date.now();
