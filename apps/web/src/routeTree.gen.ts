@@ -14,6 +14,10 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppIndexRouteImport } from './routes/app/index'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
+import { Route as AppTransactionsRouteImport } from './routes/app/transactions'
+import { Route as AppFeedbackRouteImport } from './routes/app/feedback'
+import { Route as AppFaqRouteImport } from './routes/app/faq'
+import { Route as AppAvailabilityRouteImport } from './routes/app/availability'
 import { Route as AdminVouchersRouteImport } from './routes/admin/vouchers'
 import { Route as AdminSettingsRouteImport } from './routes/admin/settings'
 import { Route as AdminHealthCheckRouteImport } from './routes/admin/health-check'
@@ -48,6 +52,26 @@ const AdminIndexRoute = AdminIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AdminRoute,
+} as any)
+const AppTransactionsRoute = AppTransactionsRouteImport.update({
+  id: '/transactions',
+  path: '/transactions',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppFeedbackRoute = AppFeedbackRouteImport.update({
+  id: '/feedback',
+  path: '/feedback',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppFaqRoute = AppFaqRouteImport.update({
+  id: '/faq',
+  path: '/faq',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAvailabilityRoute = AppAvailabilityRouteImport.update({
+  id: '/availability',
+  path: '/availability',
+  getParentRoute: () => AppRoute,
 } as any)
 const AdminVouchersRoute = AdminVouchersRouteImport.update({
   id: '/vouchers',
@@ -106,6 +130,10 @@ export interface FileRoutesByFullPath {
   '/admin/health-check': typeof AdminHealthCheckRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/vouchers': typeof AdminVouchersRoute
+  '/app/availability': typeof AppAvailabilityRoute
+  '/app/faq': typeof AppFaqRoute
+  '/app/feedback': typeof AppFeedbackRoute
+  '/app/transactions': typeof AppTransactionsRoute
   '/admin/': typeof AdminIndexRoute
   '/app/': typeof AppIndexRoute
   '/admin/users/$userId': typeof AdminUsersUserIdRoute
@@ -120,6 +148,10 @@ export interface FileRoutesByTo {
   '/admin/health-check': typeof AdminHealthCheckRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/vouchers': typeof AdminVouchersRoute
+  '/app/availability': typeof AppAvailabilityRoute
+  '/app/faq': typeof AppFaqRoute
+  '/app/feedback': typeof AppFeedbackRoute
+  '/app/transactions': typeof AppTransactionsRoute
   '/admin': typeof AdminIndexRoute
   '/app': typeof AppIndexRoute
   '/admin/users/$userId': typeof AdminUsersUserIdRoute
@@ -137,6 +169,10 @@ export interface FileRoutesById {
   '/admin/health-check': typeof AdminHealthCheckRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/vouchers': typeof AdminVouchersRoute
+  '/app/availability': typeof AppAvailabilityRoute
+  '/app/faq': typeof AppFaqRoute
+  '/app/feedback': typeof AppFeedbackRoute
+  '/app/transactions': typeof AppTransactionsRoute
   '/admin/': typeof AdminIndexRoute
   '/app/': typeof AppIndexRoute
   '/admin/users/$userId': typeof AdminUsersUserIdRoute
@@ -155,6 +191,10 @@ export interface FileRouteTypes {
     | '/admin/health-check'
     | '/admin/settings'
     | '/admin/vouchers'
+    | '/app/availability'
+    | '/app/faq'
+    | '/app/feedback'
+    | '/app/transactions'
     | '/admin/'
     | '/app/'
     | '/admin/users/$userId'
@@ -169,6 +209,10 @@ export interface FileRouteTypes {
     | '/admin/health-check'
     | '/admin/settings'
     | '/admin/vouchers'
+    | '/app/availability'
+    | '/app/faq'
+    | '/app/feedback'
+    | '/app/transactions'
     | '/admin'
     | '/app'
     | '/admin/users/$userId'
@@ -185,6 +229,10 @@ export interface FileRouteTypes {
     | '/admin/health-check'
     | '/admin/settings'
     | '/admin/vouchers'
+    | '/app/availability'
+    | '/app/faq'
+    | '/app/feedback'
+    | '/app/transactions'
     | '/admin/'
     | '/app/'
     | '/admin/users/$userId'
@@ -233,6 +281,34 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/'
       preLoaderRoute: typeof AdminIndexRouteImport
       parentRoute: typeof AdminRoute
+    }
+    '/app/transactions': {
+      id: '/app/transactions'
+      path: '/transactions'
+      fullPath: '/app/transactions'
+      preLoaderRoute: typeof AppTransactionsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/feedback': {
+      id: '/app/feedback'
+      path: '/feedback'
+      fullPath: '/app/feedback'
+      preLoaderRoute: typeof AppFeedbackRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/faq': {
+      id: '/app/faq'
+      path: '/faq'
+      fullPath: '/app/faq'
+      preLoaderRoute: typeof AppFaqRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/availability': {
+      id: '/app/availability'
+      path: '/availability'
+      fullPath: '/app/availability'
+      preLoaderRoute: typeof AppAvailabilityRouteImport
+      parentRoute: typeof AppRoute
     }
     '/admin/vouchers': {
       id: '/admin/vouchers'
@@ -329,10 +405,18 @@ const AdminRouteChildren: AdminRouteChildren = {
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
 interface AppRouteChildren {
+  AppAvailabilityRoute: typeof AppAvailabilityRoute
+  AppFaqRoute: typeof AppFaqRoute
+  AppFeedbackRoute: typeof AppFeedbackRoute
+  AppTransactionsRoute: typeof AppTransactionsRoute
   AppIndexRoute: typeof AppIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
+  AppAvailabilityRoute: AppAvailabilityRoute,
+  AppFaqRoute: AppFaqRoute,
+  AppFeedbackRoute: AppFeedbackRoute,
+  AppTransactionsRoute: AppTransactionsRoute,
   AppIndexRoute: AppIndexRoute,
 }
 

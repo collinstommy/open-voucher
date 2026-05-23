@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { internalMutation, internalQuery, query } from "./_generated/server";
 import { SIGNUP_BONUS } from "./constants";
-import { userQuery } from "./auth";
+import { userMutation, userQuery } from "./auth";
 
 /**
  * Create a new user.
@@ -194,6 +194,26 @@ export const getUserTransactions = internalQuery({
 			.withIndex("by_user", (q) => q.eq("userId", userId))
 			.collect();
 		return transactions.sort((a, b) => b.createdAt - a.createdAt).slice(0, 25);
+	},
+});
+
+export const submitAppFeedback = userMutation({
+	args: { text: v.string() },
+	handler: async (ctx, { userId, text }) => {
+		const trimmed = text.trim();
+		if (!trimmed) {
+			throw new Error("Feedback cannot be empty");
+		}
+		if (trimmed.length > 2000) {
+			throw new Error("Feedback is too long (max 2000 characters)");
+		}
+		await ctx.db.insert("feedback", {
+			userId,
+			text: trimmed,
+			status: "new",
+			type: "feedback",
+			createdAt: Date.now(),
+		});
 	},
 });
 

@@ -2,7 +2,12 @@ import { v } from "convex/values";
 import dayjs from "dayjs";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
-import { internalMutation, internalQuery, query } from "./_generated/server";
+import {
+	internalMutation,
+	internalQuery,
+	type QueryCtx,
+} from "./_generated/server";
+import { userQuery } from "./auth";
 import { CLAIM_COSTS, MIN_COINS, UPLOAD_REWARDS } from "./constants";
 
 export const getVoucherByBarcode = internalQuery({
@@ -484,36 +489,27 @@ export const expireOldVouchers = internalMutation({
 	},
 });
 
+async function countAvailableVouchersByType(ctx: QueryCtx) {
+	const availableVouchers = await ctx.db
+		.query("vouchers")
+		.withIndex("by_status_type", (q) => q.eq("status", "available"))
+		.collect();
+
+	const counts: Record<string, number> = { "5": 0, "10": 0, "20": 0 };
+	for (const v of availableVouchers) {
+		counts[v.type] = (counts[v.type] || 0) + 1;
+	}
+	return counts;
+}
+
 export const getAvailableVoucherCount = internalQuery({
 	args: {},
-	handler: async (ctx) => {
-		const availableVouchers = await ctx.db
-			.query("vouchers")
-			.withIndex("by_status_type", (q) => q.eq("status", "available"))
-			.collect();
-
-		const counts: Record<string, number> = { "5": 0, "10": 0, "20": 0 };
-		for (const v of availableVouchers) {
-			counts[v.type] = (counts[v.type] || 0) + 1;
-		}
-		return counts;
-	},
+	handler: async (ctx) => countAvailableVouchersByType(ctx),
 });
 
-export const getVoucherAvailability = query({
+export const getVoucherAvailability = userQuery({
 	args: {},
-	handler: async (ctx) => {
-		const availableVouchers = await ctx.db
-			.query("vouchers")
-			.withIndex("by_status_type", (q) => q.eq("status", "available"))
-			.collect();
-
-		const counts: Record<string, number> = { "5": 0, "10": 0, "20": 0 };
-		for (const v of availableVouchers) {
-			counts[v.type] = (counts[v.type] || 0) + 1;
-		}
-		return counts;
-	},
+	handler: async (ctx, { userId: _userId }) => countAvailableVouchersByType(ctx),
 });
 
 export const getVoucherForUploaderConfirm = internalQuery({

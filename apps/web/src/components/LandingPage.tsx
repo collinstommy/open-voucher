@@ -1,5 +1,6 @@
 import { useState } from "react";
 import LandingNav from "@/components/LandingNav";
+import { LANDING_FAQ_ITEMS } from "@/lib/faqContent";
 
 export default function LandingPage() {
 	return (
@@ -290,68 +291,6 @@ function Support() {
 }
 
 function FAQ() {
-	const faqs = [
-		{
-			q: "Why are smaller vouchers worth more?",
-			a: (
-				<>
-					<p className="mb-4">
-						You might notice that a{" "}
-						<strong>€10 off €50</strong> voucher is worth more coins
-						than a <strong>€20 off €100</strong> voucher, and a{" "}
-						<strong>€5 off €25</strong> voucher is worth even more.
-						This is intentional!
-					</p>
-					<ul className="list-disc list-inside space-y-2">
-						<li>
-							<strong>More Flexible:</strong> It&apos;s easier to
-							spend €50 than €100. Two €10 vouchers (split over two
-							shops) are often more useful than one single €20
-							voucher.
-						</li>
-						<li>
-							<strong>Higher Demand:</strong> Smaller vouchers are
-							requested more often, so we reward you more for
-							supplying them.
-						</li>
-					</ul>
-				</>
-			),
-		},
-		{
-			q: "Is this really free?",
-			a: "Yes. The project is open-source and community-run. We have no intention of charging fees.",
-		},
-		{
-			q: "Can I use online or app vouchers?",
-			a: "Yes! You can upload screenshots of vouchers from the Dunnes Stores app or from your email. They work exactly the same as paper vouchers.",
-		},
-		{
-			q: "What if the voucher I receive has already been used?",
-			a: 'You can mark it as "already used" in the bot. Users who upload multiple used vouchers will be banned from the system. When you report a voucher as used, you will get a replacement voucher when available.',
-		},
-		{
-			q: "How do I know if there are enough vouchers in the pool?",
-			a: 'Use the availability button in the bot help menu to see current pool levels before uploading. The pool typically has plenty of €5 and €10 vouchers available.',
-		},
-		{
-			q: "Can I upload vouchers that expire today?",
-			a: "Yes, but uploads after 9pm for same-day expiring vouchers won't earn coins. This ensures vouchers have enough time to be used before shops close.",
-		},
-		{
-			q: "Is there a limit on how many vouchers I can swap?",
-			a: "No limits! You can swap as many vouchers as you need, completely free.",
-		},
-		{
-			q: "What happens if I upload a voucher and accidentally use it?",
-			a: 'The claimer can mark the voucher as "already used" in the bot. You will get a message to confirm it\'s already been used.',
-		},
-		{
-			q: "Is this a cryptocurrency? Can I buy coins?",
-			a: 'No. "Coins" are simply community points used to ensure the system is fair. They have no monetary value and cannot be bought or sold. The only way to earn coins is by helping others (uploading vouchers).',
-		},
-	];
-
 	return (
 		<section className="py-16 bg-gray-50 border-t border-gray-200">
 			<div className="container mx-auto px-6">
@@ -366,7 +305,7 @@ function FAQ() {
 					</div>
 
 					<div className="space-y-4">
-						{faqs.map((faq) => (
+						{LANDING_FAQ_ITEMS.map((faq) => (
 							<FAQItem key={faq.q} question={faq.q} answer={faq.a} />
 						))}
 					</div>

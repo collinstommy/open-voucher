@@ -1,8 +1,7 @@
 import { api } from "@open-voucher/backend/convex/_generated/api";
 import type { Id } from "@open-voucher/backend/convex/_generated/dataModel";
 import { useConvex } from "convex/react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { getDeployment } from "@/components/EnvironmentDropdown";
 import { CONVEX_SITE_URLS } from "@/lib/convexConfig";
 
@@ -71,34 +70,13 @@ async function authenticate(convex: ReturnType<typeof useConvex>): Promise<UserS
 
 export function useUserAuth() {
 	const convex = useConvex();
-	const queryClient = useQueryClient();
-	const authQueryKey = ["userAuth", getDeployment()] as const;
 
 	const { data: user, isLoading, error } = useQuery({
-		queryKey: authQueryKey,
+		queryKey: ["userAuth", getDeployment()] as const,
 		queryFn: () => authenticate(convex),
 		staleTime: Infinity,
 		retry: false,
 	});
 
-	const logoutMutation = useMutation({
-		mutationFn: async () => {
-			const token = localStorage.getItem(getTokenKey());
-			if (token) {
-				await convex.mutation(api.auth.logoutUser, {
-					sessionToken: token,
-				}).catch(() => {});
-			}
-		},
-		onSuccess: () => {
-			localStorage.removeItem(getTokenKey());
-			queryClient.setQueryData(authQueryKey, null);
-		},
-	});
-
-	const logout = useCallback(() => {
-		logoutMutation.mutate();
-	}, [logoutMutation]);
-
-	return { user: user ?? null, isLoading, error, logout };
+	return { user: user ?? null, isLoading, error };
 }

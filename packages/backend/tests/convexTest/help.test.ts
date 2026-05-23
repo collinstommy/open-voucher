@@ -251,8 +251,8 @@ describe("Help Callback Responses", () => {
 
 });
 
-describe("Voucher Availability Query", () => {
-	test("getVoucherAvailability returns correct counts per type", async () => {
+describe("getAvailableVoucherCount", () => {
+	test("returns correct counts per type", async () => {
 		const t = convexTest(schema, modules);
 		const chatId = "123456";
 		const userId = await createUser(t, { telegramChatId: chatId, coins: 100 });

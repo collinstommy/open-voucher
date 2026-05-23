@@ -2,7 +2,10 @@ import { v } from "convex/values";
 import { internalMutation, mutation, query, type QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { USER_SESSION_DURATION_MS, USER_SESSION_CLEANUP_BATCH_SIZE } from "./constants";
-import { customQuery } from "convex-helpers/server/customFunctions";
+import {
+	customMutation,
+	customQuery,
+} from "convex-helpers/server/customFunctions";
 
 export const devAuth = mutation({
 	args: {},
@@ -190,6 +193,14 @@ export async function verifyUserSession(
 }
 
 export const userQuery = customQuery(query, {
+	args: { sessionToken: v.string() },
+	input: async (ctx, { sessionToken }) => {
+		const userId = await verifyUserSession(ctx, sessionToken);
+		return { ctx: {}, args: { userId } };
+	},
+});
+
+export const userMutation = customMutation(mutation, {
 	args: { sessionToken: v.string() },
 	input: async (ctx, { sessionToken }) => {
 		const userId = await verifyUserSession(ctx, sessionToken);
