@@ -253,16 +253,21 @@ async function sendHelpMenu(chatId: string) {
 		inline_keyboard: [
 			[
 				{ text: "💰 Balance", callback_data: "help:balance" },
-				{ text: "📊 Open Voucher App", web_app: { url: "https://openvouchers.org/app" } },
+				{ text: "❓ FAQ", callback_data: "help:faq" },
+			],
+			[{ text: "💬 Give Feedback", callback_data: "help:feedback" }],
+			[
+				{
+					text: "📊 Voucher Availability",
+					callback_data: "help:availability",
+				},
 			],
 			[
 				{ text: "📸 How to Upload", callback_data: "help:upload" },
 				{ text: "🎫 How to Claim", callback_data: "help:claim" },
 			],
-			[
-				{ text: "❓ FAQ", callback_data: "help:faq" },
-				{ text: "💬 Give Feedback", callback_data: "help:feedback" },
-			],
+			[{ text: "📋 View Transactions", callback_data: "help:transactions" }],
+			[{ text: "🆕 View updates", callback_data: "help:updates" }],
 			[{ text: "☕ Donate", callback_data: "help:donate" }],
 		],
 	});
@@ -836,8 +841,71 @@ export const handleTelegramCallback = internalAction({
 					);
 					break;
 				}
-				case "app": {
-					await sendAppWebAppButton(chatId);
+				case "availability": {
+					const counts = await ctx.runQuery(
+						internal.vouchers.getAvailableVoucherCount,
+					);
+
+					const getStatus = (count: number) => {
+						if (count === 0) return "🔴 none";
+						if (count < 10) return `🟡 low - ${count} vouchers`;
+						return "🟢 good availability";
+					};
+
+					await sendTelegramMessage(
+						chatId,
+						`€5 vouchers: ${getStatus(counts["5"])}\n€10 vouchers: ${getStatus(counts["10"])}\n€20 vouchers: ${getStatus(counts["20"])}`,
+					);
+					break;
+				}
+				case "transactions": {
+					const transactions = await ctx.runQuery(
+						internal.users.getUserTransactions,
+						{ userId: user._id },
+					);
+
+					if (transactions.length === 0) {
+						await sendTelegramMessage(chatId, "📋 No transactions yet.");
+						break;
+					}
+
+					const formatType = (type: string) => {
+						switch (type) {
+							case "signup_bonus":
+								return "🎁 Signup Bonus";
+							case "upload_reward":
+								return "📤 Upload Reward";
+							case "claim_spend":
+								return "💳 Claim Spent";
+							case "refund":
+								return "↩️ Refund";
+							case "report_refund":
+								return "↩️ Refund";
+							case "uploader_denied":
+								return "❌ Upload Denied";
+							default:
+								return type;
+						}
+					};
+
+					const transactionList = transactions.map((t) => {
+						const date = dayjs(t.createdAt).format("MMM D, YYYY");
+						const formattedType = formatType(t.type);
+						const amountPrefix = t.type === "claim_spend" ? "-" : "+";
+						return `${formattedType}: ${amountPrefix}${t.amount} (${date})`;
+					});
+
+					await sendTelegramMessage(
+						chatId,
+						`📋 <b>Your Last 25 Transactions:</b>\n\n${transactionList.join("\n")}`,
+					);
+					break;
+				}
+				case "updates": {
+					await sendTelegramMessage(
+						chatId,
+						"🆕 <b>Latest Updates</b>\n\nCheck out what's new:\nhttps://www.openvouchers.org#updates",
+					);
 					break;
 				}
 				case "upload": {
