@@ -24,6 +24,15 @@
 		"deploy": {
 			"dependsOn": ["build"],
 			"cache": false
+		},
+		"build:dev": {
+			"dependsOn": ["^build"],
+			"inputs": ["$TURBO_DEFAULT$", ".env*"],
+			"outputs": ["dist/**"]
+		},
+		"deploy:dev": {
+			"dependsOn": ["build:dev"],
+			"cache": false
 		}
 	}
 }

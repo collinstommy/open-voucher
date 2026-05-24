@@ -7,6 +7,7 @@ const http = httpRouter();
 
 const ALLOWED_ORIGINS = [
 	"https://openvouchers.org",
+	"https://dev.openvouchers.org",
 	"http://localhost:3001",
 ];
 

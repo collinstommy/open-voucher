@@ -293,6 +293,10 @@ async function sendFaqMenu(chatId: string) {
 	});
 }
 
+function getMiniAppUrl(): string {
+	return process.env.MINI_APP_URL ?? "https://openvouchers.org/app";
+}
+
 async function sendAppWebAppButton(chatId: string) {
 	await sendTelegramMessage(
 		chatId,
@@ -302,7 +306,7 @@ async function sendAppWebAppButton(chatId: string) {
 				[
 					{
 						text: "📋 Open My Vouchers",
-						web_app: { url: "https://openvouchers.org/app" },
+						web_app: { url: getMiniAppUrl() },
 					},
 				],
 			],
