@@ -1,6 +1,9 @@
 import { Link } from "@tanstack/react-router";
 import { LogOut } from "lucide-react";
-import { EnvironmentDropdown } from "@/components/EnvironmentDropdown";
+import {
+	EnvironmentDropdown,
+	isDeploymentLocked,
+} from "@/components/EnvironmentDropdown";
 import { Button } from "@/components/ui/button";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
 
@@ -77,7 +80,7 @@ export function NavigationLayout() {
 					<LogOut className="mr-2 h-4 w-4" />
 					Logout
 				</Button>
-				<EnvironmentDropdown />
+				{!isDeploymentLocked() && <EnvironmentDropdown />}
 			</div>
 		</div>
 	);

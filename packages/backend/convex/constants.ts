@@ -32,9 +32,10 @@ export function miniAppPath(
 	path = "",
 	searchParams?: Record<string, string>,
 ): string {
+	const baseUrl = process.env.MINI_APP_URL ?? MINI_APP_URL;
 	const base = path
-		? `${MINI_APP_URL}${path.startsWith("/") ? path : `/${path}`}`
-		: MINI_APP_URL;
+		? `${baseUrl}${path.startsWith("/") ? path : `/${path}`}`
+		: baseUrl;
 	const url = new URL(base);
 	if (searchParams) {
 		for (const [key, value] of Object.entries(searchParams)) {

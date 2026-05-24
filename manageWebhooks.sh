@@ -15,6 +15,8 @@
 #   - TELEGRAM_WEBHOOK_SECRET
 #   - GOOGLE_GENERATIVE_AI_API_KEY
 #   - ADMIN_PASSWORD
+#
+# MINI_APP_URL is set automatically per environment (see set_convex_vars).
 
 # Check if environment argument is provided
 ENV=${1:-dev}
@@ -186,6 +188,14 @@ set_convex_vars() {
     # Set Admin password
     echo "Setting ADMIN_PASSWORD..."
     (cd packages/backend && npx convex env set ADMIN_PASSWORD "$admin_password" $prod_flag)
+
+    # Mini App URL for Telegram web_app buttons
+    local mini_app_url="https://dev.openvouchers.org/app"
+    if [ "$env_name" = "prd" ]; then
+        mini_app_url="https://openvouchers.org/app"
+    fi
+    echo "Setting MINI_APP_URL to ${mini_app_url}..."
+    (cd packages/backend && npx convex env set MINI_APP_URL "$mini_app_url" $prod_flag)
     echo ""
 }
 

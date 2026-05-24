@@ -4,9 +4,11 @@
 	"type": "module",
 	"scripts": {
 		"build": "vite build",
+		"build:dev": "VITE_DEPLOYMENT=dev vite build",
 		"dev": "vite dev --port=3001",
 		"preview": "bun run build && vite preview",
 		"deploy": "bun run build && wrangler deploy",
+		"deploy:dev": "bun run build:dev && wrangler deploy --config dist/server/wrangler.json --name open-voucher-web-dev",
 		"cf-typegen": "wrangler types",
 		"check-types": "tsc --noEmit"
 	},
