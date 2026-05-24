@@ -5,7 +5,7 @@ import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import type { ActionCtx } from "./_generated/server";
 import { internalAction } from "./_generated/server";
-import { UPLOAD_REWARDS, miniAppPath } from "./constants";
+import { UPLOAD_REWARDS } from "./constants";
 
 dayjs.extend(advancedFormat);
 
@@ -276,6 +276,10 @@ async function sendFaqMenu(chatId: string) {
 	});
 }
 
+function getMiniAppUrl(): string {
+	return process.env.MINI_APP_URL ?? "https://openvouchers.org/app";
+}
+
 async function sendAppWebAppButton(chatId: string) {
 	await sendTelegramMessage(
 		chatId,
@@ -285,7 +289,7 @@ async function sendAppWebAppButton(chatId: string) {
 				[
 					{
 						text: "📱 Open My Account",
-						web_app: { url: miniAppPath("") },
+						web_app: { url: getMiniAppUrl() },
 					},
 				],
 			],
