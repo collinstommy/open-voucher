@@ -68,10 +68,6 @@ function getWelcomeMessage(): string {
 	return "🎉 <b>Welcome to Dunnes Voucher Bot!</b>";
 }
 
-function getBetaMessage(): string {
-	return `👋 <b>We're in beta!</b>\nWe're keen to hear about bugs or general feedback.\n\n📝 Share feedback from <b>My Account</b> in the app menu.`;
-}
-
 async function getSampleVoucherImageUrl(
 	ctx: ActionCtx,
 ): Promise<string | null> {
@@ -94,7 +90,6 @@ async function handleNewUser(
 		firstName,
 	});
 	await sendTelegramMessage(chatId, getWelcomeMessage());
-	await sendTelegramMessage(chatId, getBetaMessage());
 	await ctx.runMutation(internal.users.setUserOnboardingStep, {
 		userId: newUser._id,
 		step: 1,
@@ -232,25 +227,24 @@ async function handleImageUpload(
 	}
 }
 
+function getMiniAppUrl(): string {
+	return process.env.MINI_APP_URL ?? "https://openvouchers.org/app";
+}
+
 async function sendHelpMenu(chatId: string) {
 	await sendTelegramMessage(chatId, "Choose an option below", {
 		inline_keyboard: [
 			[
 				{ text: "💰 Balance", callback_data: "help:balance" },
-				{ text: "❓ FAQ", callback_data: "help:faq" },
-			],
-			[
 				{
-					text: "📊 Voucher Availability",
-					callback_data: "help:availability",
+					text: "📱 My Account",
+					web_app: { url: getMiniAppUrl() },
 				},
 			],
 			[
 				{ text: "📸 How to Upload", callback_data: "help:upload" },
 				{ text: "🎫 How to Claim", callback_data: "help:claim" },
 			],
-			[{ text: "📋 View Transactions", callback_data: "help:transactions" }],
-			[{ text: "🆕 View updates", callback_data: "help:updates" }],
 			[{ text: "☕ Donate", callback_data: "help:donate" }],
 		],
 	});
@@ -274,10 +268,6 @@ async function sendFaqMenu(chatId: string) {
 			[{ text: "Back to Help", callback_data: "faq:back" }],
 		],
 	});
-}
-
-function getMiniAppUrl(): string {
-	return process.env.MINI_APP_URL ?? "https://openvouchers.org/app";
 }
 
 async function sendAppWebAppButton(chatId: string) {
@@ -332,7 +322,7 @@ async function handleCommand(
 		return true;
 	}
 
-	if (lowerText === "app") {
+	if (lowerText === "account" || lowerText === "app") {
 		await sendAppWebAppButton(chatId);
 		return true;
 	}
@@ -612,6 +602,7 @@ async function setBotCommands() {
 	const commands = [
 		{ command: "help", description: "Show help menu" },
 		{ command: "balance", description: "Check your coin balance" },
+		{ command: "account", description: "Open My Account" },
 		{ command: "donate", description: "Support the project" },
 	];
 
@@ -633,15 +624,28 @@ async function setBotCommands() {
 		console.error("Network error setting bot commands:", error);
 	}
 
-	const resetMenuUrl = `https://api.telegram.org/bot${token}/setChatMenuButton`;
+	const menuButtonUrl = `https://api.telegram.org/bot${token}/setChatMenuButton`;
 	try {
-		await fetch(resetMenuUrl, {
+		const response = await fetch(menuButtonUrl, {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ menu_button: { type: "default" } }),
+			body: JSON.stringify({
+				menu_button: {
+					type: "web_app",
+					text: "My Account",
+					web_app: { url: getMiniAppUrl() },
+				},
+			}),
 		});
+
+		if (!response.ok) {
+			const errorText = await response.text();
+			console.error("Failed to set chat menu button:", errorText);
+		} else {
+			console.log("Chat menu button set to My Account Mini App");
+		}
 	} catch (error) {
-		console.error("Network error resetting chat menu button:", error);
+		console.error("Network error setting chat menu button:", error);
 	}
 }
 
