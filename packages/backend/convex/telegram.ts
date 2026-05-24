@@ -11,7 +11,6 @@ dayjs.extend(advancedFormat);
 
 type TelegramUserState =
 	| "waiting_for_support_message"
-	| "waiting_for_feedback_message"
 	| "waiting_for_ban_appeal"
 	| "onboarding_tutorial";
 
@@ -69,10 +68,6 @@ function getWelcomeMessage(): string {
 	return "🎉 <b>Welcome to Dunnes Voucher Bot!</b>";
 }
 
-function getBetaMessage(): string {
-	return `👋 <b>We're in beta!</b>\nWe're keen to hear about bugs or general feedback.\n\n📝 To send feedback send <b>feedback [your message]</b>`;
-}
-
 async function getSampleVoucherImageUrl(
 	ctx: ActionCtx,
 ): Promise<string | null> {
@@ -95,7 +90,6 @@ async function handleNewUser(
 		firstName,
 	});
 	await sendTelegramMessage(chatId, getWelcomeMessage());
-	await sendTelegramMessage(chatId, getBetaMessage());
 	await ctx.runMutation(internal.users.setUserOnboardingStep, {
 		userId: newUser._id,
 		step: 1,
@@ -122,21 +116,6 @@ async function handleUserState(
 			await sendTelegramMessage(
 				chatId,
 				"✅ Your support request has been received. We'll review your case and get back to you.",
-			);
-			return true;
-
-		case "waiting_for_feedback_message":
-			await ctx.runMutation(internal.users.submitFeedback, {
-				userId: user._id,
-				text,
-				type: "feedback",
-			});
-			await ctx.runMutation(internal.users.clearUserTelegramState, {
-				userId: user._id,
-			});
-			await sendTelegramMessage(
-				chatId,
-				"✅ Thanks for your feedback! We read every message.",
 			);
 			return true;
 
@@ -248,26 +227,24 @@ async function handleImageUpload(
 	}
 }
 
+function getMiniAppUrl(): string {
+	return process.env.MINI_APP_URL ?? "https://openvouchers.org/app";
+}
+
 async function sendHelpMenu(chatId: string) {
 	await sendTelegramMessage(chatId, "Choose an option below", {
 		inline_keyboard: [
 			[
 				{ text: "💰 Balance", callback_data: "help:balance" },
-				{ text: "❓ FAQ", callback_data: "help:faq" },
-			],
-			[{ text: "💬 Give Feedback", callback_data: "help:feedback" }],
-			[
 				{
-					text: "📊 Voucher Availability",
-					callback_data: "help:availability",
+					text: "📱 My Account",
+					web_app: { url: getMiniAppUrl() },
 				},
 			],
 			[
 				{ text: "📸 How to Upload", callback_data: "help:upload" },
 				{ text: "🎫 How to Claim", callback_data: "help:claim" },
 			],
-			[{ text: "📋 View Transactions", callback_data: "help:transactions" }],
-			[{ text: "🆕 View updates", callback_data: "help:updates" }],
 			[{ text: "☕ Donate", callback_data: "help:donate" }],
 		],
 	});
@@ -293,19 +270,15 @@ async function sendFaqMenu(chatId: string) {
 	});
 }
 
-function getMiniAppUrl(): string {
-	return process.env.MINI_APP_URL ?? "https://openvouchers.org/app";
-}
-
 async function sendAppWebAppButton(chatId: string) {
 	await sendTelegramMessage(
 		chatId,
-		"📋 <b>My Vouchers</b>\n\nView your transactions and voucher availability in the web app.",
+		"📱 <b>My Account</b>\n\nView your balance, transactions, and voucher availability.",
 		{
 			inline_keyboard: [
 				[
 					{
-						text: "📋 Open My Vouchers",
+						text: "📱 Open My Account",
 						web_app: { url: getMiniAppUrl() },
 					},
 				],
@@ -349,36 +322,8 @@ async function handleCommand(
 		return true;
 	}
 
-	if (lowerText === "app") {
+	if (lowerText === "account" || lowerText === "app") {
 		await sendAppWebAppButton(chatId);
-		return true;
-	}
-
-	if (lowerText === "feedback") {
-		await sendTelegramMessage(
-			chatId,
-			"📝 To send feedback, include your message:\n<code>feedback your message here</code>",
-		);
-		return true;
-	}
-
-	if (lowerText.startsWith("feedback ")) {
-		const feedbackText = text.slice(9).trim();
-		if (feedbackText.length > 0) {
-			await ctx.runMutation(internal.users.submitFeedback, {
-				userId: user._id,
-				text: feedbackText,
-			});
-			await sendTelegramMessage(
-				chatId,
-				"✅ Thanks for your feedback! We read every message.",
-			);
-		} else {
-			await sendTelegramMessage(
-				chatId,
-				"⚠️ Please include a message, e.g., 'feedback fix this bug!'",
-			);
-		}
 		return true;
 	}
 
@@ -657,6 +602,7 @@ async function setBotCommands() {
 	const commands = [
 		{ command: "help", description: "Show help menu" },
 		{ command: "balance", description: "Check your coin balance" },
+		{ command: "account", description: "Open My Account" },
 		{ command: "donate", description: "Support the project" },
 	];
 
@@ -678,15 +624,28 @@ async function setBotCommands() {
 		console.error("Network error setting bot commands:", error);
 	}
 
-	const resetMenuUrl = `https://api.telegram.org/bot${token}/setChatMenuButton`;
+	const menuButtonUrl = `https://api.telegram.org/bot${token}/setChatMenuButton`;
 	try {
-		await fetch(resetMenuUrl, {
+		const response = await fetch(menuButtonUrl, {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ menu_button: { type: "default" } }),
+			body: JSON.stringify({
+				menu_button: {
+					type: "web_app",
+					text: "My Account",
+					web_app: { url: getMiniAppUrl() },
+				},
+			}),
 		});
+
+		if (!response.ok) {
+			const errorText = await response.text();
+			console.error("Failed to set chat menu button:", errorText);
+		} else {
+			console.log("Chat menu button set to My Account Mini App");
+		}
 	} catch (error) {
-		console.error("Network error resetting chat menu button:", error);
+		console.error("Network error setting chat menu button:", error);
 	}
 }
 
@@ -831,17 +790,6 @@ export const handleTelegramCallback = internalAction({
 				case "support":
 				case "faq": {
 					await sendFaqMenu(chatId);
-					break;
-				}
-				case "feedback": {
-					await ctx.runMutation(internal.users.setUserTelegramState, {
-						userId: user._id,
-						state: "waiting_for_feedback_message",
-					});
-					await sendTelegramMessage(
-						chatId,
-						"Please reply with your feedback message",
-					);
 					break;
 				}
 				case "availability": {

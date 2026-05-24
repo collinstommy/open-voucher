@@ -139,7 +139,6 @@ export const setUserTelegramState = internalMutation({
 		state: v.optional(
 			v.union(
 				v.literal("waiting_for_support_message"),
-				v.literal("waiting_for_feedback_message"),
 				v.literal("waiting_for_ban_appeal"),
 				v.literal("onboarding_tutorial"),
 			),
