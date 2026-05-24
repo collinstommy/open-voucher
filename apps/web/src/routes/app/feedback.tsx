@@ -7,14 +7,22 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { useUserAuth } from "@/hooks/useUserAuth";
 
+type FeedbackSearch = {
+	draft?: string;
+};
+
 export const Route = createFileRoute("/app/feedback")({
+	validateSearch: (search: Record<string, unknown>): FeedbackSearch => ({
+		draft: typeof search.draft === "string" ? search.draft : undefined,
+	}),
 	component: FeedbackPage,
 });
 
 function FeedbackPage() {
+	const { draft } = Route.useSearch();
 	const { user } = useUserAuth();
 	const convex = useConvex();
-	const [text, setText] = useState("");
+	const [text, setText] = useState(() => draft?.slice(0, 2000) ?? "");
 
 	const submit = useMutation({
 		mutationFn: async (message: string) => {

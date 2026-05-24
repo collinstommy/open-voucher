@@ -25,3 +25,21 @@ export type VoucherType = (typeof VOUCHER_TYPES)[number];
 export const USER_SESSION_DURATION_MS = 365 * 24 * 60 * 60 * 1000; // 1 year
 
 export const USER_SESSION_CLEANUP_BATCH_SIZE = 100;
+
+export const MINI_APP_URL = "https://openvouchers.org/app";
+
+export function miniAppPath(
+	path = "",
+	searchParams?: Record<string, string>,
+): string {
+	const base = path
+		? `${MINI_APP_URL}${path.startsWith("/") ? path : `/${path}`}`
+		: MINI_APP_URL;
+	const url = new URL(base);
+	if (searchParams) {
+		for (const [key, value] of Object.entries(searchParams)) {
+			url.searchParams.set(key, value);
+		}
+	}
+	return url.toString();
+}

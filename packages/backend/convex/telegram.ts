@@ -5,13 +5,12 @@ import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import type { ActionCtx } from "./_generated/server";
 import { internalAction } from "./_generated/server";
-import { UPLOAD_REWARDS } from "./constants";
+import { UPLOAD_REWARDS, miniAppPath } from "./constants";
 
 dayjs.extend(advancedFormat);
 
 type TelegramUserState =
 	| "waiting_for_support_message"
-	| "waiting_for_feedback_message"
 	| "waiting_for_ban_appeal"
 	| "onboarding_tutorial";
 
@@ -70,7 +69,7 @@ function getWelcomeMessage(): string {
 }
 
 function getBetaMessage(): string {
-	return `👋 <b>We're in beta!</b>\nWe're keen to hear about bugs or general feedback.\n\n📝 To send feedback send <b>feedback [your message]</b>`;
+	return `👋 <b>We're in beta!</b>\nWe're keen to hear about bugs or general feedback.\n\n📝 Share feedback from <b>My Account</b> in the app menu.`;
 }
 
 async function getSampleVoucherImageUrl(
@@ -122,21 +121,6 @@ async function handleUserState(
 			await sendTelegramMessage(
 				chatId,
 				"✅ Your support request has been received. We'll review your case and get back to you.",
-			);
-			return true;
-
-		case "waiting_for_feedback_message":
-			await ctx.runMutation(internal.users.submitFeedback, {
-				userId: user._id,
-				text,
-				type: "feedback",
-			});
-			await ctx.runMutation(internal.users.clearUserTelegramState, {
-				userId: user._id,
-			});
-			await sendTelegramMessage(
-				chatId,
-				"✅ Thanks for your feedback! We read every message.",
 			);
 			return true;
 
@@ -255,7 +239,6 @@ async function sendHelpMenu(chatId: string) {
 				{ text: "💰 Balance", callback_data: "help:balance" },
 				{ text: "❓ FAQ", callback_data: "help:faq" },
 			],
-			[{ text: "💬 Give Feedback", callback_data: "help:feedback" }],
 			[
 				{
 					text: "📊 Voucher Availability",
@@ -296,13 +279,13 @@ async function sendFaqMenu(chatId: string) {
 async function sendAppWebAppButton(chatId: string) {
 	await sendTelegramMessage(
 		chatId,
-		"📋 <b>My Vouchers</b>\n\nView your transactions and voucher availability in the web app.",
+		"📱 <b>My Account</b>\n\nView your balance, transactions, and voucher availability.",
 		{
 			inline_keyboard: [
 				[
 					{
-						text: "📋 Open My Vouchers",
-						web_app: { url: "https://openvouchers.org/app" },
+						text: "📱 Open My Account",
+						web_app: { url: miniAppPath("") },
 					},
 				],
 			],
@@ -347,34 +330,6 @@ async function handleCommand(
 
 	if (lowerText === "app") {
 		await sendAppWebAppButton(chatId);
-		return true;
-	}
-
-	if (lowerText === "feedback") {
-		await sendTelegramMessage(
-			chatId,
-			"📝 To send feedback, include your message:\n<code>feedback your message here</code>",
-		);
-		return true;
-	}
-
-	if (lowerText.startsWith("feedback ")) {
-		const feedbackText = text.slice(9).trim();
-		if (feedbackText.length > 0) {
-			await ctx.runMutation(internal.users.submitFeedback, {
-				userId: user._id,
-				text: feedbackText,
-			});
-			await sendTelegramMessage(
-				chatId,
-				"✅ Thanks for your feedback! We read every message.",
-			);
-		} else {
-			await sendTelegramMessage(
-				chatId,
-				"⚠️ Please include a message, e.g., 'feedback fix this bug!'",
-			);
-		}
 		return true;
 	}
 
@@ -827,17 +782,6 @@ export const handleTelegramCallback = internalAction({
 				case "support":
 				case "faq": {
 					await sendFaqMenu(chatId);
-					break;
-				}
-				case "feedback": {
-					await ctx.runMutation(internal.users.setUserTelegramState, {
-						userId: user._id,
-						state: "waiting_for_feedback_message",
-					});
-					await sendTelegramMessage(
-						chatId,
-						"Please reply with your feedback message",
-					);
 					break;
 				}
 				case "availability": {

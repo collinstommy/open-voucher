@@ -96,7 +96,6 @@ describe("Help Command", () => {
 
 		expect(buttonTexts).toContain("💰 Balance");
 		expect(buttonTexts).toContain("❓ FAQ");
-		expect(buttonTexts).toContain("💬 Give Feedback");
 		expect(buttonTexts).toContain("📊 Voucher Availability");
 		expect(buttonTexts).toContain("📸 How to Upload");
 		expect(buttonTexts).toContain("🎫 How to Claim");
@@ -154,22 +153,6 @@ describe("Help Callback Responses", () => {
 
 		expect(buttonTexts).toContain("Can I return/cancel a voucher?");
 		expect(buttonTexts).toContain("Voucher processing failed");
-	});
-
-	test("feedback callback prompts user for feedback message", async () => {
-		const t = convexTest(schema, modules);
-		const chatId = "123456";
-		await createUser(t, { telegramChatId: chatId, coins: 100 });
-
-		await t.action(internal.telegram.handleTelegramCallback, {
-			callbackQuery: createTelegramCallback({ data: "help:feedback", chatId }),
-		});
-
-		const feedbackMsg = sentMessages.find(
-			(m) => m.chatId === chatId && m.text?.toLowerCase().includes("feedback"),
-		);
-		expect(feedbackMsg).toBeDefined();
-		expect(feedbackMsg?.text).toContain("message");
 	});
 
 	test("upload callback shows instruction text on how to upload", async () => {
