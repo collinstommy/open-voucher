@@ -1,9 +1,9 @@
 import { api } from "@open-voucher/backend/convex/_generated/api";
 import type { Id } from "@open-voucher/backend/convex/_generated/dataModel";
-import { useMutation, useQuery } from "convex/react";
+import { useConvex } from "convex/react";
+import { useQuery } from "@tanstack/react-query";
 import { getDeployment } from "@/components/EnvironmentDropdown";
 import { CONVEX_SITE_URLS } from "@/lib/convexConfig";
-import { useEffect, useState, useRef } from "react";
 
 export interface UserSession {
 	_id: Id<"users">;
@@ -24,87 +24,59 @@ function getConvexHttpUrl(): string {
 	return CONVEX_SITE_URLS[deployment] || CONVEX_SITE_URLS.prod;
 }
 
+async function authenticate(convex: ReturnType<typeof useConvex>): Promise<UserSession | null> {
+	const storedToken = localStorage.getItem(getTokenKey());
+	if (storedToken) {
+		const sessionUser = await convex.query(
+			api.auth.validateSession,
+			{ sessionToken: storedToken },
+		);
+		if (sessionUser) {
+			return { ...sessionUser, sessionToken: storedToken };
+		}
+		localStorage.removeItem(getTokenKey());
+	}
+
+	// dev override
+	if (
+		typeof window !== "undefined" &&
+		window.location.hostname === "localhost"
+	) {
+		const result = await convex.mutation(api.auth.devAuth, {});
+		localStorage.setItem(getTokenKey(), result.sessionToken);
+		return { ...result.user, sessionToken: result.sessionToken };
+	}
+
+	const tg = (window as any).Telegram?.WebApp;
+	if (tg?.initData) {
+		const response = await fetch(
+			`${getConvexHttpUrl()}/api/telegram-auth`,
+			{
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ initData: tg.initData }),
+			},
+		);
+		const result = await response.json();
+		if (!response.ok) {
+			throw new Error(result.error || "Authentication failed");
+		}
+		localStorage.setItem(getTokenKey(), result.sessionToken);
+		return { ...result.user, sessionToken: result.sessionToken };
+	}
+
+	return null;
+}
+
 export function useUserAuth() {
-	const [sessionToken, setSessionToken] = useState<string | null>(() => {
-		if (typeof window === "undefined") return null;
-		return localStorage.getItem(getTokenKey());
+	const convex = useConvex();
+
+	const { data: user, isLoading, error } = useQuery({
+		queryKey: ["userAuth", getDeployment()] as const,
+		queryFn: () => authenticate(convex),
+		staleTime: Infinity,
+		retry: false,
 	});
 
-	const [authError, setAuthError] = useState<Error | null>(null);
-	const authRanRef = useRef(false);
-	const storedToken = sessionToken;
-
-	const validateSession = useQuery(
-		api.auth.validateSession,
-		storedToken ? { sessionToken: storedToken } : "skip",
-	);
-
-	const devAuth = useMutation(api.auth.devAuth);
-
-	// One-time auth: only runs if no stored token and auth hasn't been attempted
-	useEffect(() => {
-		if (authRanRef.current || storedToken) return;
-		authRanRef.current = true;
-
-		async function authenticate() {
-			if (
-				typeof window !== "undefined" &&
-				window.location.hostname === "localhost"
-			) {
-				try {
-					const result = await devAuth({});
-					localStorage.setItem(getTokenKey(), result.sessionToken);
-					setSessionToken(result.sessionToken);
-				} catch (e) {
-					setAuthError(e instanceof Error ? e : new Error(String(e)));
-				}
-				return;
-			}
-
-			const tg = (window as any).Telegram?.WebApp;
-			if (tg?.initData) {
-				try {
-					const response = await fetch(
-						`${getConvexHttpUrl()}/api/telegram-auth`,
-						{
-							method: "POST",
-							headers: { "Content-Type": "application/json" },
-							body: JSON.stringify({ initData: tg.initData }),
-						},
-					);
-					const result = await response.json();
-					if (!response.ok) {
-						throw new Error(result.error || "Authentication failed");
-					}
-					localStorage.setItem(getTokenKey(), result.sessionToken);
-					setSessionToken(result.sessionToken);
-				} catch (e) {
-					setAuthError(e instanceof Error ? e : new Error(String(e)));
-				}
-			}
-		}
-
-		authenticate();
-	}, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-	// If stored token is invalid, clear it and allow re-auth attempt
-	useEffect(() => {
-		if (storedToken && validateSession === null) {
-			localStorage.removeItem(getTokenKey());
-			authRanRef.current = false;
-			setSessionToken(null);
-		}
-	}, [storedToken, validateSession]);
-
-	const user: UserSession | null =
-		storedToken && validateSession
-			? { ...validateSession, sessionToken: storedToken }
-			: null;
-
-	// Loading: we have a token that's being validated, OR we have no token but auth hasn't run yet
-	const isLoading =
-		!!storedToken && validateSession === undefined ||
-		(!storedToken && !authRanRef.current);
-
-	return { user, isLoading, error: authError };
+	return { user: user ?? null, isLoading, error };
 }
