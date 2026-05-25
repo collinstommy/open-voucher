@@ -16,6 +16,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppIndexRouteImport } from './routes/app/index'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as AppTransactionsRouteImport } from './routes/app/transactions'
+import { Route as AppMyUploadsRouteImport } from './routes/app/my-uploads'
 import { Route as AppFeedbackRouteImport } from './routes/app/feedback'
 import { Route as AppFaqRouteImport } from './routes/app/faq'
 import { Route as AppAvailabilityRouteImport } from './routes/app/availability'
@@ -63,6 +64,11 @@ const AdminIndexRoute = AdminIndexRouteImport.update({
 const AppTransactionsRoute = AppTransactionsRouteImport.update({
   id: '/transactions',
   path: '/transactions',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppMyUploadsRoute = AppMyUploadsRouteImport.update({
+  id: '/my-uploads',
+  path: '/my-uploads',
   getParentRoute: () => AppRoute,
 } as any)
 const AppFeedbackRoute = AppFeedbackRouteImport.update({
@@ -147,6 +153,7 @@ export interface FileRoutesByFullPath {
   '/app/availability': typeof AppAvailabilityRoute
   '/app/faq': typeof AppFaqRoute
   '/app/feedback': typeof AppFeedbackRoute
+  '/app/my-uploads': typeof AppMyUploadsRoute
   '/app/transactions': typeof AppTransactionsRoute
   '/admin/': typeof AdminIndexRoute
   '/app/': typeof AppIndexRoute
@@ -167,6 +174,7 @@ export interface FileRoutesByTo {
   '/app/availability': typeof AppAvailabilityRoute
   '/app/faq': typeof AppFaqRoute
   '/app/feedback': typeof AppFeedbackRoute
+  '/app/my-uploads': typeof AppMyUploadsRoute
   '/app/transactions': typeof AppTransactionsRoute
   '/admin': typeof AdminIndexRoute
   '/app': typeof AppIndexRoute
@@ -190,6 +198,7 @@ export interface FileRoutesById {
   '/app/availability': typeof AppAvailabilityRoute
   '/app/faq': typeof AppFaqRoute
   '/app/feedback': typeof AppFeedbackRoute
+  '/app/my-uploads': typeof AppMyUploadsRoute
   '/app/transactions': typeof AppTransactionsRoute
   '/admin/': typeof AdminIndexRoute
   '/app/': typeof AppIndexRoute
@@ -214,6 +223,7 @@ export interface FileRouteTypes {
     | '/app/availability'
     | '/app/faq'
     | '/app/feedback'
+    | '/app/my-uploads'
     | '/app/transactions'
     | '/admin/'
     | '/app/'
@@ -234,6 +244,7 @@ export interface FileRouteTypes {
     | '/app/availability'
     | '/app/faq'
     | '/app/feedback'
+    | '/app/my-uploads'
     | '/app/transactions'
     | '/admin'
     | '/app'
@@ -256,6 +267,7 @@ export interface FileRouteTypes {
     | '/app/availability'
     | '/app/faq'
     | '/app/feedback'
+    | '/app/my-uploads'
     | '/app/transactions'
     | '/admin/'
     | '/app/'
@@ -319,6 +331,13 @@ declare module '@tanstack/react-router' {
       path: '/transactions'
       fullPath: '/app/transactions'
       preLoaderRoute: typeof AppTransactionsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/my-uploads': {
+      id: '/app/my-uploads'
+      path: '/my-uploads'
+      fullPath: '/app/my-uploads'
+      preLoaderRoute: typeof AppMyUploadsRouteImport
       parentRoute: typeof AppRoute
     }
     '/app/feedback': {
@@ -449,6 +468,7 @@ interface AppRouteChildren {
   AppAvailabilityRoute: typeof AppAvailabilityRoute
   AppFaqRoute: typeof AppFaqRoute
   AppFeedbackRoute: typeof AppFeedbackRoute
+  AppMyUploadsRoute: typeof AppMyUploadsRoute
   AppTransactionsRoute: typeof AppTransactionsRoute
   AppIndexRoute: typeof AppIndexRoute
 }
@@ -457,6 +477,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppAvailabilityRoute: AppAvailabilityRoute,
   AppFaqRoute: AppFaqRoute,
   AppFeedbackRoute: AppFeedbackRoute,
+  AppMyUploadsRoute: AppMyUploadsRoute,
   AppTransactionsRoute: AppTransactionsRoute,
   AppIndexRoute: AppIndexRoute,
 }

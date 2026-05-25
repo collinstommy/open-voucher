@@ -7,7 +7,7 @@ import {
 	internalQuery,
 	type QueryCtx,
 } from "./_generated/server";
-import { userQuery } from "./auth";
+import { userMutation, userQuery } from "./auth";
 import { CLAIM_COSTS, MIN_COINS, UPLOAD_REWARDS } from "./constants";
 
 export const getVoucherByBarcode = internalQuery({
@@ -556,6 +556,66 @@ export const getAvailableVoucherCount = internalQuery({
 export const getVoucherAvailability = userQuery({
 	args: {},
 	handler: async (ctx, { userId: _userId }) => countAvailableVouchersByType(ctx),
+});
+
+export const getMyAvailableUploads = userQuery({
+	args: {},
+	handler: async (ctx, { userId }) => {
+		const vouchers = await ctx.db
+			.query("vouchers")
+			.withIndex("by_uploader_created", (q) => q.eq("uploaderId", userId))
+			.order("desc")
+			.collect();
+
+		const filtered = vouchers.filter((v) =>
+			v.status === "available" || v.status === "invalidated"
+		);
+
+		return await Promise.all(
+			filtered.map(async (v) => ({
+				_id: v._id,
+				type: v.type,
+				status: v.status,
+				barcodeNumber: v.barcodeNumber,
+				expiryDate: v.expiryDate,
+				createdAt: v.createdAt,
+				imageUrl: await ctx.storage.getUrl(v.imageStorageId),
+				coinValue: UPLOAD_REWARDS[v.type] ?? 0,
+			})),
+		);
+	},
+});
+
+export const invalidateMyUpload = userMutation({
+	args: {
+		voucherId: v.id("vouchers"),
+	},
+	handler: async (ctx, { userId, voucherId }) => {
+		const voucher = await ctx.db.get(voucherId);
+		if (!voucher) throw new Error("Voucher not found");
+		if (voucher.uploaderId !== userId)
+			throw new Error("You can only invalidate your own vouchers");
+		if (voucher.status !== "available")
+			throw new Error("This voucher has already been claimed");
+
+		await ctx.db.patch(voucherId, { status: "invalidated" });
+
+		const user = await ctx.db.get(userId);
+		const deduction = UPLOAD_REWARDS[voucher.type] || 0;
+		const newCoins = Math.max(MIN_COINS, (user?.coins ?? 0) - deduction);
+
+		await ctx.db.patch(userId, { coins: newCoins });
+
+		await ctx.db.insert("transactions", {
+			userId,
+			type: "self_invalidated",
+			amount: -deduction,
+			voucherId,
+			createdAt: Date.now(),
+		});
+
+		return { success: true, deduction, newCoins };
+	},
 });
 
 export const getVoucherForUploaderConfirm = internalQuery({

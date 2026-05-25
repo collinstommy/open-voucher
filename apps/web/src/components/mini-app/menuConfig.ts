@@ -1,5 +1,6 @@
 export type MenuItemId =
 	| "availability"
+	| "my-uploads"
 	| "transactions"
 	| "faq"
 	| "feedback"
@@ -18,6 +19,30 @@ export type MenuItem = {
 
 export const MENU_ITEMS: MenuItem[] = [
 	{
+		id: "my-uploads",
+		label: "My Uploads",
+		description: "Remove vouchers you've used",
+		href: "/app/my-uploads",
+		icon: "🔄",
+		iconClass: "bg-red-100 text-red-600",
+	},
+	{
+		id: "transactions",
+		label: "Transactions",
+		description: "Earned and spent coins",
+		href: "/app/transactions",
+		icon: "📋",
+		iconClass: "bg-green-100 text-green-600",
+	},
+	{
+		id: "donate",
+		label: "Donate",
+		description: "buymeacoffee.com/openvouchers",
+		external: true,
+		icon: "☕",
+		iconClass: "bg-yellow-100 text-yellow-600",
+	},
+	{
 		id: "availability",
 		label: "Voucher availability",
 		description: "€5 · €10 · €20 stock levels",
@@ -34,14 +59,6 @@ export const MENU_ITEMS: MenuItem[] = [
 		iconClass: "bg-blue-100 text-blue-600",
 	},
 	{
-		id: "transactions",
-		label: "Transactions",
-		description: "Earned and spent coins",
-		href: "/app/transactions",
-		icon: "📋",
-		iconClass: "bg-green-100 text-green-600",
-	},
-	{
 		id: "faq",
 		label: "FAQ",
 		description: "How the community works",
@@ -56,13 +73,5 @@ export const MENU_ITEMS: MenuItem[] = [
 		href: "/app/feedback",
 		icon: "💬",
 		iconClass: "bg-orange-100 text-orange-600",
-	},
-	{
-		id: "donate",
-		label: "Donate",
-		description: "buymeacoffee.com/openvouchers",
-		external: true,
-		icon: "☕",
-		iconClass: "bg-yellow-100 text-yellow-600",
 	},
 ];
