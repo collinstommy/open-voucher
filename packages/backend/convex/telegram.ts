@@ -246,7 +246,8 @@ async function sendHelpMenu(chatId: string) {
 				{ text: "📸 How to Upload", callback_data: "help:upload" },
 				{ text: "🎫 How to Claim", callback_data: "help:claim" },
 			],
-			[{ text: "☕ Donate", callback_data: "help:donate" }],
+			[{ text: "🔗 Share Bot", callback_data: "help:share" }],
+		[{ text: "☕ Donate", callback_data: "help:donate" }],
 		],
 	});
 }
@@ -325,6 +326,14 @@ async function handleCommand(
 
 	if (lowerText === "account" || lowerText === "app") {
 		await sendAppWebAppButton(chatId);
+		return true;
+	}
+
+	if (lowerText === "share") {
+		await sendTelegramMessage(
+			chatId,
+			"🔗 Swap and share Dunnes Stores vouchers:\nhttps://openvouchers.org/telegram\n\nNew users get a <b>10-coin welcome bonus</b>!",
+		);
 		return true;
 	}
 
@@ -610,6 +619,7 @@ async function setBotCommands() {
 	const commands = [
 		{ command: "help", description: "Show help menu" },
 		{ command: "balance", description: "Check your coin balance" },
+		{ command: "share", description: "Share the bot with friends" },
 		{ command: "account", description: "Open My Account" },
 		{ command: "donate", description: "Support the project" },
 	];
@@ -885,6 +895,13 @@ export const handleTelegramCallback = internalAction({
 					await sendTelegramMessage(
 						chatId,
 						"☕ <b>Support Open Vouchers</b>\n\nThe service is free, but servers and AI-powered OCR aren't. Your support helps keep the lights on!\n\nhttps://buymeacoffee.com/openvouchers",
+					);
+					break;
+				}
+				case "share": {
+					await sendTelegramMessage(
+						chatId,
+						"🔗 Swap and share Dunnes Storesvouchers:\nhttps://openvouchers.org/telegram\n\nNew users get a <b>10-coin welcome bonus</b>!",
 					);
 					break;
 				}

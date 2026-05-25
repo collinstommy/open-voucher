@@ -3,6 +3,7 @@ export type MenuItemId =
 	| "transactions"
 	| "faq"
 	| "feedback"
+	| "share"
 	| "donate";
 
 export type MenuItem = {
@@ -23,6 +24,14 @@ export const MENU_ITEMS: MenuItem[] = [
 		href: "/app/availability",
 		icon: "📊",
 		iconClass: "bg-pink-100 text-pink-600",
+	},
+	{
+		id: "share",
+		label: "Share with friends",
+		description: "openvouchers.org/telegram",
+		external: true,
+		icon: "🔗",
+		iconClass: "bg-blue-100 text-blue-600",
 	},
 	{
 		id: "transactions",

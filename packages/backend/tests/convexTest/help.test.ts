@@ -98,6 +98,7 @@ describe("Help Command", () => {
 		expect(buttonTexts).toContain("📱 My Account");
 		expect(buttonTexts).toContain("📸 How to Upload");
 		expect(buttonTexts).toContain("🎫 How to Claim");
+		expect(buttonTexts).toContain("🔗 Share Bot");
 		expect(buttonTexts).toContain("☕ Donate");
 		expect(buttonTexts).not.toContain("❓ FAQ");
 		expect(buttonTexts).not.toContain("📊 Voucher Availability");

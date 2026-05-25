@@ -17,6 +17,7 @@ export const MESSAGE_INTENTS = [
 	"faq",
 	"donate",
 	"app",
+	"share",
 	"feedback",
 	"feedback_with_text",
 	"state_support",
@@ -49,6 +50,7 @@ export const INTENT_LABELS: Record<MessageIntent, string> = {
 	faq: "FAQ",
 	donate: "Donate",
 	app: "App",
+	share: "Share",
 	feedback: "Feedback",
 	feedback_with_text: "Feedback (with text)",
 	state_support: "Support flow",
@@ -69,6 +71,7 @@ export const DASHBOARD_INTENTS: MessageIntent[] = [
 	"faq",
 	"donate",
 	"app",
+	"share",
 	"feedback",
 	"feedback_with_text",
 	"image",
@@ -121,6 +124,9 @@ export function classifyInboundMessage(args: {
 	}
 	if (lowerText === "app") {
 		return "app";
+	}
+	if (lowerText === "share") {
+		return "share";
 	}
 	if (lowerText === "feedback") {
 		return "feedback";

@@ -4,12 +4,18 @@ import { MENU_ITEMS } from "@/components/mini-app/menuConfig";
 import { useUserAuth } from "@/hooks/useUserAuth";
 import { openDonateLink } from "@/lib/openDonateLink";
 import { createFileRoute } from "@tanstack/react-router";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/app/")({
 	component: AppHome,
 });
 
 function AppHome() {
+	const handleShare = () => {
+		navigator.clipboard.writeText("https://openvouchers.org/telegram");
+		toast.success("Link copied!");
+	};
+
 	const { user } = useUserAuth();
 	if (!user) return null;
 
@@ -21,7 +27,9 @@ function AppHome() {
 				<MenuRow
 					key={item.id}
 					item={item}
-					onExternalClick={openDonateLink}
+					onExternalClick={
+						item.id === "share" ? handleShare : openDonateLink
+					}
 				/>
 			))}
 			</div>
