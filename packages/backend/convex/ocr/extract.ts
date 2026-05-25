@@ -310,6 +310,8 @@ We are ONLY looking for specific Dunnes Stores vouchers (Ireland) of these exact
 
 Any other voucher type (e.g. "€1 off", "€3 off", product specific, or from other stores) is INVALID.
 
+Images without a visible scannable 1D barcode are NOT acceptable, even if a barcode number is visible (e.g. mobile wallet screenshots).
+
 Three+ vouchers are special: they are issued by Three mobile and say "with Three+" or "Three+" on them. They typically only have an expiry date ("valid until X") and NO start date. These ARE valid €5 off €25 vouchers and should return type "5".
 
 The date on the voucher is relative to the voucher issue date of ${currentYear}.
@@ -327,13 +329,26 @@ Extract ONLY the day and month numbers from the voucher validity range:
 4. **expiryDay**: Day of month for the END of validity range (e.g., "Valid 30 Dec - 5 Jan" → 5, "17/02/26" → 17, "valid until 31st March" → 31)
 5. **expiryMonth**: Month number for the END of validity range (e.g., "Valid 30 Dec - 5 Jan" → 1, "17/02/26" → 2 for February, "valid until 31st March" → 3)
 6. **expiryYear**: If the image shows a full date with year (e.g., "11/02/26"), extract the full year as 2026. Otherwise leave as null.
-7. **barcode**: The number below the barcode.
+7. **barcode**: The numeric code printed directly below a visible 1D barcode (vertical black/white stripes) that a cashier can scan at checkout.
+
+BARCODE REQUIREMENTS (all must be true to return a barcode value):
+- You must see the actual scannable barcode graphic (stripes), not only digits.
+- The number must be the one printed immediately below that barcode graphic.
+
+Return barcode: null if ANY of these apply:
+- Only a barcode number is shown with no barcode stripes (e.g. Dunnes Wallet / app "Vouchers" tab that shows digits but no barcode image).
+- The image is a wallet/app UI card with offer text and a code, but no scannable barcode.
+- The barcode is cropped, blurred, or too small to scan.
+- You cannot clearly read both the stripes and the number below them.
+
+Do NOT treat a standalone voucher code, reference number, or wallet ID as a barcode if there is no barcode graphic in the image.
+
 8. **isThreePlus**: true if this is a Three+ voucher (says "Three+" or "with Three+"), false otherwise.
 
 Return ONLY JSON:
 {"type": "10", "validFromDay": 11, "validFromMonth": 2, "expiryDay": 17, "expiryMonth": 2, "expiryYear": 2026, "barcode": "1234567890", "isThreePlus": false}
 
-If barcode is missing: null.
+If barcode is missing or not scannable: null.
 If type is unknown or invalid: "0".
 If any date field is unknown: null.
 If the voucher only has "valid until" with no start date: set validFromDay and validFromMonth to null.`;
