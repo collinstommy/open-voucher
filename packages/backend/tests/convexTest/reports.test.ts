@@ -122,13 +122,23 @@ describe("Report Flow", () => {
 			claimedAt: Date.now(),
 		});
 
-		// Report the voucher
+		// Report the voucher — should return "reported" (replacement is opt-in now)
 		const result = await t.mutation(internal.vouchers.reportVoucher, {
 			userId: claimerId,
 			voucherId,
 		});
 
-		expect(result.status).toBe("refunded");
+		expect(result.status).toBe("reported");
+
+		const replacementResult = await t.mutation(
+			internal.vouchers.requestReplacement,
+			{
+				userId: claimerId,
+				originalVoucherId: voucherId,
+			},
+		);
+
+		expect(replacementResult.status).toBe("refunded");
 
 		// Check claimer got coins back
 		const claimer = await t.run(async (ctx) => {
@@ -340,7 +350,7 @@ describe("Ban Flow Tests", () => {
 			voucherId: voucherIds[3],
 		});
 
-		expect(result4.status).toBe("refunded");
+		expect(result4.status).toBe("reported");
 
 		await t.finishAllScheduledFunctions(vi.runAllTimers);
 

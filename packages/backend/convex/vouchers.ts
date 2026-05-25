@@ -206,6 +206,21 @@ export const refundFailedClaimDelivery = internalMutation({
 	},
 });
 
+export const checkExistingReport = internalQuery({
+	args: {
+		userId: v.id("users"),
+		voucherId: v.id("vouchers"),
+	},
+	handler: async (ctx, { userId, voucherId }) => {
+		const existing = await ctx.db
+			.query("reports")
+			.withIndex("by_voucher", (q) => q.eq("voucherId", voucherId))
+			.filter((q) => q.eq(q.field("reporterId"), userId))
+			.first();
+		return existing !== null;
+	},
+});
+
 export const reportVoucher = internalMutation({
 	args: {
 		userId: v.id("users"),
@@ -403,11 +418,37 @@ export const reportVoucher = internalMutation({
 			}
 		}
 
-		// Find replacement of same type
+		return {
+			status: "reported",
+			reportId: reportId,
+			message:
+				"Report received. You can request a replacement voucher if you need one.",
+		};
+	},
+});
+
+export const requestReplacement = internalMutation({
+	args: {
+		userId: v.id("users"),
+		originalVoucherId: v.id("vouchers"),
+	},
+	handler: async (ctx, { userId, originalVoucherId }) => {
+		const originalVoucher = await ctx.db.get(originalVoucherId);
+		if (!originalVoucher) {
+			return { status: "not_found" };
+		}
+
+		const user = await ctx.db.get(userId);
+		if (!user) {
+			return { status: "not_found" };
+		}
+
+		const now = Date.now();
+
 		const replacement = await ctx.db
 			.query("vouchers")
 			.withIndex("by_status_type", (q) =>
-				q.eq("status", "available").eq("type", voucher.type),
+				q.eq("status", "available").eq("type", originalVoucher.type),
 			)
 			.filter((q) =>
 				q.or(
@@ -417,48 +458,53 @@ export const reportVoucher = internalMutation({
 			)
 			.first();
 
-		if (replacement) {
-			const imageUrl = await ctx.storage.getUrl(replacement.imageStorageId);
-			if (!imageUrl) {
-				// Edge case: image missing. Refund coins.
-				await ctx.db.patch(user._id, {
-					coins: user.coins + CLAIM_COSTS[voucher.type],
-				});
-				return {
-					status: "refunded",
-					message: "Replacement found but image missing. Coins refunded.",
-				};
-			}
-
-			await ctx.db.patch(replacement._id, {
-				status: "claimed",
-				claimerId: user._id,
-				claimedAt: Date.now(),
-			});
-
+		if (!replacement) {
 			await ctx.db.patch(user._id, {
-				claimCount: (user.claimCount || 0) + 1,
+				coins: user.coins + CLAIM_COSTS[originalVoucher.type],
 			});
+			return { status: "refunded" };
+		}
 
-			// Link replacement to report
-			if (reportId) {
-				await ctx.db.patch(reportId, { replacementVoucherId: replacement._id });
-			}
-
+		const imageUrl = await ctx.storage.getUrl(replacement.imageStorageId);
+		if (!imageUrl) {
+			await ctx.db.patch(user._id, {
+				coins: user.coins + CLAIM_COSTS[originalVoucher.type],
+			});
 			return {
-				status: "replaced",
-				voucher: {
-					_id: replacement._id,
-					type: replacement.type,
-					imageUrl,
-					expiryDate: replacement.expiryDate,
-				},
+				status: "refunded",
+				message: "Replacement found but image missing. Coins refunded.",
 			};
 		}
-		await ctx.db.patch(user._id, {
-			coins: user.coins + CLAIM_COSTS[voucher.type],
+
+		await ctx.db.patch(replacement._id, {
+			status: "claimed",
+			claimerId: user._id,
+			claimedAt: now,
 		});
-		return { status: "refunded" };
+
+		await ctx.db.patch(user._id, {
+			claimCount: (user.claimCount || 0) + 1,
+		});
+
+		const report = await ctx.db
+			.query("reports")
+			.withIndex("by_voucher", (q) => q.eq("voucherId", originalVoucherId))
+			.first();
+		if (report) {
+			await ctx.db.patch(report._id, {
+				replacementVoucherId: replacement._id,
+			});
+		}
+
+		return {
+			status: "replaced",
+			voucher: {
+				_id: replacement._id,
+				type: replacement.type,
+				imageUrl,
+				expiryDate: replacement.expiryDate,
+			},
+		};
 	},
 });
 

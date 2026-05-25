@@ -716,7 +716,54 @@ export const handleTelegramCallback = internalAction({
 				await sendTelegramMessage(chatId, `⏰ ${result.message}`);
 			} else if (result.status === "already_reported") {
 				await sendTelegramMessage(chatId, `⚠️ ${result.message}`);
-			} else if (result.status === "replaced" && result.voucher) {
+			} else if (result.status === "reported") {
+				await sendTelegramMessage(
+					chatId,
+					"✅ Report received.\n\nDo you want a replacement voucher?",
+					{
+						inline_keyboard: [
+							[
+								{
+									text: "✅ Yes, send a replacement",
+									callback_data: `report:replacement:yes:${voucherId}`,
+								},
+							],
+							[
+								{
+									text: "❌ No thanks",
+									callback_data: `report:replacement:no:${voucherId}`,
+								},
+							],
+						],
+					},
+				);
+			}
+		} else if (data.startsWith("report:replacement:yes:")) {
+			const voucherId = data.split(":")[3];
+
+			await answerTelegramCallback(callbackQuery.id);
+			await editTelegramMessageText(
+				chatId,
+				callbackQuery.message.message_id,
+				callbackQuery.message.text,
+			);
+
+			const user = await ctx.runQuery(internal.users.getUserByTelegramChatId, {
+				telegramChatId: telegramUserId,
+			});
+			if (!user) {
+				return;
+			}
+
+			const result = await ctx.runMutation(
+				internal.vouchers.requestReplacement,
+				{
+					userId: user._id,
+					originalVoucherId: voucherId as Id<"vouchers">,
+				},
+			);
+
+			if (result.status === "replaced" && result.voucher) {
 				await sendTelegramPhoto(
 					chatId,
 					result.voucher.imageUrl,
@@ -732,14 +779,23 @@ export const handleTelegramCallback = internalAction({
 						],
 					},
 				);
-			} else if (result.status === "refunded") {
+			} else {
 				await sendTelegramMessage(
 					chatId,
 					"⚠️ No replacement vouchers available. Your coins have been refunded.",
 				);
-			} else if (result.status === "reported") {
-				await sendTelegramMessage(chatId, "✅ Report received.");
 			}
+		} else if (data.startsWith("report:replacement:no:")) {
+			await answerTelegramCallback(callbackQuery.id);
+			await editTelegramMessageText(
+				chatId,
+				callbackQuery.message.message_id,
+				callbackQuery.message.text,
+			);
+			await sendTelegramMessage(
+				chatId,
+				"✅ No replacement needed. Thank you for reporting!",
+			);
 		} else if (data.startsWith("report:cancel:")) {
 			await editTelegramMessageText(
 				chatId,
@@ -778,9 +834,24 @@ export const handleTelegramCallback = internalAction({
 				return;
 			}
 
+			const existingReport = await ctx.runQuery(
+				internal.vouchers.checkExistingReport,
+				{
+					userId: user._id,
+					voucherId: voucherId as Id<"vouchers">,
+				},
+			);
+			if (existingReport) {
+				await sendTelegramMessage(
+					chatId,
+					"⚠️ You have already reported this voucher.",
+				);
+				return;
+			}
+
 			await sendTelegramMessage(
 				chatId,
-				"⚠️ <b>Report this voucher as not working?</b>\n\nA replacement voucher will be sent if available. If not, your coins will be refunded.",
+				"⚠️ <b>Report this voucher as not working?</b>\n\nYou can request a replacement voucher if you need one.",
 				{
 					inline_keyboard: [
 						[{ text: "✅ Yes", callback_data: `report:confirm:${voucherId}` }],
