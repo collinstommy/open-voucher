@@ -20,6 +20,7 @@ import { Route as AppFaqRouteImport } from './routes/app/faq'
 import { Route as AppAvailabilityRouteImport } from './routes/app/availability'
 import { Route as AdminVouchersRouteImport } from './routes/admin/vouchers'
 import { Route as AdminSettingsRouteImport } from './routes/admin/settings'
+import { Route as AdminMessagesRouteImport } from './routes/admin/messages'
 import { Route as AdminHealthCheckRouteImport } from './routes/admin/health-check'
 import { Route as AdminFeedbackRouteImport } from './routes/admin/feedback'
 import { Route as AdminFailedUploadsRouteImport } from './routes/admin/failed-uploads'
@@ -83,6 +84,11 @@ const AdminSettingsRoute = AdminSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminMessagesRoute = AdminMessagesRouteImport.update({
+  id: '/messages',
+  path: '/messages',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminHealthCheckRoute = AdminHealthCheckRouteImport.update({
   id: '/health-check',
   path: '/health-check',
@@ -128,6 +134,7 @@ export interface FileRoutesByFullPath {
   '/admin/failed-uploads': typeof AdminFailedUploadsRoute
   '/admin/feedback': typeof AdminFeedbackRoute
   '/admin/health-check': typeof AdminHealthCheckRoute
+  '/admin/messages': typeof AdminMessagesRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/vouchers': typeof AdminVouchersRoute
   '/app/availability': typeof AppAvailabilityRoute
@@ -146,6 +153,7 @@ export interface FileRoutesByTo {
   '/admin/failed-uploads': typeof AdminFailedUploadsRoute
   '/admin/feedback': typeof AdminFeedbackRoute
   '/admin/health-check': typeof AdminHealthCheckRoute
+  '/admin/messages': typeof AdminMessagesRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/vouchers': typeof AdminVouchersRoute
   '/app/availability': typeof AppAvailabilityRoute
@@ -167,6 +175,7 @@ export interface FileRoutesById {
   '/admin/failed-uploads': typeof AdminFailedUploadsRoute
   '/admin/feedback': typeof AdminFeedbackRoute
   '/admin/health-check': typeof AdminHealthCheckRoute
+  '/admin/messages': typeof AdminMessagesRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/vouchers': typeof AdminVouchersRoute
   '/app/availability': typeof AppAvailabilityRoute
@@ -189,6 +198,7 @@ export interface FileRouteTypes {
     | '/admin/failed-uploads'
     | '/admin/feedback'
     | '/admin/health-check'
+    | '/admin/messages'
     | '/admin/settings'
     | '/admin/vouchers'
     | '/app/availability'
@@ -207,6 +217,7 @@ export interface FileRouteTypes {
     | '/admin/failed-uploads'
     | '/admin/feedback'
     | '/admin/health-check'
+    | '/admin/messages'
     | '/admin/settings'
     | '/admin/vouchers'
     | '/app/availability'
@@ -227,6 +238,7 @@ export interface FileRouteTypes {
     | '/admin/failed-uploads'
     | '/admin/feedback'
     | '/admin/health-check'
+    | '/admin/messages'
     | '/admin/settings'
     | '/admin/vouchers'
     | '/app/availability'
@@ -324,6 +336,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminSettingsRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/messages': {
+      id: '/admin/messages'
+      path: '/messages'
+      fullPath: '/admin/messages'
+      preLoaderRoute: typeof AdminMessagesRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/health-check': {
       id: '/admin/health-check'
       path: '/health-check'
@@ -382,6 +401,7 @@ interface AdminRouteChildren {
   AdminFailedUploadsRoute: typeof AdminFailedUploadsRoute
   AdminFeedbackRoute: typeof AdminFeedbackRoute
   AdminHealthCheckRoute: typeof AdminHealthCheckRoute
+  AdminMessagesRoute: typeof AdminMessagesRoute
   AdminSettingsRoute: typeof AdminSettingsRoute
   AdminVouchersRoute: typeof AdminVouchersRoute
   AdminIndexRoute: typeof AdminIndexRoute
@@ -395,6 +415,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminFailedUploadsRoute: AdminFailedUploadsRoute,
   AdminFeedbackRoute: AdminFeedbackRoute,
   AdminHealthCheckRoute: AdminHealthCheckRoute,
+  AdminMessagesRoute: AdminMessagesRoute,
   AdminSettingsRoute: AdminSettingsRoute,
   AdminVouchersRoute: AdminVouchersRoute,
   AdminIndexRoute: AdminIndexRoute,
