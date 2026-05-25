@@ -38,11 +38,6 @@ export const Route = createRootRouteWithContext<RouterAppContext>()({
 				href: appCss,
 			},
 		],
-		scripts: [
-			{
-				src: "https://telegram.org/js/telegram-web-app.js",
-			},
-		],
 	}),
 
 	component: RootDocument,
@@ -50,11 +45,11 @@ export const Route = createRootRouteWithContext<RouterAppContext>()({
 
 function RootDocument() {
 	return (
-		<html lang="en" className="dark">
+		<html lang="en" className="dark" suppressHydrationWarning>
 			<head>
 				<HeadContent />
 			</head>
-			<body>
+			<body suppressHydrationWarning>
 				<Outlet />
 				<Toaster richColors />
 				<TanStackRouterDevtools position="bottom-left" />

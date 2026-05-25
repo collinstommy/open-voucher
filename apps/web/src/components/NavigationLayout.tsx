@@ -63,6 +63,12 @@ export function NavigationLayout() {
 					Feedback
 				</Link>
 				<Link
+					to="/admin/messages"
+					className="text-muted-foreground hover:text-foreground"
+				>
+					Messages
+				</Link>
+				<Link
 					to="/admin/banned"
 					className="text-muted-foreground hover:text-foreground"
 				>

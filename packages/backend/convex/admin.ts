@@ -8,6 +8,7 @@ import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import type { ActionCtx, QueryCtx } from "./_generated/server";
 import { MIN_COINS, UPLOAD_REWARDS, CLAIM_COSTS } from "./constants";
+import { buildMessageAnalytics } from "./lib/messageAnalytics";
 import {
 	action,
 	internalAction,
@@ -347,6 +348,15 @@ export const getUsersWithStats = adminQuery({
 		}));
 
 		return { users: usersWithStats };
+	},
+});
+
+export const getMessageAnalytics = adminQuery({
+	args: {
+		since: v.optional(v.number()),
+	},
+	handler: async (ctx, { since }) => {
+		return await buildMessageAnalytics(ctx, since);
 	},
 });
 

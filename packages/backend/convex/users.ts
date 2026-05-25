@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { internalMutation, internalQuery, query } from "./_generated/server";
 import { SIGNUP_BONUS } from "./constants";
 import { userMutation, userQuery } from "./auth";
+import { messageIntentValidator } from "./lib/messageIntent";
 
 /**
  * Create a new user.
@@ -96,6 +97,7 @@ export const storeMessage = internalMutation({
 		text: v.optional(v.string()),
 		mediaGroupId: v.optional(v.string()),
 		imageStorageId: v.optional(v.id("_storage")),
+		intent: v.optional(messageIntentValidator),
 	},
 	handler: async (ctx, args) => {
 		return await ctx.db.insert("messages", {

@@ -47,8 +47,12 @@ export default defineSchema({
 		mediaGroupId: v.optional(v.string()),
 		imageStorageId: v.optional(v.id("_storage")),
 		isAdminMessage: v.optional(v.boolean()),
+		// Stored as string; validated on write via messageIntentValidator in mutations.
+		intent: v.optional(v.string()),
 		createdAt: v.number(),
-	}).index("by_admin_message", ["isAdminMessage", "telegramChatId"]),
+	})
+		.index("by_admin_message", ["isAdminMessage", "telegramChatId"])
+		.index("by_direction", ["direction"]),
 
 	vouchers: defineTable({
 		type: v.union(

@@ -172,7 +172,7 @@ function HomeComponent() {
 					<select
 						value={range}
 						onChange={(e) => setRange(e.target.value as "all" | "30days")}
-						className="rounded-md border bg-background px-3 py-1 text-sm"
+						className="rounded-md border border-input bg-background px-3 py-1 text-foreground text-sm"
 					>
 						<option value="30days">Last 30 Days</option>
 						<option value="all">All Time</option>

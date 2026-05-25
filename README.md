@@ -178,6 +178,28 @@ To set up the sample voucher image shown to users:
 
 ## Admin CLI Tools
 
+### Message analytics
+
+Classify and analyze inbound Telegram messages (known commands vs free text).
+
+**Backfill intent tags** on existing messages (run after deploy):
+
+```bash
+bunx convex run messages:backfillMessageIntents
+```
+
+**Export unknown / free-text messages** for analysis:
+
+```bash
+# All unknown messages (all time)
+bunx convex run messages:getUnknownInboundMessages
+
+# Last 30 days only
+bunx convex run messages:getUnknownInboundMessages --args '{"since": 1735689600000}'
+```
+
+View counts and browse unknown messages in the admin UI under **Messages** (`/admin/messages`).
+
 ## Backups
 
 Daily backups of Convex table data and file storage (voucher images) can be run locally via the included backup script.

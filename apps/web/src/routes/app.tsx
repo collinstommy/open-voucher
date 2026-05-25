@@ -3,6 +3,13 @@ import { useUserAuth } from "@/hooks/useUserAuth";
 import { Outlet, createFileRoute } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/app")({
+	head: () => ({
+		scripts: [
+			{
+				src: "https://telegram.org/js/telegram-web-app.js",
+			},
+		],
+	}),
 	component: AppLayout,
 });
 

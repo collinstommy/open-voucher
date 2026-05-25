@@ -6,6 +6,7 @@ import type { Id } from "./_generated/dataModel";
 import type { ActionCtx } from "./_generated/server";
 import { internalAction } from "./_generated/server";
 import { UPLOAD_REWARDS } from "./constants";
+import { classifyInboundMessage } from "./lib/messageIntent";
 
 dayjs.extend(advancedFormat);
 
@@ -401,6 +402,16 @@ export const handleTelegramMessage = internalAction({
 		const isImage = !!message.photo;
 		const mediaGroupId = message.media_group_id;
 
+		const user = await ctx.runQuery(internal.users.getUserByTelegramChatId, {
+			telegramChatId: chatId,
+		});
+
+		const intent = classifyInboundMessage({
+			text,
+			messageType: isImage ? "image" : "text",
+			userState: user?.telegramState,
+		});
+
 		// 1. Idempotency Check & Storage
 		const messageDbId = (await ctx.runMutation(internal.users.storeMessage, {
 			telegramMessageId: messageId,
@@ -410,16 +421,13 @@ export const handleTelegramMessage = internalAction({
 			text: text,
 			mediaGroupId,
 			imageStorageId: undefined,
+			intent,
 		})) as Id<"messages"> | null;
 
 		if (!messageDbId) {
 			console.log(`Duplicate message ${messageId} from ${chatId}, ignoring.`);
 			return;
 		}
-
-		const user = await ctx.runQuery(internal.users.getUserByTelegramChatId, {
-			telegramChatId: chatId,
-		});
 
 		if (!user) {
 			await handleNewUser(ctx, chatId, username, firstName);
