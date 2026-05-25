@@ -1,6 +1,7 @@
 export type MenuItemId =
 	| "availability"
 	| "my-uploads"
+	| "my-claims"
 	| "transactions"
 	| "faq"
 	| "feedback"
@@ -21,10 +22,18 @@ export const MENU_ITEMS: MenuItem[] = [
 	{
 		id: "my-uploads",
 		label: "My Uploads",
-		description: "Remove vouchers you've used",
+		description: "Mark vouchers you've used",
 		href: "/app/my-uploads",
 		icon: "🔄",
 		iconClass: "bg-red-100 text-red-600",
+	},
+	{
+		id: "my-claims",
+		label: "My Claims",
+		description: "Return vouchers to the pool",
+		href: "/app/my-claims",
+		icon: "↩️",
+		iconClass: "bg-amber-100 text-amber-600",
 	},
 	{
 		id: "transactions",

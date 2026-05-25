@@ -116,6 +116,7 @@ export default defineSchema({
 			v.literal("admin_expiry_deduction"),
 			v.literal("claim_reversed"),
 			v.literal("self_invalidated"),
+			v.literal("claim_returned"),
 		),
 		amount: v.number(),
 		voucherId: v.optional(v.id("vouchers")),

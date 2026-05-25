@@ -17,6 +17,7 @@ import { Route as AppIndexRouteImport } from './routes/app/index'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as AppTransactionsRouteImport } from './routes/app/transactions'
 import { Route as AppMyUploadsRouteImport } from './routes/app/my-uploads'
+import { Route as AppMyClaimsRouteImport } from './routes/app/my-claims'
 import { Route as AppFeedbackRouteImport } from './routes/app/feedback'
 import { Route as AppFaqRouteImport } from './routes/app/faq'
 import { Route as AppAvailabilityRouteImport } from './routes/app/availability'
@@ -69,6 +70,11 @@ const AppTransactionsRoute = AppTransactionsRouteImport.update({
 const AppMyUploadsRoute = AppMyUploadsRouteImport.update({
   id: '/my-uploads',
   path: '/my-uploads',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppMyClaimsRoute = AppMyClaimsRouteImport.update({
+  id: '/my-claims',
+  path: '/my-claims',
   getParentRoute: () => AppRoute,
 } as any)
 const AppFeedbackRoute = AppFeedbackRouteImport.update({
@@ -153,6 +159,7 @@ export interface FileRoutesByFullPath {
   '/app/availability': typeof AppAvailabilityRoute
   '/app/faq': typeof AppFaqRoute
   '/app/feedback': typeof AppFeedbackRoute
+  '/app/my-claims': typeof AppMyClaimsRoute
   '/app/my-uploads': typeof AppMyUploadsRoute
   '/app/transactions': typeof AppTransactionsRoute
   '/admin/': typeof AdminIndexRoute
@@ -174,6 +181,7 @@ export interface FileRoutesByTo {
   '/app/availability': typeof AppAvailabilityRoute
   '/app/faq': typeof AppFaqRoute
   '/app/feedback': typeof AppFeedbackRoute
+  '/app/my-claims': typeof AppMyClaimsRoute
   '/app/my-uploads': typeof AppMyUploadsRoute
   '/app/transactions': typeof AppTransactionsRoute
   '/admin': typeof AdminIndexRoute
@@ -198,6 +206,7 @@ export interface FileRoutesById {
   '/app/availability': typeof AppAvailabilityRoute
   '/app/faq': typeof AppFaqRoute
   '/app/feedback': typeof AppFeedbackRoute
+  '/app/my-claims': typeof AppMyClaimsRoute
   '/app/my-uploads': typeof AppMyUploadsRoute
   '/app/transactions': typeof AppTransactionsRoute
   '/admin/': typeof AdminIndexRoute
@@ -223,6 +232,7 @@ export interface FileRouteTypes {
     | '/app/availability'
     | '/app/faq'
     | '/app/feedback'
+    | '/app/my-claims'
     | '/app/my-uploads'
     | '/app/transactions'
     | '/admin/'
@@ -244,6 +254,7 @@ export interface FileRouteTypes {
     | '/app/availability'
     | '/app/faq'
     | '/app/feedback'
+    | '/app/my-claims'
     | '/app/my-uploads'
     | '/app/transactions'
     | '/admin'
@@ -267,6 +278,7 @@ export interface FileRouteTypes {
     | '/app/availability'
     | '/app/faq'
     | '/app/feedback'
+    | '/app/my-claims'
     | '/app/my-uploads'
     | '/app/transactions'
     | '/admin/'
@@ -338,6 +350,13 @@ declare module '@tanstack/react-router' {
       path: '/my-uploads'
       fullPath: '/app/my-uploads'
       preLoaderRoute: typeof AppMyUploadsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/my-claims': {
+      id: '/app/my-claims'
+      path: '/my-claims'
+      fullPath: '/app/my-claims'
+      preLoaderRoute: typeof AppMyClaimsRouteImport
       parentRoute: typeof AppRoute
     }
     '/app/feedback': {
@@ -468,6 +487,7 @@ interface AppRouteChildren {
   AppAvailabilityRoute: typeof AppAvailabilityRoute
   AppFaqRoute: typeof AppFaqRoute
   AppFeedbackRoute: typeof AppFeedbackRoute
+  AppMyClaimsRoute: typeof AppMyClaimsRoute
   AppMyUploadsRoute: typeof AppMyUploadsRoute
   AppTransactionsRoute: typeof AppTransactionsRoute
   AppIndexRoute: typeof AppIndexRoute
@@ -477,6 +497,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppAvailabilityRoute: AppAvailabilityRoute,
   AppFaqRoute: AppFaqRoute,
   AppFeedbackRoute: AppFeedbackRoute,
+  AppMyClaimsRoute: AppMyClaimsRoute,
   AppMyUploadsRoute: AppMyUploadsRoute,
   AppTransactionsRoute: AppTransactionsRoute,
   AppIndexRoute: AppIndexRoute,

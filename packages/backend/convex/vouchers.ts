@@ -618,6 +618,93 @@ export const invalidateMyUpload = userMutation({
 	},
 });
 
+export const getMyClaimedVouchers = userQuery({
+	args: {},
+	handler: async (ctx, { userId }) => {
+		const now = Date.now();
+
+		const vouchers = await ctx.db
+			.query("vouchers")
+			.withIndex("by_claimer_claimed_at", (q) => q.eq("claimerId", userId))
+			.order("desc")
+			.collect();
+
+		const active = vouchers.filter(
+			(v) =>
+				v.status === "claimed" &&
+				v.expiryDate > now,
+		);
+
+		return await Promise.all(
+			active.map(async (v) => ({
+				_id: v._id,
+				type: v.type,
+				barcodeNumber: v.barcodeNumber,
+				expiryDate: v.expiryDate,
+				claimedAt: v.claimedAt,
+				imageUrl: v.imageStorageId
+					? await ctx.storage.getUrl(v.imageStorageId)
+					: null,
+				coinValue: CLAIM_COSTS[v.type] ?? 0,
+			})),
+		);
+	},
+});
+
+export const returnClaimedVoucher = userMutation({
+	args: {
+		voucherId: v.id("vouchers"),
+	},
+	handler: async (ctx, { userId, voucherId }) => {
+		const voucher = await ctx.db.get(voucherId);
+		if (!voucher) throw new Error("Voucher not found");
+		if (voucher.claimerId !== userId)
+			throw new Error("You did not claim this voucher");
+		if (voucher.status !== "claimed")
+			throw new Error("This voucher is not currently claimed");
+
+		// 9pm rule: can't return a voucher that expires today after 9pm Irish time
+		const irishHour = Number(
+			new Intl.DateTimeFormat("en-IE", {
+				timeZone: "Europe/Dublin",
+				hour: "numeric",
+				hour12: false,
+			}).format(new Date()),
+		);
+		const expiryDay = dayjs(voucher.expiryDate).startOf("day");
+		const today = dayjs().startOf("day");
+		if (expiryDay.isSame(today) && irishHour >= 21) {
+			throw new Error(
+				"This voucher expires today and it's after 9 PM. It can no longer be returned.",
+			);
+		}
+
+		const refundAmount = CLAIM_COSTS[voucher.type] ?? 0;
+
+		await ctx.db.patch(voucherId, {
+			status: "available",
+			claimerId: undefined,
+			claimedAt: undefined,
+		});
+
+		const user = await ctx.db.get(userId);
+		await ctx.db.patch(userId, {
+			coins: (user?.coins ?? 0) + refundAmount,
+			claimCount: Math.max(0, (user?.claimCount ?? 0) - 1),
+		});
+
+		await ctx.db.insert("transactions", {
+			userId,
+			type: "claim_returned",
+			amount: refundAmount,
+			voucherId,
+			createdAt: Date.now(),
+		});
+
+		return { success: true, refundAmount };
+	},
+});
+
 export const getVoucherForUploaderConfirm = internalQuery({
 	args: { voucherId: v.id("vouchers") },
 	handler: async (ctx, { voucherId }) => {
