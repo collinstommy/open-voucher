@@ -1,19 +1,28 @@
 import { BalanceHero } from "@/components/mini-app/BalanceHero";
 import { MenuRow } from "@/components/mini-app/MenuRow";
+import { SharePanel } from "@/components/mini-app/SharePanel";
 import { MENU_ITEMS } from "@/components/mini-app/menuConfig";
 import { useUserAuth } from "@/hooks/useUserAuth";
 import { openDonateLink } from "@/lib/openDonateLink";
 import { createFileRoute } from "@tanstack/react-router";
-import { toast } from "sonner";
+import { useState } from "react";
 
 export const Route = createFileRoute("/app/")({
 	component: AppHome,
 });
 
+const SHARE_URL = "https://openvouchers.org/telegram";
+const SHARE_TEXT = "Swap and share Dunnes Vouchers using this Telegram bot";
+
 function AppHome() {
-	const handleShare = () => {
-		navigator.clipboard.writeText("https://openvouchers.org/telegram");
-		toast.success("Link copied!");
+	const [showShare, setShowShare] = useState(false);
+
+	const handleMenuClick = (id: string) => {
+		if (id === "share") {
+			setShowShare(true);
+		} else {
+			openDonateLink();
+		}
 	};
 
 	const { user } = useUserAuth();
@@ -27,12 +36,17 @@ function AppHome() {
 				<MenuRow
 					key={item.id}
 					item={item}
-					onExternalClick={
-						item.id === "share" ? handleShare : openDonateLink
-					}
+					onExternalClick={() => handleMenuClick(item.id)}
 				/>
 			))}
 			</div>
+
+			<SharePanel
+				open={showShare}
+				onClose={() => setShowShare(false)}
+				url={SHARE_URL}
+				text={SHARE_TEXT}
+			/>
 		</div>
 	);
 }
