@@ -11,8 +11,8 @@
 		"deploy": "convex deploy -y",
 		"register-commands": "convex run telegram:registerBotCommands --prod",
 		"register-commands:dev": "convex run telegram:registerBotCommands",
-		"expiring": "convex run dashboard:getExpiringVouchers --prod",
-		"expiring:dev": "convex run dashboard:getExpiringVouchers"
+		"expiring": "convex run admin/dashboard:getExpiringVouchers --prod",
+		"expiring:dev": "convex run admin/dashboard:getExpiringVouchers"
 	},
 	"author": "",
 	"license": "ISC",

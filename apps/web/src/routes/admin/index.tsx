@@ -33,16 +33,19 @@ function HomeComponent() {
 	const [dryRun, setDryRun] = useState(true);
 	const [cleanupResult, setCleanupResult] = useState<any>(null);
 	const stats = useQuery(
-		convexQuery(api.dashboard.getStats, token ? { token } : "skip"),
+		convexQuery(api.admin.dashboard.getStats, token ? { token } : "skip"),
 	);
 	const userGrowth = useQuery(
 		convexQuery(api.admin.getUserGrowth, token ? { token, range } : "skip"),
 	);
 	const weeklyVouchers = useQuery(
-		convexQuery(api.dashboard.getWeeklyVouchers, {}),
+		convexQuery(api.admin.dashboard.getWeeklyVouchers, token ? { token } : "skip"),
 	);
 	const weeklyFailures = useQuery(
-		convexQuery(api.dashboard.getWeeklyFailureStats, {}),
+		convexQuery(
+			api.admin.dashboard.getWeeklyFailureStats,
+			token ? { token } : "skip",
+		),
 	);
 
 	const cleanupMutation = useMutation({

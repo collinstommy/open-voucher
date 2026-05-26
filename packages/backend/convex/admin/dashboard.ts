@@ -1,5 +1,5 @@
-import { internalQuery, query } from "./_generated/server";
-import { adminQuery } from "./admin";
+import { internalQuery } from "../_generated/server";
+import { adminQuery } from "../admin";
 
 export const getStats = adminQuery({
 	args: {},
@@ -34,6 +34,7 @@ export const getStats = adminQuery({
 });
 
 export const getExpiringVouchers = internalQuery({
+	args: {},
 	handler: async (ctx) => {
 		const now = new Date();
 		const nowTimestamp = now.getTime();
@@ -82,7 +83,8 @@ function formatWeekLabel(monday: Date): string {
 	return `${month} ${day}`;
 }
 
-export const getWeeklyFailureStats = query({
+export const getWeeklyFailureStats = adminQuery({
+	args: {},
 	handler: async (ctx) => {
 		const [vouchers, failedUploads] = await Promise.all([
 			ctx.db.query("vouchers").collect(),
@@ -111,7 +113,6 @@ export const getWeeklyFailureStats = query({
 		}
 
 		for (const f of failedUploads) {
-			// Ignore duplicate barcode failures
 			if (f.failureReason === "DUPLICATE_BARCODE") continue;
 
 			const monday = getWeekStart(f._creationTime);
@@ -130,11 +131,10 @@ export const getWeeklyFailureStats = query({
 			}
 		}
 
-		let sorted = Array.from(weeks.values()).sort(
-			(a, b) => b.weekStart.localeCompare(a.weekStart),
+		let sorted = Array.from(weeks.values()).sort((a, b) =>
+			b.weekStart.localeCompare(a.weekStart),
 		);
 
-		// Include current week even if empty
 		const now = Date.now();
 		const currentMonday = getWeekStart(now);
 		const currentKey = currentMonday.toISOString().split("T")[0];
@@ -147,7 +147,6 @@ export const getWeeklyFailureStats = query({
 			});
 		}
 
-		// Limit to last 12 weeks
 		sorted = sorted.slice(0, 12);
 
 		return sorted.map((w) => ({
@@ -157,7 +156,8 @@ export const getWeeklyFailureStats = query({
 	},
 });
 
-export const getWeeklyVouchers = query({
+export const getWeeklyVouchers = adminQuery({
+	args: {},
 	handler: async (ctx) => {
 		const now = new Date();
 		const startOfToday = new Date(

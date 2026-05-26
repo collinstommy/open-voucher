@@ -1258,6 +1258,18 @@ export const getUserGrowth = adminQuery({
 	},
 });
 
+export const getSampleVoucherImageUrl = adminQuery({
+	args: {},
+	handler: async (ctx) => {
+		const setting = await ctx.db
+			.query("settings")
+			.withIndex("by_key", (q) => q.eq("key", "sample-voucher-image"))
+			.first();
+		if (!setting?.value) return null;
+		return await ctx.storage.getUrl(setting.value as Id<"_storage">);
+	},
+});
+
 export const runOcrEvals = adminAction({
 	args: {
 		token: v.string(),
