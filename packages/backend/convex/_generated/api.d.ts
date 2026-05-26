@@ -14,6 +14,7 @@ import type * as constants from "../constants.js";
 import type * as crons from "../crons.js";
 import type * as dashboard from "../dashboard.js";
 import type * as http from "../http.js";
+import type * as lib_jwt from "../lib/jwt.js";
 import type * as lib_messageAnalytics from "../lib/messageAnalytics.js";
 import type * as lib_messageIntent from "../lib/messageIntent.js";
 import type * as lib_telegramAuth from "../lib/telegramAuth.js";
@@ -41,6 +42,7 @@ declare const fullApi: ApiFromModules<{
   crons: typeof crons;
   dashboard: typeof dashboard;
   http: typeof http;
+  "lib/jwt": typeof lib_jwt;
   "lib/messageAnalytics": typeof lib_messageAnalytics;
   "lib/messageIntent": typeof lib_messageIntent;
   "lib/telegramAuth": typeof lib_telegramAuth;

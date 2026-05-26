@@ -154,14 +154,4 @@ export default defineSchema({
     createdAt: v.number(),
     expiresAt: v.number(),
   }).index("by_token", ["token"]),
-
-  userSessions: defineTable({
-    token: v.string(),
-    userId: v.id("users"),
-    createdAt: v.number(),
-    expiresAt: v.number(),
-  })
-    .index("by_token", ["token"])
-    .index("by_user", ["userId"])
-    .index("by_expires_at", ["expiresAt"]),
 });

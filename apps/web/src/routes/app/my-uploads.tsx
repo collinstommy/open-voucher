@@ -2,7 +2,6 @@ import { AppHeader } from "@/components/mini-app/AppHeader";
 import { api } from "@open-voucher/backend/convex/_generated/api";
 import { useMutation, useQuery } from "convex/react";
 import { createFileRoute } from "@tanstack/react-router";
-import { useUserAuth } from "@/hooks/useUserAuth";
 import dayjs from "dayjs";
 
 export const Route = createFileRoute("/app/my-uploads")({
@@ -10,12 +9,7 @@ export const Route = createFileRoute("/app/my-uploads")({
 });
 
 function MyUploadsPage() {
-	const { user } = useUserAuth();
-
-	const uploads = useQuery(
-		api.vouchers.getMyAvailableUploads,
-		user ? { sessionToken: user.sessionToken } : "skip",
-	);
+	const uploads = useQuery(api.vouchers.getMyAvailableUploads);
 
 	const invalidate = useMutation(api.vouchers.invalidateMyUpload);
 
@@ -26,7 +20,7 @@ function MyUploadsPage() {
 			`Mark this voucher as already used?\n\n€${item.type} voucher: ${item.barcodeNumber}\n\nThis will remove it from the pool and deduct ${item.coinValue} coins from your balance.`,
 		);
 		if (confirmed) {
-			invalidate({ sessionToken: user!.sessionToken, voucherId: item._id });
+			invalidate({ voucherId: item._id });
 		}
 	};
 
@@ -83,11 +77,11 @@ function MyUploadsPage() {
 												Marked as used
 											</span>
 										)}
-									<div className="text-xs text-slate-500 space-y-0.5">
-										{v.barcodeNumber && (
-											<p className="font-mono">{v.barcodeNumber}</p>
-										)}
-										<p>
+										<div className="text-xs text-slate-500 space-y-0.5">
+											{v.barcodeNumber && (
+												<p className="font-mono">{v.barcodeNumber}</p>
+											)}
+											<p>
 												Expires{" "}
 												{dayjs(v.expiryDate).format("MMM D")}
 											</p>

@@ -1,36 +1,28 @@
 import { AppHeader } from "@/components/mini-app/AppHeader";
 import { api } from "@open-voucher/backend/convex/_generated/api";
-import { useConvex } from "convex/react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation } from "convex/react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
-import { useUserAuth } from "@/hooks/useUserAuth";
 
 export const Route = createFileRoute("/app/feedback")({
 	component: FeedbackPage,
 });
 
 function FeedbackPage() {
-	const { user } = useUserAuth();
-	const convex = useConvex();
 	const [text, setText] = useState("");
 
-	const submit = useMutation({
-		mutationFn: async (message: string) => {
-			await convex.mutation(api.users.submitAppFeedback, {
-				sessionToken: user!.sessionToken,
-				text: message,
-			});
-		},
-		onSuccess: () => {
+	const submit = useMutation(api.users.submitAppFeedback);
+
+	const handleSubmit = async () => {
+		try {
+			await submit({ text });
 			setText("");
 			toast.success("Thanks for your feedback!");
-		},
-		onError: (err) => {
+		} catch (err) {
 			toast.error(err instanceof Error ? err.message : "Failed to send feedback");
-		},
-	});
+		}
+	};
 
 	return (
 		<div className="flex flex-col flex-1 min-h-0">
@@ -53,11 +45,11 @@ function FeedbackPage() {
 					/>
 					<button
 						type="button"
-						disabled={!text.trim() || submit.isPending}
-						onClick={() => submit.mutate(text)}
+						disabled={!text.trim()}
+						onClick={handleSubmit}
 						className="w-full py-3 bg-blue-600 active:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-full text-sm shadow-lg cursor-pointer"
 					>
-						{submit.isPending ? "Sending…" : "Send feedback"}
+						Send feedback
 					</button>
 				</div>
 			</div>

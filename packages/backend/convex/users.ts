@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { internalMutation, internalQuery, query } from "./_generated/server";
+import { internalMutation, internalQuery } from "./_generated/server";
 import { SIGNUP_BONUS } from "./constants";
 import { userMutation, userQuery } from "./auth";
 import { messageIntentValidator } from "./lib/messageIntent";
@@ -226,5 +226,21 @@ export const getTransactionHistory = userQuery({
 			.withIndex("by_user", (q) => q.eq("userId", userId))
 			.collect();
 		return transactions.sort((a, b) => b.createdAt - a.createdAt).slice(0, 25);
+	},
+});
+
+export const getCurrentUser = userQuery({
+	args: {},
+	handler: async (ctx, { userId }) => {
+		const user = await ctx.db.get(userId);
+		if (!user) throw new Error("User not found");
+		return {
+			_id: user._id,
+			telegramChatId: user.telegramChatId,
+			firstName: user.firstName,
+			username: user.username,
+			coins: user.coins,
+			isBanned: user.isBanned,
+		};
 	},
 });

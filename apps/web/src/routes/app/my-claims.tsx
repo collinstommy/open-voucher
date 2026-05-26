@@ -2,7 +2,6 @@ import { AppHeader } from "@/components/mini-app/AppHeader";
 import { api } from "@open-voucher/backend/convex/_generated/api";
 import { useMutation, useQuery } from "convex/react";
 import { createFileRoute } from "@tanstack/react-router";
-import { useUserAuth } from "@/hooks/useUserAuth";
 import dayjs from "dayjs";
 
 export const Route = createFileRoute("/app/my-claims")({
@@ -10,12 +9,7 @@ export const Route = createFileRoute("/app/my-claims")({
 });
 
 function MyClaimsPage() {
-	const { user } = useUserAuth();
-
-	const claims = useQuery(
-		api.vouchers.getMyClaimedVouchers,
-		user ? { sessionToken: user.sessionToken } : "skip",
-	);
+	const claims = useQuery(api.vouchers.getMyClaimedVouchers);
 
 	const returnVoucher = useMutation(api.vouchers.returnClaimedVoucher);
 
@@ -26,7 +20,7 @@ function MyClaimsPage() {
 			`Return this voucher to the pool?\n\n€${item.type} · ${item.barcodeNumber}\n\nOnly return vouchers you have not used. You'll get ${item.coinValue} coins back.`,
 		);
 		if (confirmed) {
-			returnVoucher({ sessionToken: user!.sessionToken, voucherId: item._id });
+			returnVoucher({ voucherId: item._id });
 		}
 	};
 

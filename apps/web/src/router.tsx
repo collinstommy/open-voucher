@@ -2,11 +2,12 @@ import { createRouter as createTanStackRouter } from "@tanstack/react-router";
 import { QueryClient } from "@tanstack/react-query";
 import { routerWithQueryClient } from "@tanstack/react-router-with-query";
 import { ConvexQueryClient } from "@convex-dev/react-query";
-import { ConvexProvider, ConvexReactClient } from "convex/react";
+import { ConvexReactClient } from "convex/react";
 import { routeTree } from "./routeTree.gen";
 import Loader from "./components/loader";
 import { getDeployment } from "@/components/EnvironmentDropdown";
 import { CONVEX_URLS } from "@/lib/convexConfig";
+import { JwtAuthProvider } from "@/auth/JwtAuthProvider";
 import "./index.css";
 
 export function getRouter() {
@@ -40,9 +41,9 @@ export function getRouter() {
 			defaultNotFoundComponent: () => <div>Not Found</div>,
 			context: { queryClient, convexClient: convex, convexQueryClient },
 			Wrap: ({ children }) => (
-				<ConvexProvider client={convexQueryClient.convexClient}>
+				<JwtAuthProvider client={convex}>
 					{children}
-				</ConvexProvider>
+				</JwtAuthProvider>
 			),
 		}),
 		queryClient,

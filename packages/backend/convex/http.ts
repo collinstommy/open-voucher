@@ -1,7 +1,8 @@
 import { httpRouter } from "convex/server";
-import { httpAction } from "./_generated/server";
+import { httpAction, type ActionCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { verifyTelegramInitData } from "./lib/telegramAuth";
+import { issueJwt } from "./lib/jwt";
 
 const http = httpRouter();
 
@@ -25,11 +26,44 @@ function getCorsHeaders(request: Request): Record<string, string> {
 	};
 }
 
+async function handleDevAuth(
+	ctx: ActionCtx,
+	corsHeaders: Record<string, string>,
+) {
+	if (process.env.ENVIRONMENT !== "development") {
+		return new Response(
+			JSON.stringify({ error: "Dev auth is only available in development" }),
+			{ status: 403, headers: corsHeaders },
+		);
+	}
+
+	const user = await ctx.runMutation(internal.auth.getUserForDevAuth, {});
+
+	if (!user) {
+		return new Response(
+			JSON.stringify({
+				error: "User not found. Please start the bot first.",
+			}),
+			{ status: 404, headers: corsHeaders },
+		);
+	}
+
+	const jwt = await issueJwt(user._id);
+
+	return new Response(JSON.stringify({ user, jwt }), {
+		status: 200,
+		headers: corsHeaders,
+	});
+}
+
 http.route({
 	path: "/api/telegram-auth",
 	method: "POST",
 	handler: httpAction(async (ctx, request) => {
-		const corsHeaders = { ...getCorsHeaders(request), "Content-Type": "application/json" };
+		const corsHeaders = {
+			...getCorsHeaders(request),
+			"Content-Type": "application/json",
+		};
 		try {
 			const { initData } = (await request.json()) as { initData?: string };
 			if (!initData) {
@@ -58,32 +92,33 @@ http.route({
 			const telegramUser = verifyResult.user;
 			const telegramChatId = String(telegramUser.id);
 
-			const result = await ctx.runMutation(
-				internal.auth.createSessionForTelegramUser,
+			const user = await ctx.runMutation(
+				internal.auth.getUserForTelegramAuth,
 				{ telegramChatId },
 			);
 
-			if (!result) {
+			if (!user) {
 				return new Response(
-					JSON.stringify({ error: "User not found. Please start the bot first." }),
+					JSON.stringify({
+						error: "User not found. Please start the bot first.",
+					}),
 					{ status: 404, headers: corsHeaders },
 				);
 			}
 
-			return new Response(
-				JSON.stringify({
-					user: result.user,
-					sessionToken: result.sessionToken,
-					expiresAt: result.expiresAt,
-				}),
-				{ status: 200, headers: corsHeaders },
-			);
+			const jwt = await issueJwt(user._id);
+
+			return new Response(JSON.stringify({ user, jwt }), {
+				status: 200,
+				headers: corsHeaders,
+			});
 		} catch (error) {
-			const message = error instanceof Error ? error.message : "Authentication failed";
-			return new Response(
-				JSON.stringify({ error: message }),
-				{ status: 500, headers: corsHeaders },
-			);
+			const message =
+				error instanceof Error ? error.message : "Authentication failed";
+			return new Response(JSON.stringify({ error: message }), {
+				status: 500,
+				headers: corsHeaders,
+			});
 		}
 	}),
 });
@@ -92,10 +127,44 @@ http.route({
 	path: "/api/telegram-auth",
 	method: "OPTIONS",
 	handler: httpAction(async (_ctx, request) => {
-		return new Response(null, { status: 204, headers: getCorsHeaders(request) });
+		return new Response(null, {
+			status: 204,
+			headers: getCorsHeaders(request),
+		});
 	}),
 });
 
+http.route({
+	path: "/api/dev-auth",
+	method: "POST",
+	handler: httpAction(async (ctx, request) => {
+		const corsHeaders = {
+			...getCorsHeaders(request),
+			"Content-Type": "application/json",
+		};
+		try {
+			return await handleDevAuth(ctx, corsHeaders);
+		} catch (error) {
+			const message =
+				error instanceof Error ? error.message : "Dev auth failed";
+			return new Response(JSON.stringify({ error: message }), {
+				status: 500,
+				headers: corsHeaders,
+			});
+		}
+	}),
+});
+
+http.route({
+	path: "/api/dev-auth",
+	method: "OPTIONS",
+	handler: httpAction(async (_ctx, request) => {
+		return new Response(null, {
+			status: 204,
+			headers: getCorsHeaders(request),
+		});
+	}),
+});
 
 http.route({
 	path: "/telegram/webhook",
@@ -134,7 +203,6 @@ http.route({
 			return new Response("OK", { status: 200 });
 		} catch (error) {
 			console.error("Webhook error:", error);
-			// Still return 200 to prevent retries
 			return new Response("OK", { status: 200 });
 		}
 	}),

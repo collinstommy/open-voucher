@@ -1,10 +1,8 @@
 import { AppHeader } from "@/components/mini-app/AppHeader";
 import { api } from "@open-voucher/backend/convex/_generated/api";
-import { useConvex } from "convex/react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery } from "convex/react";
 import { createFileRoute } from "@tanstack/react-router";
 import dayjs from "dayjs";
-import { useUserAuth } from "@/hooks/useUserAuth";
 
 export const Route = createFileRoute("/app/transactions")({
 	component: TransactionsPage,
@@ -29,35 +27,24 @@ function formatType(type: string): string {
 }
 
 function TransactionsPage() {
-	const { user } = useUserAuth();
-	const convex = useConvex();
-
-	const { data: transactions, isPending, error } = useQuery({
-		queryKey: ["userTransactions", user?.sessionToken],
-		queryFn: () =>
-			convex.query(api.users.getTransactionHistory, {
-				sessionToken: user!.sessionToken,
-			}),
-		enabled: !!user,
-		staleTime: 10_000,
-	});
+	const transactions = useQuery(api.users.getTransactionHistory);
 
 	return (
 		<div className="flex flex-col flex-1 min-h-0">
 			<AppHeader title="Transactions" />
 			<div className="flex-1 overflow-auto bg-slate-50 p-4">
-				{isPending && (
+				{transactions === undefined && (
 					<p className="text-sm text-slate-500 text-center py-8">Loading...</p>
 				)}
-				{error && (
+				{transactions === null && (
 					<p className="text-sm text-red-600 text-center py-8">
-						{error.message ?? "Something went wrong"}
+						Something went wrong
 					</p>
 				)}
-				{!isPending && !error && (
+				{transactions !== undefined && transactions !== null && (
 					<>
 						<p className="text-xs text-slate-500 mb-3">Last 25 coin movements</p>
-						{transactions && transactions.length > 0 ? (
+						{transactions.length > 0 ? (
 							<ul className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
 								{transactions.map((t, i) => {
 									const isCredit = t.amount > 0;

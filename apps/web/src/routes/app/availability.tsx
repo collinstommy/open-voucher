@@ -1,9 +1,7 @@
 import { AppHeader } from "@/components/mini-app/AppHeader";
 import { api } from "@open-voucher/backend/convex/_generated/api";
-import { useConvex } from "convex/react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery } from "convex/react";
 import { createFileRoute } from "@tanstack/react-router";
-import { useUserAuth } from "@/hooks/useUserAuth";
 
 const statusStyles = {
 	green: "bg-green-50 border-green-200 text-green-700",
@@ -30,29 +28,18 @@ export const Route = createFileRoute("/app/availability")({
 });
 
 function AvailabilityPage() {
-	const { user } = useUserAuth();
-	const convex = useConvex();
-
-	const { data: availability, isPending, error } = useQuery({
-		queryKey: ["voucherAvailability", user?.sessionToken],
-		queryFn: () =>
-			convex.query(api.vouchers.getVoucherAvailability, {
-				sessionToken: user!.sessionToken,
-			}),
-		enabled: !!user,
-		staleTime: 30_000,
-	});
+	const availability = useQuery(api.vouchers.getVoucherAvailability);
 
 	return (
 		<div className="flex flex-col flex-1 min-h-0">
 			<AppHeader title="Availability" />
 			<div className="flex-1 overflow-auto bg-slate-50 p-4">
-				{isPending && (
+				{availability === undefined && (
 					<p className="text-sm text-slate-500 text-center py-8">Loading...</p>
 				)}
-				{error && (
+				{availability === null && (
 					<p className="text-sm text-red-600 text-center py-8">
-						{error.message ?? "Something went wrong"}
+						Something went wrong
 					</p>
 				)}
 				{availability && (
