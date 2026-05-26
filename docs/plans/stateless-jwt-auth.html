@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Plan: Stateless JWT Auth (Telegram)</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --surface: #1a2332;
+      --border: #2d3a4f;
+      --text: #e7ecf3;
+      --muted: #8b9cb3;
+      --accent: #3b82f6;
+      --accent-dim: #1e3a5f;
+      --green: #22c55e;
+      --amber: #f59e0b;
+      --code-bg: #0d1117;
+      --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      --mono: ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, monospace;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      padding: 2rem 1.5rem 4rem;
+      font-family: var(--font);
+      font-size: 1rem;
+      line-height: 1.6;
+      color: var(--text);
+      background: var(--bg);
+      max-width: 52rem;
+      margin-inline: auto;
+    }
+
+    h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      margin: 0 0 0.5rem;
+      letter-spacing: -0.02em;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      margin: 0 0 2rem;
+      font-size: 0.95rem;
+    }
+
+    h2 {
+      font-size: 1.25rem;
+      margin: 2.5rem 0 1rem;
+      padding-bottom: 0.35rem;
+      border-bottom: 1px solid var(--border);
+      color: var(--text);
+    }
+
+    h3 {
+      font-size: 1.05rem;
+      margin: 1.75rem 0 0.75rem;
+      color: var(--accent);
+    }
+
+    p { margin: 0.75rem 0; }
+
+    ul, ol { margin: 0.75rem 0; padding-left: 1.5rem; }
+    li { margin: 0.35rem 0; }
+
+    strong { color: #fff; font-weight: 600; }
+
+    a { color: var(--accent); }
+
+    hr {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 2rem 0;
+    }
+
+    .summary-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      margin: 1rem 0;
+    }
+
+    .summary-box ul { margin: 0.5rem 0 0; }
+
+    pre {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      overflow-x: auto;
+      font-family: var(--mono);
+      font-size: 0.8rem;
+      line-height: 1.45;
+      margin: 1rem 0;
+    }
+
+    pre.diagram { color: var(--muted); white-space: pre; }
+
+    code {
+      font-family: var(--mono);
+      font-size: 0.88em;
+      background: var(--code-bg);
+      padding: 0.15em 0.4em;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1rem 0;
+      font-size: 0.9rem;
+    }
+
+    th, td {
+      text-align: left;
+      padding: 0.6rem 0.75rem;
+      border: 1px solid var(--border);
+    }
+
+    th {
+      background: var(--surface);
+      font-weight: 600;
+    }
+
+    tr:nth-child(even) td { background: rgba(26, 35, 50, 0.5); }
+
+    .label-before { color: var(--amber); font-size: 0.85rem; font-weight: 600; margin-top: 1rem; }
+    .label-after { color: var(--green); font-size: 0.85rem; font-weight: 600; margin-top: 1rem; }
+
+    blockquote {
+      margin: 1rem 0;
+      padding: 0.75rem 1rem;
+      border-left: 3px solid var(--accent);
+      background: var(--accent-dim);
+      border-radius: 0 6px 6px 0;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .checklist { list-style: none; padding-left: 0; }
+    .checklist li {
+      padding: 0.35rem 0 0.35rem 1.75rem;
+      position: relative;
+    }
+    .checklist li::before {
+      content: "☐";
+      position: absolute;
+      left: 0;
+      color: var(--muted);
+    }
+
+    .phase-badge {
+      display: inline-block;
+      background: var(--accent-dim);
+      color: var(--accent);
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 0.2em 0.6em;
+      border-radius: 4px;
+      margin-right: 0.5rem;
+      vertical-align: middle;
+    }
+
+    .toc {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      margin-bottom: 2rem;
+    }
+    .toc h2 { margin-top: 0; font-size: 1rem; border: none; padding: 0; }
+    .toc ol { margin: 0.5rem 0 0; }
+    .toc a { text-decoration: none; }
+    .toc a:hover { text-decoration: underline; }
+
+    @media print {
+      body { background: #fff; color: #111; max-width: none; }
+      pre, code, th { background: #f5f5f5; }
+      .summary-box, .toc, blockquote { background: #f9f9f9; }
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Plan: Stateless JWT Auth (Telegram)</h1>
+  <p class="subtitle">Open Voucher — pre-launch auth refactor</p>
+
+  <nav class="toc">
+    <h2>Contents</h2>
+    <ol>
+      <li><a href="#summary">Summary</a></li>
+      <li><a href="#current-vs-target">Current vs target</a></li>
+      <li><a href="#architecture">Architecture</a></li>
+      <li><a href="#jwt-shape">JWT shape</a></li>
+      <li><a href="#phase-1">Phase 1: Keys + Convex auth config</a></li>
+      <li><a href="#phase-2">Phase 2: Backend — issue JWT</a></li>
+      <li><a href="#phase-3">Phase 3: Backend — refactor functions</a></li>
+      <li><a href="#phase-4">Phase 4: Client</a></li>
+      <li><a href="#phase-5">Phase 5: Logout</a></li>
+      <li><a href="#future-google">Future: Google</a></li>
+      <li><a href="#checklist">Migration checklist</a></li>
+      <li><a href="#testing">Testing</a></li>
+      <li><a href="#risks">Risks</a></li>
+      <li><a href="#effort">Estimated effort</a></li>
+      <li><a href="#files">Files touched</a></li>
+    </ol>
+  </nav>
+
+  <section id="summary">
+    <h2>Summary</h2>
+    <div class="summary-box">
+      <p>Replace opaque <code>sessionToken</code> + <code>userSessions</code> DB lookups with <strong>stateless app JWTs</strong> validated by Convex’s built-in auth pipeline.</p>
+      <ul>
+        <li><strong>Login:</strong> verify Telegram <code>initData</code> → load user (unchanged) → sign JWT (<code>sub</code> = <code>userId</code>)</li>
+        <li><strong>Requests:</strong> <code>ConvexProviderWithAuth</code> sends <code>Authorization: Bearer &lt;jwt&gt;</code> automatically</li>
+        <li><strong>Backend:</strong> <code>ctx.auth.getUserIdentity()</code> — no <code>sessionToken</code> in function args</li>
+        <li><strong>No <code>userSessions</code> table</strong> — ban/coins enforced on the user row in handlers (as today)</li>
+        <li><strong>Client:</strong> split login (TanStack <code>useQuery</code> bootstrap) from profile (Convex <code>useQuery</code> <code>getCurrentUser</code>) — thin <code>useUserAuth</code></li>
+      </ul>
+      <p style="margin-bottom:0">Designed so <strong>Google auth later</strong> is another HTTP sign-in route that calls the same <code>issueJwt(userId)</code>.</p>
+    </div>
+  </section>
+
+  <section id="current-vs-target">
+    <h2>Current vs target</h2>
+    <pre class="diagram">CURRENT                                    TARGET
+───────                                    ──────
+
+Client                                     Client
+  localStorage: user-session-*               localStorage: jwt-* + JwtAuthContext
+  TanStack → auth + user (stale)             TanStack → login bootstrap only
+  useQuery({ sessionToken })                 Convex useQuery → getCurrentUser (live)
+                                             useQuery({}) on other APIs
+
+HTTP /api/telegram-auth                    HTTP /api/telegram-auth
+  → createSessionForTelegramUser (DB)        → load user → issueJwt()
+
+Backend                                    Backend
+  userQuery({ sessionToken })                userQuery({}) — userId from JWT in wrapper
+  verifyUserSession → userSessions           ctx.auth.getUserIdentity()</pre>
+  </section>
+
+  <section id="architecture">
+    <h2>Architecture</h2>
+    <pre class="diagram">┌─────────────────────────────────────────────────────────────┐
+│  LOGIN (once per visit / expired token)                     │
+│                                                             │
+│  Telegram WebApp.initData                                   │
+│       │                                                     │
+│       ▼                                                     │
+│  POST /api/telegram-auth                                    │
+│       ├─ verifyTelegramInitData (unchanged)                 │
+│       ├─ find user by telegramChatId (unchanged)            │
+│       └─ issueJwt(user._id)  →  { jwt, user }             │
+│                                                             │
+│  Client: localStorage.setItem(`jwt-${deployment}`, jwt)     │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│  ONGOING (automatic)                                        │
+│                                                             │
+│  ConvexProviderWithAuth (JwtAuthProvider)                   │
+│    fetchAccessToken() → jwt from React state                │
+│       │                                                     │
+│       ▼                                                     │
+│  Convex validates JWT (auth.config.ts, signature, exp)      │
+│       │                                                     │
+│       ▼                                                     │
+│  handler: const userId = await getCurrentUserId(ctx)        │
+└─────────────────────────────────────────────────────────────┘</pre>
+  </section>
+
+  <section id="jwt-shape">
+    <h2>JWT shape</h2>
+    <table>
+      <thead>
+        <tr><th>Claim</th><th>Value</th><th>Notes</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>sub</code></td><td><code>user._id</code></td><td>Used by <code>getCurrentUserId()</code></td></tr>
+        <tr><td><code>iss</code></td><td><code>https://www.openvouchers.org</code></td><td>Must match <code>auth.config.ts</code></td></tr>
+        <tr><td><code>aud</code></td><td><code>open-voucher</code></td><td>Must match <code>applicationID</code></td></tr>
+        <tr><td><code>exp</code></td><td>30d (configurable)</td><td>No DB session; re-login via Telegram refreshes</td></tr>
+        <tr><td><code>iat</code></td><td>now</td><td>Standard</td></tr>
+      </tbody>
+    </table>
+    <p>Optional later: <code>authMethod: "telegram"</code> (for debugging only — not for authorization).</p>
+  </section>
+
+  <section id="phase-1">
+    <h2><span class="phase-badge">Phase 1</span> Keys + Convex auth config</h2>
+
+    <h3>1.1 Generate RSA keypair</h3>
+    <pre><code>openssl genpkey -algorithm RSA -out private.pem -pkeyopt rsa_keygen_bits:2048
+openssl rsa -pubout -out public.pem -in private.pem
+# Convert public key to JWK (one-time script with jose) → embed in auth.config.ts</code></pre>
+
+    <h3>1.2 Convex env</h3>
+    <pre><code>npx convex env set JWT_PRIVATE_KEY "$(cat private.pem)"</code></pre>
+    <p>Store <code>private.pem</code> only in Convex env (and your password manager for rotation). Never commit.</p>
+
+    <h3>1.3 New: <code>packages/backend/convex/auth.config.ts</code></h3>
+    <pre><code>import type { AuthConfig } from "convex/server";
+
+// Base64-encoded JWKS JSON (generate once, commit this file)
+const JWKS_BASE64 = "eyJrZXlzIjpbLi4uXX0=";
+const jwks = `data:application/json;base64,${JWKS_BASE64}`;
+
+export default {
+  providers: [
+    {
+      type: "customJwt",
+      applicationID: "open-voucher",
+      issuer: "https://www.openvouchers.org",
+      jwks,
+      algorithm: "RS256",
+    },
+  ],
+} satisfies AuthConfig;</code></pre>
+    <p>Deploy/dev sync after adding: <code>npx convex dev</code> or deploy.</p>
+
+    <h3>1.4 Dependency</h3>
+    <pre><code>cd packages/backend && bun add jose</code></pre>
+
+    <h3>1.5 New: <code>packages/backend/convex/lib/jwt.ts</code></h3>
+    <p>Shared signing helper (used from HTTP actions now; Google route later).</p>
+    <pre><code>import * as jose from "jose";
+import type { Id } from "../_generated/dataModel";
+
+const ISSUER = "https://www.openvouchers.org";
+const AUDIENCE = "open-voucher";
+const KID = "open-voucher-key-1";
+export const JWT_EXPIRY = "30d";
+
+export async function issueJwt(userId: Id&lt;"users"&gt;): Promise&lt;string&gt; {
+  const privateKeyPem = process.env.JWT_PRIVATE_KEY;
+  if (!privateKeyPem) throw new Error("JWT_PRIVATE_KEY not configured");
+
+  const privateKey = await jose.importPKCS8(privateKeyPem, "RS256");
+
+  return await new jose.SignJWT({})
+    .setProtectedHeader({ alg: "RS256", kid: KID })
+    .setSubject(userId)
+    .setIssuer(ISSUER)
+    .setAudience(AUDIENCE)
+    .setIssuedAt()
+    .setExpirationTime(JWT_EXPIRY)
+    .sign(privateKey);
+}</code></pre>
+  </section>
+
+  <section id="phase-2">
+    <h2><span class="phase-badge">Phase 2</span> Backend — issue JWT instead of session</h2>
+
+    <h3>2.1 Replace <code>createSessionForTelegramUser</code></h3>
+    <p class="label-before">Before (<code>auth.ts</code>): revoke sessions, insert <code>userSessions</code>, return <code>sessionToken</code>.</p>
+    <p class="label-after">After: internal mutation only loads user — no DB session.</p>
+    <pre><code>// packages/backend/convex/auth.ts
+export const getUserForTelegramAuth = internalMutation({
+  args: { telegramChatId: v.string() },
+  handler: async (ctx, { telegramChatId }) => {
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_chat_id", (q) =&gt; q.eq("telegramChatId", telegramChatId))
+      .first();
+
+    if (!user) return null;
+
+    return {
+      _id: user._id,
+      telegramChatId: user.telegramChatId,
+      firstName: user.firstName,
+      username: user.username,
+      coins: user.coins,
+      isBanned: user.isBanned,
+    };
+  },
+});</code></pre>
+
+    <h3>2.2 Update <code>http.ts</code> telegram-auth handler</h3>
+    <p class="label-before">Before:</p>
+    <pre><code>const result = await ctx.runMutation(
+  internal.auth.createSessionForTelegramUser,
+  { telegramChatId },
+);
+// returns { user, sessionToken, expiresAt }</code></pre>
+    <p class="label-after">After:</p>
+    <pre><code>import { issueJwt } from "./lib/jwt";
+
+const user = await ctx.runMutation(
+  internal.auth.getUserForTelegramAuth,
+  { telegramChatId },
+);
+
+if (!user) {
+  return new Response(
+    JSON.stringify({ error: "User not found. Please start the bot first." }),
+    { status: 404, headers: corsHeaders },
+  );
+}
+
+const jwt = await issueJwt(user._id);
+
+return new Response(
+  JSON.stringify({ user, jwt }),
+  { status: 200, headers: corsHeaders },
+);</code></pre>
+
+    <h3>2.3 Dev auth</h3>
+    <p><code>devAuth</code> mutation cannot access <code>JWT_PRIVATE_KEY</code> signing cleanly in all setups — mirror Telegram with HTTP:</p>
+    <ul>
+      <li><strong>New route:</strong> <code>POST /api/dev-auth</code> (development only)</li>
+      <li>Check <code>ENVIRONMENT === "development"</code></li>
+      <li>Resolve <code>DEV_TELEGRAM_CHAT_ID</code> user (same as today’s <code>devAuth</code>)</li>
+      <li><code>issueJwt(user._id)</code> → <code>{ jwt, user }</code></li>
+    </ul>
+    <p><strong>Client localhost branch:</strong> <code>fetch('/api/dev-auth')</code> instead of <code>convex.mutation(api.auth.devAuth)</code>.</p>
+  </section>
+
+  <section id="phase-3">
+    <h2><span class="phase-badge">Phase 3</span> Backend — <code>getCurrentUserId</code> + refactor functions</h2>
+
+    <h3>3.1 New helper in <code>auth.ts</code></h3>
+    <pre><code>import type { QueryCtx, MutationCtx } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
+
+export async function getCurrentUserId(
+  ctx: QueryCtx | MutationCtx,
+): Promise&lt;Id&lt;"users"&gt;&gt; {
+  const identity = await ctx.auth.getUserIdentity();
+  if (!identity) {
+    throw new Error("Unauthorized: not authenticated");
+  }
+  return identity.subject as Id&lt;"users"&gt;;
+}</code></pre>
+
+    <h3>3.2 Keep <code>userQuery</code> / <code>userMutation</code> — change how they resolve the user</h3>
+    <p>You do <strong>not</strong> need to convert every function to plain <code>query</code>/<code>mutation</code>. Keep existing handlers (<code>handler: async (ctx, { userId }) =&gt; { ... }</code>); only rewire the wrappers in <code>auth.ts</code>.</p>
+    <p class="label-before">Before (<code>auth.ts</code>):</p>
+    <pre><code>export const userQuery = customQuery(query, {
+  args: { sessionToken: v.string() },
+  input: async (ctx, { sessionToken }) =&gt; {
+    const userId = await verifyUserSession(ctx, sessionToken);
+    return { ctx: {}, args: { userId } };
+  },
+});
+
+export const userMutation = customMutation(mutation, {
+  args: { sessionToken: v.string() },
+  input: async (ctx, { sessionToken }) =&gt; {
+    const userId = await verifyUserSession(ctx, sessionToken);
+    return { ctx: {}, args: { userId } };
+  },
+});</code></pre>
+    <p class="label-after">After (<code>auth.ts</code>):</p>
+    <pre><code>export const userQuery = customQuery(query, {
+  args: {},
+  input: async (ctx) =&gt; {
+    const userId = await getCurrentUserId(ctx);
+    return { ctx: {}, args: { userId } };
+  },
+});
+
+export const userMutation = customMutation(mutation, {
+  args: {},
+  input: async (ctx) =&gt; {
+    const userId = await getCurrentUserId(ctx);
+    return { ctx: {}, args: { userId } };
+  },
+});</code></pre>
+    <p><code>users.ts</code> / <code>vouchers.ts</code> handlers stay the same:</p>
+    <pre><code>import { userQuery } from "./auth";
+
+export const getTransactionHistory = userQuery({
+  args: {},
+  handler: async (ctx, { userId }) =&gt; {
+    // unchanged
+  },
+});</code></pre>
+    <p>The <strong>9</strong> exports in <code>users.ts</code> (3) and <code>vouchers.ts</code> (6) only lose <code>sessionToken</code> on the <strong>client</strong>, not in handler signatures.</p>
+
+    <h3>3.3 Add reactive <code>getCurrentUser</code></h3>
+    <p>Fixes stale <code>coins</code> on home screen (currently <code>staleTime: Infinity</code> in TanStack auth).</p>
+    <pre><code>export const getCurrentUser = userQuery({
+  args: {},
+  handler: async (ctx, { userId }) =&gt; {
+    const user = await ctx.db.get(userId);
+    if (!user) throw new Error("User not found");
+    return {
+      _id: user._id,
+      telegramChatId: user.telegramChatId,
+      firstName: user.firstName,
+      username: user.username,
+      coins: user.coins,
+      isBanned: user.isBanned,
+    };
+  },
+});</code></pre>
+    <p>Public <code>userQuery</code> is fine — callers without a JWT get unauthorized; <code>userId</code> always comes from <code>identity.subject</code>, never from client args.</p>
+
+    <h3>3.4 Remove session-only exports</h3>
+    <p>Delete from <code>auth.ts</code>:</p>
+    <ul>
+      <li><code>validateSession</code></li>
+      <li><code>logoutUser</code> (unused in web today; client logout = clear <code>localStorage</code>)</li>
+      <li><code>createSessionForTelegramUser</code></li>
+      <li><code>cleanupExpiredUserSessions</code></li>
+      <li><code>verifyUserSession</code></li>
+      <li><code>revokeAllUserSessions</code></li>
+    </ul>
+    <p>Keep <strong><code>userQuery</code> / <code>userMutation</code></strong> (rewired to JWT — see §3.2).</p>
+    <p>Remove cron in <code>crons.ts</code>:</p>
+    <pre><code>// DELETE this block
+crons.daily("cleanup user sessions", ..., internal.auth.cleanupExpiredUserSessions);</code></pre>
+
+    <h3>3.5 Schema: remove <code>userSessions</code></h3>
+    <pre><code>// DELETE from schema.ts
+userSessions: defineTable({ ... }),</code></pre>
+    <p>After deploy, optionally run a one-off migration to delete orphaned <code>userSessions</code> rows.</p>
+    <p>Remove from <code>constants.ts</code>:</p>
+    <ul>
+      <li><code>USER_SESSION_DURATION_MS</code></li>
+      <li><code>USER_SESSION_CLEANUP_BATCH_SIZE</code></li>
+    </ul>
+  </section>
+
+  <section id="phase-4">
+    <h2><span class="phase-badge">Phase 4</span> Client</h2>
+
+    <p>Split auth into three layers — no <code>window.location.reload()</code>, no monolithic <code>authenticate()</code> in one TanStack query.</p>
+
+    <table>
+      <thead>
+        <tr><th>Layer</th><th>Tool</th><th>Responsibility</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>JWT on the wire</td><td><code>JwtAuthProvider</code> + <code>ConvexProviderWithAuth</code></td><td><code>fetchAccessToken</code> reads React state (synced with <code>localStorage</code>)</td></tr>
+        <tr><td>Login bootstrap</td><td>TanStack <code>useQuery</code> (<code>useAuthBootstrap</code>)</td><td>HTTP → JWT once when <code>jwt</code> state is null</td></tr>
+        <tr><td>User profile</td><td>Convex <code>useQuery</code> (<code>getCurrentUser</code>)</td><td>Reactive <code>coins</code>, name, ban flag</td></tr>
+        <tr><td>App hook</td><td><code>useUserAuth</code></td><td>Composes the above; same API for <code>app.tsx</code></td></tr>
+      </tbody>
+    </table>
+
+    <h3>4.1 New: <code>apps/web/src/auth/jwtStorage.ts</code></h3>
+    <pre><code>export function getJwtKey() {
+  return `jwt-${getDeployment()}`;
+}
+
+export async function fetchJwt(): Promise&lt;string&gt; {
+  const existing = readStoredJwt();
+  if (existing) return existing;
+
+  if (window.location.hostname === "localhost") {
+    const res = await fetch(`${getSiteUrl()}/api/dev-auth`, { method: "POST" });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error ?? "Dev auth failed");
+    writeStoredJwt(data.jwt);
+    return data.jwt;
+  }
+
+  const tg = (window as any).Telegram?.WebApp;
+  if (!tg?.initData) throw new Error("Open this page in Telegram");
+
+  const res = await fetch(`${getSiteUrl()}/api/telegram-auth`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ initData: tg.initData }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error ?? "Authentication failed");
+
+  writeStoredJwt(data.jwt);
+  return data.jwt;
+}</code></pre>
+    <p>Also: <code>readStoredJwt</code>, <code>writeStoredJwt</code>, <code>clearStoredJwt</code> — full file in <code>stateless-jwt-auth.md</code> §4.1.</p>
+
+    <h3>4.2 New: <code>apps/web/src/auth/JwtAuthProvider.tsx</code></h3>
+    <p>React state drives <code>ConvexProviderWithAuth</code> so login can call <code>setJwt</code> without a page reload.</p>
+    <pre><code>export function JwtAuthProvider({ client, children }) {
+  const [jwt, setJwtState] = useState(() =&gt; readStoredJwt());
+
+  const setJwt = useCallback((value: string | null) =&gt; {
+    setJwtState(value);
+    if (value) localStorage.setItem(getJwtKey(), value);
+    else localStorage.removeItem(getJwtKey());
+  }, []);
+
+  return (
+    &lt;JwtAuthContext.Provider value={{ jwt, setJwt }}&gt;
+      &lt;ConvexProviderWithAuth client={client} useAuth={useConvexAuthFromJwt}&gt;
+        {children}
+      &lt;/ConvexProviderWithAuth&gt;
+    &lt;/JwtAuthContext.Provider&gt;
+  );
+}</code></pre>
+    <p>Full file (storage sync, <code>useJwtAuth</code>) in <code>stateless-jwt-auth.md</code> §4.2.</p>
+
+    <h3>4.3 <code>router.tsx</code> — use <code>JwtAuthProvider</code></h3>
+    <p class="label-before">Before:</p>
+    <pre><code>&lt;ConvexProvider client={convexQueryClient.convexClient}&gt;
+  {children}
+&lt;/ConvexProvider&gt;</code></pre>
+    <p class="label-after">After:</p>
+    <pre><code>import { JwtAuthProvider } from "@/auth/JwtAuthProvider";
+
+&lt;JwtAuthProvider client={convex}&gt;
+  {children}
+&lt;/JwtAuthProvider&gt;</code></pre>
+    <p>Keep <code>ConvexQueryClient</code> / TanStack <code>QueryClient</code> — still used for login bootstrap.</p>
+
+    <h3>4.4 New: <code>apps/web/src/hooks/useAuthBootstrap.ts</code></h3>
+    <p>TanStack <code>useQuery</code> for one-shot login when <code>!jwt</code>:</p>
+    <pre><code>export function useAuthBootstrap() {
+  const { jwt, setJwt } = useJwtAuth();
+
+  const bootstrap = useQuery({
+    queryKey: ["auth", "bootstrap", getDeployment()] as const,
+    queryFn: fetchJwt,
+    enabled: !jwt,
+    retry: false,
+    staleTime: Infinity,
+  });
+
+  useEffect(() =&gt; {
+    if (bootstrap.data) setJwt(bootstrap.data);
+  }, [bootstrap.data, setJwt]);
+
+  return bootstrap;
+}</code></pre>
+
+    <h3>4.5 Rewrite <code>useUserAuth.ts</code> — thin composer</h3>
+    <p class="label-before">Before:</p> one TanStack <code>useQuery</code> → <code>authenticate()</code> → user + <code>sessionToken</code>, <code>staleTime: Infinity</code>.
+    <p class="label-after">After:</p>
+    <pre><code>export function useUserAuth() {
+  const { isAuthenticated, isLoading: convexAuthLoading } = useConvexAuth();
+  const bootstrap = useAuthBootstrap();
+
+  // Only "skip" in the app: runs in app.tsx during bootstrap
+  const user = useQuery(
+    api.users.getCurrentUser,
+    isAuthenticated ? {} : "skip",
+  );
+
+  const isLoading =
+    convexAuthLoading ||
+    bootstrap.isLoading ||
+    (isAuthenticated &amp;&amp; user === undefined);
+
+  return {
+    user: (user ?? null) as AppUser | null,
+    isLoading,
+    error: bootstrap.error ?? null,
+  };
+}</code></pre>
+    <p><code>app.tsx</code> keeps <code>{ user, isLoading, error }</code>. Routes under <code>/app</code> mount only after <code>user</code> exists.</p>
+
+    <h3>4.6 Route files — drop <code>sessionToken</code> (no <code>"skip"</code>)</h3>
+    <p><code>userQuery</code> is server-only; client uses <code>useQuery(api.…)</code>.</p>
+
+    <p class="label-before">Before (<code>my-claims.tsx</code>):</p>
+    <pre><code>const claims = useQuery(
+  api.vouchers.getMyClaimedVouchers,
+  user ? { sessionToken: user.sessionToken } : "skip",
+);
+
+returnVoucher({ sessionToken: user!.sessionToken, voucherId: item._id });</code></pre>
+    <p class="label-after">After:</p>
+    <pre><code>const claims = useQuery(api.vouchers.getMyClaimedVouchers);
+
+returnVoucher({ voucherId: item._id });</code></pre>
+    <table>
+      <thead>
+        <tr><th>File</th><th>Changes</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>apps/web/src/auth/jwtStorage.ts</code></td><td><strong>Create</strong></td></tr>
+        <tr><td><code>apps/web/src/auth/JwtAuthProvider.tsx</code></td><td><strong>Create</strong></td></tr>
+        <tr><td><code>apps/web/src/hooks/useAuthBootstrap.ts</code></td><td><strong>Create</strong></td></tr>
+        <tr><td><code>apps/web/src/hooks/useUserAuth.ts</code></td><td><strong>Rewrite</strong></td></tr>
+        <tr><td><code>apps/web/src/router.tsx</code></td><td><code>JwtAuthProvider</code></td></tr>
+        <tr><td><code>apps/web/src/routes/app/my-claims.tsx</code></td><td><code>useQuery(api.…)</code> only — no <code>sessionToken</code>, no <code>"skip"</code></td></tr>
+        <tr><td><code>apps/web/src/routes/app/my-uploads.tsx</code></td><td>Same</td></tr>
+        <tr><td><code>apps/web/src/routes/app/transactions.tsx</code></td><td>Same</td></tr>
+        <tr><td><code>apps/web/src/routes/app/availability.tsx</code></td><td>Same</td></tr>
+        <tr><td><code>apps/web/src/routes/app/feedback.tsx</code></td><td>Same</td></tr>
+        <tr><td><code>apps/web/src/routes/app/index.tsx</code></td><td>Reactive <code>user.coins</code></td></tr>
+      </tbody>
+    </table>
+    <p>Remove <code>UserSession</code> / <code>sessionToken</code> from client types.</p>
+  </section>
+
+  <section id="phase-5">
+    <h2><span class="phase-badge">Phase 5</span> Logout (client-only)</h2>
+    <p>No server session to delete.</p>
+    <pre><code>export function useLogout() {
+  const { setJwt } = useJwtAuth();
+  return () =&gt; setJwt(null);
+}</code></pre>
+    <p>Wire up if/when you add a logout button. <code>setJwt(null)</code> clears storage and disconnects authenticated Convex calls without a full reload.</p>
+  </section>
+
+  <section id="future-google">
+    <h2>Future: Google (not in this migration)</h2>
+    <p>Add <code>POST /api/google-auth</code>:</p>
+    <ol>
+      <li>Verify Google ID token (or OAuth code exchange).</li>
+      <li><code>findOrCreateUser</code> / link accounts (new logic).</li>
+      <li><code>issueJwt(user._id)</code> — <strong>same function, same client storage key, same <code>getCurrentUserId</code></strong>.</li>
+    </ol>
+    <p>No changes to <code>userQuery</code>/<code>userMutation</code> handler shapes or Convex provider.</p>
+  </section>
+
+  <section id="checklist">
+    <h2>Migration checklist</h2>
+    <table>
+      <thead>
+        <tr><th>Step</th><th>Task</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>1</td><td>Generate keys, set <code>JWT_PRIVATE_KEY</code>, add <code>auth.config.ts</code></td></tr>
+        <tr><td>2</td><td>Add <code>lib/jwt.ts</code>, <code>bun add jose</code></td></tr>
+        <tr><td>3</td><td>HTTP: telegram-auth returns <code>jwt</code>; add dev-auth HTTP route</td></tr>
+        <tr><td>4</td><td>Add <code>getCurrentUserId</code>, <code>getCurrentUser</code></td></tr>
+        <tr><td>5</td><td>Rewire <code>userQuery</code>/<code>userMutation</code> in <code>auth.ts</code>; client drops <code>sessionToken</code> only</td></tr>
+        <tr><td>6</td><td>Remove session exports, cron, schema table</td></tr>
+        <tr><td>7</td><td>Client: <code>JwtAuthProvider</code>, <code>jwtStorage</code>, <code>useAuthBootstrap</code>, <code>useUserAuth</code></td></tr>
+        <tr><td>8</td><td>Client: update 6 route files (<code>useQuery(api.…)</code> only, no <code>"skip"</code>)</td></tr>
+        <tr><td>9</td><td><code>npx convex dev</code> — regenerate types, fix TS errors</td></tr>
+        <tr><td>10</td><td>Test Telegram + localhost dev flows</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="testing">
+    <h2>Testing</h2>
+    <ul class="checklist">
+      <li>Fresh user: open mini app → bot creates user → auth returns JWT → home shows coins</li>
+      <li>Return visit: JWT in localStorage → no telegram-auth call → queries work</li>
+      <li>Expired / invalid JWT: clear or corrupt token → re-auth via Telegram</li>
+      <li>Localhost: <code>/api/dev-auth</code> issues JWT</li>
+      <li>Claim / return voucher: mutations work without <code>sessionToken</code></li>
+      <li>Banned user: can still authenticate; restricted actions fail with ban check (unchanged)</li>
+      <li>Deploy preview + prod: correct <code>JWT_PRIVATE_KEY</code> per deployment</li>
+    </ul>
+  </section>
+
+  <section id="risks">
+    <h2>Risks</h2>
+    <table>
+      <thead>
+        <tr><th>Risk</th><th>Mitigation</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>auth.config.ts</code> mismatch</td><td><code>iss</code> / <code>aud</code> / <code>kid</code> must match <code>issueJwt</code> exactly</td></tr>
+        <tr><td>JWT not picked up after login</td><td><code>setJwt</code> via <code>JwtAuthProvider</code> after bootstrap (no reload)</td></tr>
+        <tr><td>Old <code>user-session-*</code> keys orphaned</td><td>Harmless; optionally clear on first load</td></tr>
+        <tr><td>Private key leak</td><td>Convex env only; rotate keys + JWKS if compromised</td></tr>
+        <tr><td>Stolen JWT valid until <code>exp</code></td><td>Accept for now; shorten <code>exp</code> if needed</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="effort">
+    <h2>Estimated effort</h2>
+    <table>
+      <thead>
+        <tr><th>Area</th><th>Time</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Keys + auth.config + jwt helper</td><td>45 min</td></tr>
+        <tr><td>HTTP + backend refactor</td><td>2–3 h</td></tr>
+        <tr><td>Client auth modules + useUserAuth</td><td>1–2 h</td></tr>
+        <tr><td>Route cleanup + types</td><td>1 h</td></tr>
+        <tr><td>Testing</td><td>1 h</td></tr>
+        <tr><td><strong>Total</strong></td><td><strong>~6 hours</strong></td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="files">
+    <h2>Files touched (summary)</h2>
+    <table>
+      <thead>
+        <tr><th>File</th><th>Action</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>packages/backend/convex/auth.config.ts</code></td><td><strong>Create</strong></td></tr>
+        <tr><td><code>packages/backend/convex/lib/jwt.ts</code></td><td><strong>Create</strong></td></tr>
+        <tr><td><code>packages/backend/convex/auth.ts</code></td><td><strong>Rewrite</strong> — remove sessions, add <code>getCurrentUserId</code>, <code>getUserForTelegramAuth</code></td></tr>
+        <tr><td><code>packages/backend/convex/http.ts</code></td><td><strong>Modify</strong> — JWT response, dev-auth route</td></tr>
+        <tr><td><code>packages/backend/convex/users.ts</code></td><td><strong>Modify</strong> — add <code>getCurrentUser</code> (handlers unchanged)</td></tr>
+        <tr><td><code>packages/backend/convex/vouchers.ts</code></td><td><strong>Modify</strong> — handlers unchanged</td></tr>
+        <tr><td><code>packages/backend/convex/schema.ts</code></td><td><strong>Modify</strong> — remove <code>userSessions</code></td></tr>
+        <tr><td><code>packages/backend/convex/crons.ts</code></td><td><strong>Modify</strong> — remove user session cron</td></tr>
+        <tr><td><code>packages/backend/convex/constants.ts</code></td><td><strong>Modify</strong> — remove session constants</td></tr>
+        <tr><td><code>apps/web/src/auth/jwtStorage.ts</code></td><td><strong>Create</strong></td></tr>
+        <tr><td><code>apps/web/src/auth/JwtAuthProvider.tsx</code></td><td><strong>Create</strong></td></tr>
+        <tr><td><code>apps/web/src/hooks/useAuthBootstrap.ts</code></td><td><strong>Create</strong></td></tr>
+        <tr><td><code>apps/web/src/router.tsx</code></td><td><strong>Modify</strong> — <code>JwtAuthProvider</code></td></tr>
+        <tr><td><code>apps/web/src/hooks/useUserAuth.ts</code></td><td><strong>Rewrite</strong></td></tr>
+        <tr><td><code>apps/web/src/routes/app/*.tsx</code></td><td><strong>Modify</strong> — 6 files</td></tr>
+        <tr><td>backend <code>package.json</code></td><td><strong>Add</strong> <code>jose</code></td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <hr />
+  <p style="color: var(--muted); font-size: 0.85rem;">
+    Markdown source: <code>docs/plans/stateless-jwt-auth.md</code>
+  </p>
+
+</body>
+</html>
