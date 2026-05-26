@@ -136,13 +136,21 @@ export default defineSchema({
 		extractedExpiryDate: v.optional(v.string()),
 		extractedValidFrom: v.optional(v.string()),
 	}).index("by_userId", ["userId"]),
-	feedback: defineTable({
+  feedback: defineTable({
 		userId: v.id("users"),
 		text: v.string(),
 		createdAt: v.number(),
 		status: v.string(), // "new", "read", "archived"
 		type: v.optional(v.string()), // "feedback", "support"
 	}),
+
+	analytics: defineTable({
+		action: v.string(),
+		userId: v.optional(v.id("users")),
+		createdAt: v.number(),
+	})
+		.index("by_action", ["action"])
+		.index("by_created", ["createdAt"]),
 
 	settings: defineTable({
 		key: v.string(),

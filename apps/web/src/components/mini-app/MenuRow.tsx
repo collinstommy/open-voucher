@@ -4,9 +4,10 @@ import type { MenuItem } from "./menuConfig";
 type Props = {
 	item: MenuItem;
 	onExternalClick: () => void;
+	onItemClick?: (id: string) => void;
 };
 
-export function MenuRow({ item, onExternalClick }: Props) {
+export function MenuRow({ item, onExternalClick, onItemClick }: Props) {
 	const content = (
 		<>
 			<div
@@ -31,16 +32,24 @@ export function MenuRow({ item, onExternalClick }: Props) {
 	const className =
 		"w-full flex items-center gap-4 p-3 rounded-2xl border border-slate-100 bg-white shadow-sm active:scale-[0.98] active:bg-slate-50 transition-all text-left cursor-pointer";
 
+	const handleClick = () => {
+		onItemClick?.(item.id);
+	};
+
 	if (item.external) {
 		return (
-			<button type="button" onClick={onExternalClick} className={className}>
+			<button
+				type="button"
+				onClick={onExternalClick}
+				className={className}
+			>
 				{content}
 			</button>
 		);
 	}
 
 	return (
-		<Link to={item.href!} className={className}>
+		<Link to={item.href!} className={className} onClick={handleClick}>
 			{content}
 		</Link>
 	);

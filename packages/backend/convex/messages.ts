@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import {
+	buildAnalyticsEventCounts,
 	enrichUnknownMessages,
 	filterBySince,
 	isInboundUserMessage,
@@ -46,5 +47,14 @@ export const backfillMessageIntents = internalMutation({
 		).length;
 
 		return { updated, remaining: remaining - updated };
+	},
+});
+
+export const getAnalyticsEventCounts = internalQuery({
+	args: {
+		since: v.optional(v.number()),
+	},
+	handler: async (ctx, { since }) => {
+		return await buildAnalyticsEventCounts(ctx, since);
 	},
 });

@@ -6,19 +6,22 @@ type SharePanelProps = {
 	onClose: () => void;
 	url: string;
 	text: string;
+	onShare?: (method: string) => void;
 };
 
-export function SharePanel({ open, onClose, url, text }: SharePanelProps) {
+export function SharePanel({ open, onClose, url, text, onShare }: SharePanelProps) {
 	if (!open) return null;
 
 	const encodedText = encodeURIComponent(text);
 	const encodedUrl = encodeURIComponent(url);
 
 	const shareWhatsApp = () => {
+		onShare?.("whatsapp");
 		window.open(`https://wa.me/?text=${encodedText}%20${encodedUrl}`, "_blank");
 	};
 
 	const shareFacebook = () => {
+		onShare?.("facebook");
 		window.open(
 			`https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}&quote=${encodedText}`,
 			"_blank",
@@ -26,6 +29,7 @@ export function SharePanel({ open, onClose, url, text }: SharePanelProps) {
 	};
 
 	const copyText = async () => {
+		onShare?.("copy");
 		try {
 			await navigator.clipboard.writeText(`${text} ${url}`);
 			toast.success("Copied!");

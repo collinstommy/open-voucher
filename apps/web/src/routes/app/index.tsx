@@ -4,8 +4,10 @@ import { SharePanel } from "@/components/mini-app/SharePanel";
 import { MENU_ITEMS } from "@/components/mini-app/menuConfig";
 import { useUserAuth } from "@/hooks/useUserAuth";
 import { openDonateLink } from "@/lib/openDonateLink";
+import { api } from "@open-voucher/backend/convex/_generated/api";
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useMutation } from "convex/react";
+import { useEffect, useState } from "react";
 
 export const Route = createFileRoute("/app/")({
 	component: AppHome,
@@ -16,16 +18,26 @@ const SHARE_TEXT = "Swap and share Dunnes Vouchers using this Telegram bot";
 
 function AppHome() {
 	const [showShare, setShowShare] = useState(false);
+	const recordEvent = useMutation(api.analytics.recordEvent);
 
 	const handleMenuClick = (id: string) => {
+		recordEvent({ action: `menu_click:${id}` });
 		if (id === "share") {
 			setShowShare(true);
-		} else {
+		} else if (id === "donate") {
 			openDonateLink();
 		}
 	};
 
+	const handleShare = (method: string) => {
+		recordEvent({ action: `share_click:${method}` });
+	};
+
 	const { user } = useUserAuth();
+
+	useEffect(() => {
+		recordEvent({ action: "page_view_app_menu" });
+	}, []);
 	if (!user) return null;
 
 	return (
@@ -37,6 +49,7 @@ function AppHome() {
 					key={item.id}
 					item={item}
 					onExternalClick={() => handleMenuClick(item.id)}
+					onItemClick={handleMenuClick}
 				/>
 			))}
 			</div>
@@ -46,6 +59,7 @@ function AppHome() {
 				onClose={() => setShowShare(false)}
 				url={SHARE_URL}
 				text={SHARE_TEXT}
+				onShare={handleShare}
 			/>
 		</div>
 	);

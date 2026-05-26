@@ -10,6 +10,7 @@
 
 import type * as admin from "../admin.js";
 import type * as admin_dashboard from "../admin/dashboard.js";
+import type * as analytics from "../analytics.js";
 import type * as auth from "../auth.js";
 import type * as constants from "../constants.js";
 import type * as crons from "../crons.js";
@@ -38,6 +39,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   admin: typeof admin;
   "admin/dashboard": typeof admin_dashboard;
+  analytics: typeof analytics;
   auth: typeof auth;
   constants: typeof constants;
   crons: typeof crons;

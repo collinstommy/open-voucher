@@ -23,6 +23,21 @@ const INTENT_LABELS: Record<string, string> = {
 	image: "Image upload",
 };
 
+const ANALYTICS_LABELS: Record<string, string> = {
+	page_view_app_menu: "App home views",
+	"menu_click:my-uploads": "Menu: My Uploads",
+	"menu_click:my-claims": "Menu: My Claims",
+	"menu_click:transactions": "Menu: Transactions",
+	"menu_click:donate": "Menu: Donate",
+	"menu_click:availability": "Menu: Availability",
+	"menu_click:share": "Menu: Share",
+	"menu_click:faq": "Menu: FAQ",
+	"menu_click:feedback": "Menu: Feedback",
+	"share_click:whatsapp": "Share: WhatsApp",
+	"share_click:facebook": "Share: Facebook",
+	"share_click:copy": "Share: Copy text",
+};
+
 export const Route = createFileRoute("/admin/messages")({
 	component: MessagesPage,
 });
@@ -39,6 +54,13 @@ function MessagesPage() {
 	const { data, isLoading, error } = useQuery(
 		convexQuery(
 			api.admin.getMessageAnalytics,
+			token ? { token, since } : "skip",
+		),
+	);
+
+	const { data: analyticsData, isLoading: analyticsLoading } = useQuery(
+		convexQuery(
+			api.admin.getAnalyticsEventCounts,
 			token ? { token, since } : "skip",
 		),
 	);
@@ -100,6 +122,29 @@ function MessagesPage() {
 					</div>
 					<div className="font-semibold text-2xl">{data?.unknownCount ?? 0}</div>
 				</div>
+			</section>
+
+			<section className="mb-8 rounded-lg border p-4">
+				<h2 className="mb-4 font-medium">App events</h2>
+				{analyticsLoading ? (
+					<div className="text-muted-foreground text-sm">Loading...</div>
+				) : (
+					<div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+						{Object.entries(analyticsData?.counts ?? {}).map(([action, count]) => (
+							<div key={action} className="rounded-md border p-3">
+								<div className="mb-1 text-muted-foreground text-xs">
+									{ANALYTICS_LABELS[action] ?? action}
+								</div>
+								<div className="font-semibold text-2xl">{count as number}</div>
+							</div>
+						))}
+					</div>
+				)}
+				{analyticsData && (
+					<div className="mt-3 text-muted-foreground text-xs">
+						{analyticsData.total} total events
+					</div>
+				)}
 			</section>
 
 			<section>

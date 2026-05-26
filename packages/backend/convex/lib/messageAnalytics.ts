@@ -97,3 +97,16 @@ export async function buildMessageAnalytics(
 		unknownMessages,
 	};
 }
+
+export async function buildAnalyticsEventCounts(
+	ctx: QueryCtx,
+	since: number | undefined,
+) {
+	const events = await ctx.db.query("analytics").collect();
+	const filtered = filterBySince(events, since);
+	const counts: Record<string, number> = {};
+	for (const event of filtered) {
+		counts[event.action] = (counts[event.action] ?? 0) + 1;
+	}
+	return { counts, total: filtered.length };
+}
