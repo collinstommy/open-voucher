@@ -1,6 +1,8 @@
 import { internalQuery, query } from "./_generated/server";
+import { adminQuery } from "./admin";
 
-export const getStats = query({
+export const getStats = adminQuery({
+	args: {},
 	handler: async (ctx) => {
 		const [vouchers, users] = await Promise.all([
 			ctx.db.query("vouchers").collect(),

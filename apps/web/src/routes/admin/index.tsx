@@ -32,7 +32,9 @@ function HomeComponent() {
 	const [range, setRange] = useState<"all" | "30days">("30days");
 	const [dryRun, setDryRun] = useState(true);
 	const [cleanupResult, setCleanupResult] = useState<any>(null);
-	const stats = useQuery(convexQuery(api.dashboard.getStats, {}));
+	const stats = useQuery(
+		convexQuery(api.dashboard.getStats, token ? { token } : "skip"),
+	);
 	const userGrowth = useQuery(
 		convexQuery(api.admin.getUserGrowth, token ? { token, range } : "skip"),
 	);

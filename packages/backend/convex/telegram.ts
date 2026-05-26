@@ -1024,6 +1024,13 @@ export const handleTelegramCallback = internalAction({
 				return;
 			}
 
+			const uploader = await ctx.runQuery(internal.users.getUserById, {
+				userId: voucher.uploaderId,
+			});
+			if (!uploader || uploader.telegramChatId !== telegramUserId) {
+				return;
+			}
+
 			const reward = UPLOAD_REWARDS[voucher.type];
 
 			await ctx.runMutation(internal.vouchers.confirmUploaderUsedVoucher, {
@@ -1053,12 +1060,21 @@ export const handleTelegramCallback = internalAction({
 				},
 			);
 
-			if (uploadedVoucher) {
-				await ctx.runMutation(internal.vouchers.recordUploaderDenied, {
-					uploaderId: uploadedVoucher.uploaderId,
-					voucherId: uploadedVoucher._id,
-				});
+			if (!uploadedVoucher) {
+				return;
 			}
+
+			const uploader = await ctx.runQuery(internal.users.getUserById, {
+				userId: uploadedVoucher.uploaderId,
+			});
+			if (!uploader || uploader.telegramChatId !== telegramUserId) {
+				return;
+			}
+
+			await ctx.runMutation(internal.vouchers.recordUploaderDenied, {
+				uploaderId: uploadedVoucher.uploaderId,
+				voucherId: uploadedVoucher._id,
+			});
 
 			await sendTelegramMessage(
 				chatId,

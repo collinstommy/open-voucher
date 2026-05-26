@@ -637,6 +637,62 @@ describe("Ban Flow Tests", () => {
 	});
 });
 
+describe("Uploader report callbacks", () => {
+	beforeEach(() => {
+		setupFetchMock();
+		vi.stubEnv("TELEGRAM_BOT_TOKEN", "test-bot-token");
+	});
+
+	afterEach(() => {
+		vi.unstubAllGlobals();
+		vi.unstubAllEnvs();
+	});
+
+	test("uploader_admitted ignores clicks from non-uploader", async () => {
+		const t = convexTest(schema, modules);
+		const uploaderChatId = "uploader_cb";
+		const attackerChatId = "attacker_cb";
+
+		const uploaderId = await createUser(t, {
+			telegramChatId: uploaderChatId,
+			coins: 50,
+		});
+		await createUser(t, {
+			telegramChatId: attackerChatId,
+			coins: 10,
+		});
+
+		const voucherId = await createVoucher(t, {
+			type: "10",
+			uploaderId,
+			status: "reported",
+		});
+
+		await t.action(internal.telegram.handleTelegramCallback, {
+			callbackQuery: {
+				id: "callback_attacker",
+				from: {
+					id: attackerChatId,
+					is_bot: false,
+					first_name: "Attacker",
+				},
+				message: {
+					message_id: 1,
+					chat: { id: attackerChatId, type: "private" },
+					text: "Did you use this voucher?",
+				},
+				data: `uploader_admitted:${voucherId}`,
+			},
+		});
+
+		const voucher = await t.run(async (ctx) => ctx.db.get(voucherId));
+		expect(voucher?.status).toBe("reported");
+
+		const uploader = await t.run(async (ctx) => ctx.db.get(uploaderId));
+		expect(uploader?.coins).toBe(50);
+	});
+});
+
 describe("Report Confirmation Flow", () => {
 	beforeEach(() => {
 		setupFetchMock();
