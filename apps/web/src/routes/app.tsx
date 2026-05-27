@@ -20,7 +20,7 @@ function AppLayout() {
 		return (
 			<AppShell>
 				<div className="flex flex-1 items-center justify-center text-slate-500">
-					Loading...
+
 				</div>
 			</AppShell>
 		);
