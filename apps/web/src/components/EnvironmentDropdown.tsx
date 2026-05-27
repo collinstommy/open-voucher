@@ -36,7 +36,10 @@ export function getDeployment(): Deployment {
 	if (window.location.hostname === DEV_HOSTNAME) {
 		return "dev";
 	}
-	return (localStorage.getItem("convex-deployment") as Deployment) || "prod";
+	return (
+		(localStorage.getItem("convex-deployment") as Deployment) ||
+		(window.location.hostname === "localhost" ? "dev" : "prod")
+	);
 }
 
 export function EnvironmentDropdown() {
