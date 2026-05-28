@@ -7,7 +7,6 @@ import {
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import type { ActionCtx, QueryCtx } from "./_generated/server";
-import { MIN_COINS, UPLOAD_REWARDS, CLAIM_COSTS } from "./constants";
 import { buildAnalyticsEventCounts, buildMessageAnalytics } from "./lib/messageAnalytics";
 import {
 	action,
@@ -17,6 +16,7 @@ import {
 	mutation,
 	query,
 } from "./_generated/server";
+import { CLAIM_COSTS, MIN_COINS, UPLOAD_REWARDS } from "./constants";
 
 const SESSION_DURATION_MS = 24 * 60 * 60 * 1000;
 
@@ -435,7 +435,9 @@ export const getUserDetails = adminQuery({
 		const uploadedVouchersWithDetails = await Promise.all(
 			uploadedVouchers.map(async (voucher) => {
 				const imageUrl = await ctx.storage.getUrl(voucher.imageStorageId);
-				const claimer = voucher.claimerId ? await ctx.db.get(voucher.claimerId) : null;
+				const claimer = voucher.claimerId
+					? await ctx.db.get(voucher.claimerId)
+					: null;
 				return {
 					_id: voucher._id,
 					type: voucher.type,
@@ -1025,9 +1027,7 @@ export const getFailedUploads = adminQuery({
 		].sort();
 
 		const filtered = excludeReasons?.length
-			? failedUploads.filter(
-					(u) => !excludeReasons.includes(u.failureReason),
-				)
+			? failedUploads.filter((u) => !excludeReasons.includes(u.failureReason))
 			: failedUploads;
 
 		const total = filtered.length;

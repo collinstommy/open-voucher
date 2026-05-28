@@ -209,7 +209,7 @@ describe("Failed Uploads", () => {
 	});
 
 	describe("Validation Failures", () => {
-		test("records COULD_NOT_READ_VALID_FROM when validFrom is missing", async () => {
+		test("accepts voucher when validFrom is missing", async () => {
 			vi.useFakeTimers();
 			setupFetchMock("missing_valid_from");
 			const t = convexTest(schema, modules);
@@ -233,37 +233,28 @@ describe("Failed Uploads", () => {
 
 			await t.finishAllScheduledFunctions(vi.runAllTimers);
 
-			// Verify failedUpload created
+			// Verify no failedUpload created
 			const failedUploads = await t.run(async (ctx) => {
 				return await ctx.db.query("failedUploads").collect();
 			});
+			expect(failedUploads).toHaveLength(0);
 
-			expect(failedUploads).toHaveLength(1);
-			expect(failedUploads[0]).toMatchObject({
-				userId,
-				imageStorageId,
-				failureType: "validation",
-				failureReason: "COULD_NOT_READ_VALID_FROM",
-				extractedType: "10",
-				extractedBarcode: "1234567890006",
-			});
-			expect(failedUploads[0].extractedValidFrom).toBeUndefined();
-
-			// Verify no voucher created
+			// Verify voucher created
 			const vouchers = await t.run(async (ctx) => {
 				return await ctx.db.query("vouchers").collect();
 			});
-			expect(vouchers).toHaveLength(0);
+			expect(vouchers).toHaveLength(1);
+			expect(vouchers[0].validFrom).toBeUndefined();
 
-			// Verify uploadCount NOT incremented
+			// Verify uploadCount incremented
 			const updatedUser = await t.run(async (ctx) => {
 				return await ctx.db.get(userId);
 			});
-			expect(updatedUser?.uploadCount || 0).toBe(initialUploadCount);
+			expect(updatedUser?.uploadCount || 0).toBe(initialUploadCount + 1);
 
-			// Verify error message sent
+			// Verify success message sent
 			expect(sentMessages).toHaveLength(1);
-			expect(sentMessages[0].text).toContain("valid from date");
+			expect(sentMessages[0].text).toContain("Voucher Accepted");
 		});
 
 		test("records INVALID_TYPE when type is not 5, 10, or 20", async () => {
@@ -560,7 +551,7 @@ describe("Failed Uploads", () => {
 	describe("Data Integrity", () => {
 		test("verifies all required fields present in failed upload", async () => {
 			vi.useFakeTimers();
-			setupFetchMock("missing_valid_from");
+			setupFetchMock("missing_barcode");
 			const t = convexTest(schema, modules);
 			const chatId = "505050505";
 
@@ -585,7 +576,7 @@ describe("Failed Uploads", () => {
 			expect(failedUpload.userId).toBe(userId);
 			expect(failedUpload.imageStorageId).toBe(imageStorageId);
 			expect(failedUpload.failureType).toBe("validation");
-			expect(failedUpload.failureReason).toBe("COULD_NOT_READ_VALID_FROM");
+			expect(failedUpload.failureReason).toBe("COULD_NOT_READ_BARCODE");
 			expect(failedUpload._creationTime).toBeGreaterThan(0);
 		});
 

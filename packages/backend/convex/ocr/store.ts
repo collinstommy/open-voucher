@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import dayjs from "dayjs";
 import { internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
-import { internalMutation, MutationCtx } from "../_generated/server";
+import { internalMutation, type MutationCtx } from "../_generated/server";
 import { UPLOAD_REWARDS } from "../constants";
 
 type VoucherOcrFailureReason =
@@ -11,7 +11,6 @@ type VoucherOcrFailureReason =
 	| "COULD_NOT_READ_AMOUNT"
 	| "COULD_NOT_READ_BARCODE"
 	| "COULD_NOT_READ_EXPIRY_DATE"
-	| "COULD_NOT_READ_VALID_FROM"
 	| "INVALID_TYPE"
 	| "DUPLICATE_BARCODE"
 	| "UNKNOWN_ERROR";
@@ -61,7 +60,6 @@ export const storeVoucherFromOcr = internalMutation({
 			validFrom,
 			expiryDate,
 			barcode,
-			isThreePlus,
 			rawResponse,
 		} = args;
 
@@ -82,10 +80,24 @@ export const storeVoucherFromOcr = internalMutation({
 			expiryDate && dayjsExpiry.isValid() && dayjsExpiry.valueOf() > oneYearAgo;
 		const isAlreadyExpired = dayjsExpiry.isBefore(now, "day");
 		// Check if it's after 9 PM Irish time
-		const irishHour = Number(new Intl.DateTimeFormat("en-IE", { timeZone: "Europe/Dublin", hour: "numeric", hour12: false }).format(new Date()));
+		const irishHour = Number(
+			new Intl.DateTimeFormat("en-IE", {
+				timeZone: "Europe/Dublin",
+				hour: "numeric",
+				hour12: false,
+			}).format(new Date()),
+		);
 		const isTooLateToday = dayjsExpiry.isSame(now, "day") && irishHour >= 21;
 		// Store at 22:59 UTC so it displays as the correct day in both UTC+0 and UTC+1
-		const expiryDateMs = Date.UTC(dayjsExpiry.year(), dayjsExpiry.month(), dayjsExpiry.date(), 22, 59, 0, 0);
+		const expiryDateMs = Date.UTC(
+			dayjsExpiry.year(),
+			dayjsExpiry.month(),
+			dayjsExpiry.date(),
+			22,
+			59,
+			0,
+			0,
+		);
 
 		// Parse validFrom for later validation
 		const dayjsValidFrom = dayjs(validFrom);
@@ -163,53 +175,6 @@ export const storeVoucherFromOcr = internalMutation({
 			};
 		}
 
-		// Three+ vouchers don't have a validFrom date - skip this check for them
-		if (!isThreePlus) {
-			if (!validFrom) {
-				await recordFailedUpload(
-					ctx,
-					userId,
-					imageStorageId,
-					"COULD_NOT_READ_VALID_FROM",
-					{
-						rawResponse,
-						type,
-						barcode,
-						expiryDate,
-						validFrom,
-					},
-				);
-				await sendErrorMessage(
-					ctx,
-					user.telegramChatId,
-					"COULD_NOT_READ_VALID_FROM",
-				);
-				return { success: false, reason: "COULD_NOT_READ_VALID_FROM" };
-			}
-
-			if (!isValidFromValid) {
-				await recordFailedUpload(
-					ctx,
-					userId,
-					imageStorageId,
-					"COULD_NOT_READ_VALID_FROM",
-					{
-						rawResponse,
-						type,
-						barcode,
-						expiryDate,
-						validFrom,
-					},
-				);
-				await sendErrorMessage(
-					ctx,
-					user.telegramChatId,
-					"COULD_NOT_READ_VALID_FROM",
-				);
-				return { success: false, reason: "COULD_NOT_READ_VALID_FROM" };
-			}
-		}
-
 		if (!barcode) {
 			await recordFailedUpload(
 				ctx,
@@ -262,9 +227,18 @@ export const storeVoucherFromOcr = internalMutation({
 			imageStorageId,
 			uploaderId: userId,
 			expiryDate: expiryDateMs,
-			validFrom: isThreePlus
-				? undefined
-				: Date.UTC(dayjsValidFrom.year(), dayjsValidFrom.month(), dayjsValidFrom.date(), 0, 0, 0, 0),
+			validFrom:
+				validFrom && isValidFromValid
+					? Date.UTC(
+							dayjsValidFrom.year(),
+							dayjsValidFrom.month(),
+							dayjsValidFrom.date(),
+							0,
+							0,
+							0,
+							0,
+						)
+					: undefined,
 			barcodeNumber: barcode,
 			ocrRawResponse: rawResponse,
 			createdAt: nowMs,
@@ -304,7 +278,7 @@ async function sendErrorMessage(
 	reason: VoucherOcrFailureReason,
 	expiryDate?: number,
 ) {
-	let message = `❌ <b>Voucher Processing Failed</b>\n\n`;
+	let message = "❌ <b>Voucher Processing Failed</b>\n\n";
 
 	switch (reason) {
 		case "COULD_NOT_READ_AMOUNT":
@@ -313,32 +287,34 @@ async function sendErrorMessage(
 		case "COULD_NOT_READ_EXPIRY_DATE":
 			message += `We couldn't determine the expiry date. Please make sure it's clear in the photo.`;
 			break;
-		case "COULD_NOT_READ_VALID_FROM":
-			message += `We couldn't determine the valid from date. Please make sure the validity dates are clear in the photo.`;
-			break;
 		case "COULD_NOT_READ_BARCODE":
 			message += `We couldn't read the barcode. Please ensure it's fully visible and clear.`;
 			break;
-		case "EXPIRED":
+		case "EXPIRED": {
 			const dateStr = expiryDate
 				? dayjs(expiryDate).format("DD-MM-YYYY")
 				: "unknown";
 			message += `This voucher expired on ${dateStr}.`;
 			break;
-		case "TOO_LATE_TODAY":
+		}
+		case "TOO_LATE_TODAY": {
 			const todayDateStr = expiryDate
 				? dayjs(expiryDate).format("DD-MM-YYYY")
 				: "today";
 			message += `This voucher expires ${todayDateStr}, but it's after 9 PM. Vouchers expiring today can only be uploaded before 9 PM.`;
 			break;
+		}
 		case "INVALID_TYPE":
-			message += `This voucher does not appear to be a valid €5, €10, or €20 Dunnes voucher. We only accept these specific general spend vouchers.`;
+			message +=
+				"This voucher does not appear to be a valid €5, €10, or €20 Dunnes voucher. We only accept these specific general spend vouchers.";
 			break;
 		case "DUPLICATE_BARCODE":
-			message += `This voucher has already been uploaded by someone. Each voucher can only be uploaded once.`;
+			message +=
+				"This voucher has already been uploaded by someone. Each voucher can only be uploaded once.";
 			break;
 		default:
-			message += `We encountered an unknown error while processing your voucher. Please try again or contact support.`;
+			message +=
+				"We encountered an unknown error while processing your voucher. Please try again or contact support.";
 	}
 
 	await ctx.scheduler.runAfter(0, internal.telegram.sendMessageAction, {
