@@ -7,6 +7,7 @@ import {
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import type { ActionCtx, QueryCtx } from "./_generated/server";
+import { buildAnalyticsEventCounts, buildMessageAnalytics } from "./lib/messageAnalytics";
 import {
 	action,
 	internalAction,
@@ -16,10 +17,6 @@ import {
 	query,
 } from "./_generated/server";
 import { CLAIM_COSTS, MIN_COINS, UPLOAD_REWARDS } from "./constants";
-import {
-	buildAnalyticsEventCounts,
-	buildMessageAnalytics,
-} from "./lib/messageAnalytics";
 
 const SESSION_DURATION_MS = 24 * 60 * 60 * 1000;
 

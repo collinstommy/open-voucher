@@ -136,7 +136,7 @@ export default defineSchema({
 		extractedExpiryDate: v.optional(v.string()),
 		extractedValidFrom: v.optional(v.string()),
 	}).index("by_userId", ["userId"]),
-	feedback: defineTable({
+  feedback: defineTable({
 		userId: v.id("users"),
 		text: v.string(),
 		createdAt: v.number(),
@@ -157,9 +157,9 @@ export default defineSchema({
 		value: v.string(),
 	}).index("by_key", ["key"]),
 
-	adminSessions: defineTable({
-		token: v.string(),
-		createdAt: v.number(),
-		expiresAt: v.number(),
-	}).index("by_token", ["token"]),
+  adminSessions: defineTable({
+    token: v.string(),
+    createdAt: v.number(),
+    expiresAt: v.number(),
+  }).index("by_token", ["token"]),
 });
