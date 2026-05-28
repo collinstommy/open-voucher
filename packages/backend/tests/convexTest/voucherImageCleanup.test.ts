@@ -15,7 +15,7 @@ import { createUser, createVoucher } from "./fixtures/testHelpers";
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 describe("Voucher Image Cleanup", () => {
-	describe("Marking phase - only marks vouchers expired 90+ days", () => {
+	describe("Marking phase - only marks vouchers with expiryDate 90+ days ago", () => {
 		test("marks voucher expired 91 days ago", async () => {
 			const t = convexTest(schema, modules);
 			const userId = await createUser(t, { telegramChatId: "111" });
@@ -97,7 +97,7 @@ describe("Voucher Image Cleanup", () => {
 			expect(result).toHaveLength(0);
 		});
 
-		test("does NOT mark claimed voucher", async () => {
+		test("DOES mark claimed voucher expired 100 days ago", async () => {
 			const t = convexTest(schema, modules);
 			const userId = await createUser(t, { telegramChatId: "444" });
 			const now = Date.now();
@@ -114,7 +114,29 @@ describe("Voucher Image Cleanup", () => {
 				{ mode: "mark" },
 			);
 
-			expect(result).toHaveLength(0);
+			expect(result).toHaveLength(1);
+			expect(result[0].status).toBe("claimed");
+		});
+
+		test("DOES mark uploader_admitted_used voucher expired 100 days ago", async () => {
+			const t = convexTest(schema, modules);
+			const userId = await createUser(t, { telegramChatId: "445" });
+			const now = Date.now();
+
+			await createVoucher(t, {
+				type: "10",
+				uploaderId: userId,
+				status: "uploader_admitted_used",
+				expiryDate: now - 100 * MS_PER_DAY,
+			});
+
+			const result = await t.query(
+				internal.admin.getExpiredVouchersForCleanup,
+				{ mode: "mark" },
+			);
+
+			expect(result).toHaveLength(1);
+			expect(result[0].status).toBe("uploader_admitted_used");
 		});
 
 		test("does NOT mark voucher already marked for deletion", async () => {
@@ -169,7 +191,7 @@ describe("Voucher Image Cleanup", () => {
 			expect(result).toHaveLength(0);
 		});
 
-		test("respects batch size limit of 100", async () => {
+		test("mark phase returns ALL matching vouchers (no batch limit)", async () => {
 			const t = convexTest(schema, modules);
 			const userId = await createUser(t, { telegramChatId: "777" });
 			const now = Date.now();
@@ -188,7 +210,7 @@ describe("Voucher Image Cleanup", () => {
 				{ mode: "mark" },
 			);
 
-			expect(result).toHaveLength(100);
+			expect(result).toHaveLength(105);
 		});
 	});
 

@@ -9,10 +9,17 @@
  */
 
 import type * as admin from "../admin.js";
+import type * as admin_dashboard from "../admin/dashboard.js";
+import type * as analytics from "../analytics.js";
+import type * as auth from "../auth.js";
 import type * as constants from "../constants.js";
 import type * as crons from "../crons.js";
-import type * as dashboard from "../dashboard.js";
 import type * as http from "../http.js";
+import type * as lib_jwt from "../lib/jwt.js";
+import type * as lib_messageAnalytics from "../lib/messageAnalytics.js";
+import type * as lib_messageIntent from "../lib/messageIntent.js";
+import type * as lib_telegramAuth from "../lib/telegramAuth.js";
+import type * as messages from "../messages.js";
 import type * as ocr_evals from "../ocr/evals.js";
 import type * as ocr_extract from "../ocr/extract.js";
 import type * as ocr_process from "../ocr/process.js";
@@ -31,10 +38,17 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   admin: typeof admin;
+  "admin/dashboard": typeof admin_dashboard;
+  analytics: typeof analytics;
+  auth: typeof auth;
   constants: typeof constants;
   crons: typeof crons;
-  dashboard: typeof dashboard;
   http: typeof http;
+  "lib/jwt": typeof lib_jwt;
+  "lib/messageAnalytics": typeof lib_messageAnalytics;
+  "lib/messageIntent": typeof lib_messageIntent;
+  "lib/telegramAuth": typeof lib_telegramAuth;
+  messages: typeof messages;
   "ocr/evals": typeof ocr_evals;
   "ocr/extract": typeof ocr_extract;
   "ocr/process": typeof ocr_process;

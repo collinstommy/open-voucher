@@ -32,7 +32,6 @@ export default defineSchema({
 		telegramState: v.optional(
 			v.union(
 				v.literal("waiting_for_support_message"),
-				v.literal("waiting_for_feedback_message"),
 				v.literal("waiting_for_ban_appeal"),
 				v.literal("onboarding_tutorial"),
 			),
@@ -48,8 +47,12 @@ export default defineSchema({
 		mediaGroupId: v.optional(v.string()),
 		imageStorageId: v.optional(v.id("_storage")),
 		isAdminMessage: v.optional(v.boolean()),
+		// Stored as string; validated on write via messageIntentValidator in mutations.
+		intent: v.optional(v.string()),
 		createdAt: v.number(),
-	}).index("by_admin_message", ["isAdminMessage", "telegramChatId"]),
+	})
+		.index("by_admin_message", ["isAdminMessage", "telegramChatId"])
+		.index("by_direction", ["direction"]),
 
 	vouchers: defineTable({
 		type: v.union(
@@ -66,6 +69,7 @@ export default defineSchema({
 			v.literal("expired"),
 			v.literal("uploader_admitted_used"),
 			v.literal("uploader_denied"),
+			v.literal("invalidated"),
 		),
 		imageStorageId: v.id("_storage"),
 		barcodeNumber: v.optional(v.string()),
@@ -111,6 +115,8 @@ export default defineSchema({
 			v.literal("uploader_denied"),
 			v.literal("admin_expiry_deduction"),
 			v.literal("claim_reversed"),
+			v.literal("self_invalidated"),
+			v.literal("claim_returned"),
 		),
 		amount: v.number(),
 		voucherId: v.optional(v.id("vouchers")),
@@ -137,6 +143,14 @@ export default defineSchema({
 		status: v.string(), // "new", "read", "archived"
 		type: v.optional(v.string()), // "feedback", "support"
 	}),
+
+	analytics: defineTable({
+		action: v.string(),
+		userId: v.optional(v.id("users")),
+		createdAt: v.number(),
+	})
+		.index("by_action", ["action"])
+		.index("by_created", ["createdAt"]),
 
 	settings: defineTable({
 		key: v.string(),

@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { useConvex } from "convex/react";
 import type { Id } from "@open-voucher/backend/convex/_generated/dataModel";
 
-export const Route = createFileRoute("/banned")({
+export const Route = createFileRoute("/admin/banned")({
 	component: BannedUsers,
 });
 
@@ -76,7 +76,7 @@ function BannedUsers() {
 									<div>
 										<h3 className="font-medium">
 											<Link
-												to="/users/$userId"
+												to="/admin/users/$userId"
 												params={{ userId: user._id }}
 												className="hover:text-blue-600 hover:underline"
 											>
@@ -156,7 +156,7 @@ function BannedUsers() {
 									<div>
 										<h3 className="font-medium">
 											<Link
-												to="/users/$userId"
+												to="/admin/users/$userId"
 												params={{ userId: user._id }}
 												className="hover:text-blue-600 hover:underline"
 											>

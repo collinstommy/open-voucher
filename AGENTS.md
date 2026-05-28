@@ -1,6 +1,6 @@
 # ⚠️ IMPORTANT: NEVER DEPLOY UNLESS EXPLICITLY ASKED
 
-Do not run `bun run deploy:all`, `bun run deploy:web`, `bun run deploy:server`, or `bunx convex deploy` unless the user explicitly asks you to deploy. Always commit and push first, then wait for the user to decide when to deploy.
+Do not run `bun run deploy:all`, `bun run deploy:web`, `bun run deploy:web:dev`, `bun run deploy:dev`, `bun run deploy:server`, or `bunx convex deploy` unless the user explicitly asks you to deploy. Always commit and push first, then wait for the user to decide when to deploy.
 
 ## Never Commit or Push Without Explicit Permission
 
@@ -50,6 +50,9 @@ The following `bun run` scripts are available from the root directory:
 *   `bun run dev:web`: Starts only the web frontend application in development mode.
 *   `bun run dev:server`: Starts only the Convex backend server in development mode.
 *   `bun run dev:setup`: Sets up and configures the Convex project.
+*   `bun run deploy:web`: Deploy production Cloudflare Worker.
+*   `bun run deploy:web:dev`: Deploy dev Cloudflare Worker (`dev.openvouchers.org`, always dev Convex).
+*   `bun run deploy:dev`: Deploy dev worker + register dev bot commands.
 
 ## Development Conventions
 

@@ -6,7 +6,7 @@ import { api } from "@open-voucher/backend/convex/_generated/api";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { usePaginatedQuery } from "convex/react";
 
-export const Route = createFileRoute("/vouchers")({
+export const Route = createFileRoute("/admin/vouchers")({
 	component: VouchersPage,
 });
 
@@ -75,7 +75,7 @@ function VouchersPage() {
 							<div className="text-muted-foreground mb-1 text-xs font-mono">
 								Uploader:{" "}
 								<Link
-									to="/users/$userId"
+									to="/admin/users/$userId"
 									params={{ userId: voucher.uploaderId }}
 									className="text-primary hover:underline"
 								>

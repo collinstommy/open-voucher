@@ -20,8 +20,11 @@
 		"dev:setup": "turbo -F @open-voucher/backend dev:setup",
 		"format": "biome format --write .",
 		"format:check": "biome format .",
-		"deploy:web": "turbo -F web deploy",
-		"deploy:backend": "turbo -F @open-voucher/backend deploy",
+		"deploy:web": "bun run -F web deploy",
+		"deploy:web:dev": "bun run -F web deploy:dev",
+		"deploy:backend": "turbo -F @open-voucher/backend deploy && bun run -F @open-voucher/backend register-commands",
+		"deploy:backend:dev": "bun run -F @open-voucher/backend register-commands:dev",
+		"deploy:dev": "bun run deploy:web:dev && bun run deploy:backend:dev",
 		"deploy:all": "turbo deploy"
 	},
 	"dependencies": {},

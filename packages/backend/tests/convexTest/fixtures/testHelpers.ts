@@ -197,7 +197,7 @@ export async function createUser(
 export interface CreateVoucherParams {
 	type: string;
 	uploaderId: Id<"users">;
-	status?: "available" | "claimed" | "processing" | "expired";
+	status?: "available" | "claimed" | "processing" | "expired" | "uploader_admitted_used" | "uploader_denied" | "reported";
 	imageStorageId?: Id<"_storage">;
 	expiryDate?: number;
 	validFrom?: number;

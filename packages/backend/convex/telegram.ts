@@ -6,12 +6,12 @@ import type { Id } from "./_generated/dataModel";
 import type { ActionCtx } from "./_generated/server";
 import { internalAction } from "./_generated/server";
 import { UPLOAD_REWARDS } from "./constants";
+import { classifyInboundMessage } from "./lib/messageIntent";
 
 dayjs.extend(advancedFormat);
 
 type TelegramUserState =
 	| "waiting_for_support_message"
-	| "waiting_for_feedback_message"
 	| "waiting_for_ban_appeal"
 	| "onboarding_tutorial";
 
@@ -69,10 +69,6 @@ function getWelcomeMessage(): string {
 	return "🎉 <b>Welcome to Dunnes Voucher Bot!</b>";
 }
 
-function getBetaMessage(): string {
-	return `👋 <b>We're in beta!</b>\nWe're keen to hear about bugs or general feedback.\n\n📝 To send feedback send <b>feedback [your message]</b>`;
-}
-
 async function getSampleVoucherImageUrl(
 	ctx: ActionCtx,
 ): Promise<string | null> {
@@ -95,7 +91,6 @@ async function handleNewUser(
 		firstName,
 	});
 	await sendTelegramMessage(chatId, getWelcomeMessage());
-	await sendTelegramMessage(chatId, getBetaMessage());
 	await ctx.runMutation(internal.users.setUserOnboardingStep, {
 		userId: newUser._id,
 		step: 1,
@@ -122,21 +117,6 @@ async function handleUserState(
 			await sendTelegramMessage(
 				chatId,
 				"✅ Your support request has been received. We'll review your case and get back to you.",
-			);
-			return true;
-
-		case "waiting_for_feedback_message":
-			await ctx.runMutation(internal.users.submitFeedback, {
-				userId: user._id,
-				text,
-				type: "feedback",
-			});
-			await ctx.runMutation(internal.users.clearUserTelegramState, {
-				userId: user._id,
-			});
-			await sendTelegramMessage(
-				chatId,
-				"✅ Thanks for your feedback! We read every message.",
 			);
 			return true;
 
@@ -248,27 +228,26 @@ async function handleImageUpload(
 	}
 }
 
+function getMiniAppUrl(): string {
+	return process.env.MINI_APP_URL ?? "https://openvouchers.org/app";
+}
+
 async function sendHelpMenu(chatId: string) {
 	await sendTelegramMessage(chatId, "Choose an option below", {
 		inline_keyboard: [
 			[
-				{ text: "Balance", callback_data: "help:balance" },
-				{ text: "FAQ", callback_data: "help:faq" },
-			],
-			[{ text: "Give feedback", callback_data: "help:feedback" }],
-			[
+				{ text: "💰 Balance", callback_data: "help:balance" },
 				{
-					text: "Voucher Availability",
-					callback_data: "help:availability",
+					text: "📱 My Account",
+					web_app: { url: getMiniAppUrl() },
 				},
 			],
 			[
-				{ text: "How to upload?", callback_data: "help:upload" },
-				{ text: "How to claim?", callback_data: "help:claim" },
+				{ text: "📸 How to Upload", callback_data: "help:upload" },
+				{ text: "🎫 How to Claim", callback_data: "help:claim" },
 			],
-			[{ text: "View Transactions", callback_data: "help:transactions" }],
-			[{ text: "View updates", callback_data: "help:updates" }],
-			[{ text: "☕ Donate", callback_data: "help:donate" }],
+			[{ text: "🔗 Share Bot", callback_data: "help:share" }],
+		[{ text: "☕ Donate", callback_data: "help:donate" }],
 		],
 	});
 }
@@ -293,6 +272,23 @@ async function sendFaqMenu(chatId: string) {
 	});
 }
 
+async function sendAppWebAppButton(chatId: string) {
+	await sendTelegramMessage(
+		chatId,
+		"📱 <b>My Account</b>\n\nView your balance, transactions, and voucher availability.",
+		{
+			inline_keyboard: [
+				[
+					{
+						text: "📱 Open My Account",
+						web_app: { url: getMiniAppUrl() },
+					},
+				],
+			],
+		},
+	);
+}
+
 async function handleCommand(
 	ctx: ActionCtx,
 	chatId: string,
@@ -300,6 +296,11 @@ async function handleCommand(
 	text: string,
 	user: User,
 ) {
+	if (lowerText === "start") {
+		await sendHelpMenu(chatId);
+		return true;
+	}
+
 	if (lowerText === "balance") {
 		await sendTelegramMessage(chatId, `💰 You have ${user.coins} coins.`);
 		return true;
@@ -323,31 +324,16 @@ async function handleCommand(
 		return true;
 	}
 
-	if (lowerText === "feedback") {
-		await sendTelegramMessage(
-			chatId,
-			"📝 To send feedback, include your message:\n<code>feedback your message here</code>",
-		);
+	if (lowerText === "account" || lowerText === "app") {
+		await sendAppWebAppButton(chatId);
 		return true;
 	}
 
-	if (lowerText.startsWith("feedback ")) {
-		const feedbackText = text.slice(9).trim();
-		if (feedbackText.length > 0) {
-			await ctx.runMutation(internal.users.submitFeedback, {
-				userId: user._id,
-				text: feedbackText,
-			});
-			await sendTelegramMessage(
-				chatId,
-				"✅ Thanks for your feedback! We read every message.",
-			);
-		} else {
-			await sendTelegramMessage(
-				chatId,
-				"⚠️ Please include a message, e.g., 'feedback fix this bug!'",
-			);
-		}
+	if (lowerText === "share") {
+		await sendTelegramMessage(
+			chatId,
+			"🔗 Swap and share Dunnes Stores vouchers:\nhttps://openvouchers.org/telegram\n\nNew users get a <b>10-coin welcome bonus</b>!",
+		);
 		return true;
 	}
 
@@ -425,6 +411,16 @@ export const handleTelegramMessage = internalAction({
 		const isImage = !!message.photo;
 		const mediaGroupId = message.media_group_id;
 
+		const user = await ctx.runQuery(internal.users.getUserByTelegramChatId, {
+			telegramChatId: chatId,
+		});
+
+		const intent = classifyInboundMessage({
+			text,
+			messageType: isImage ? "image" : "text",
+			userState: user?.telegramState,
+		});
+
 		// 1. Idempotency Check & Storage
 		const messageDbId = (await ctx.runMutation(internal.users.storeMessage, {
 			telegramMessageId: messageId,
@@ -434,16 +430,13 @@ export const handleTelegramMessage = internalAction({
 			text: text,
 			mediaGroupId,
 			imageStorageId: undefined,
+			intent,
 		})) as Id<"messages"> | null;
 
 		if (!messageDbId) {
 			console.log(`Duplicate message ${messageId} from ${chatId}, ignoring.`);
 			return;
 		}
-
-		const user = await ctx.runQuery(internal.users.getUserByTelegramChatId, {
-			telegramChatId: chatId,
-		});
 
 		if (!user) {
 			await handleNewUser(ctx, chatId, username, firstName);
@@ -626,8 +619,8 @@ async function setBotCommands() {
 	const commands = [
 		{ command: "help", description: "Show help menu" },
 		{ command: "balance", description: "Check your coin balance" },
-		{ command: "faq", description: "Frequently asked questions" },
-		{ command: "feedback", description: "Send feedback" },
+		{ command: "share", description: "Share the bot with friends" },
+		{ command: "account", description: "Open My Account" },
 		{ command: "donate", description: "Support the project" },
 	];
 
@@ -647,6 +640,30 @@ async function setBotCommands() {
 		}
 	} catch (error) {
 		console.error("Network error setting bot commands:", error);
+	}
+
+	const menuButtonUrl = `https://api.telegram.org/bot${token}/setChatMenuButton`;
+	try {
+		const response = await fetch(menuButtonUrl, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				menu_button: {
+					type: "web_app",
+					text: "My Account",
+					web_app: { url: getMiniAppUrl() },
+				},
+			}),
+		});
+
+		if (!response.ok) {
+			const errorText = await response.text();
+			console.error("Failed to set chat menu button:", errorText);
+		} else {
+			console.log("Chat menu button set to My Account Mini App");
+		}
+	} catch (error) {
+		console.error("Network error setting chat menu button:", error);
 	}
 }
 
@@ -699,7 +716,54 @@ export const handleTelegramCallback = internalAction({
 				await sendTelegramMessage(chatId, `⏰ ${result.message}`);
 			} else if (result.status === "already_reported") {
 				await sendTelegramMessage(chatId, `⚠️ ${result.message}`);
-			} else if (result.status === "replaced" && result.voucher) {
+			} else if (result.status === "reported") {
+				await sendTelegramMessage(
+					chatId,
+					"✅ Report received.\n\nDo you want a replacement voucher?",
+					{
+						inline_keyboard: [
+							[
+								{
+									text: "✅ Yes, send a replacement",
+									callback_data: `report:replacement:yes:${voucherId}`,
+								},
+							],
+							[
+								{
+									text: "❌ No thanks",
+									callback_data: `report:replacement:no:${voucherId}`,
+								},
+							],
+						],
+					},
+				);
+			}
+		} else if (data.startsWith("report:replacement:yes:")) {
+			const voucherId = data.split(":")[3];
+
+			await answerTelegramCallback(callbackQuery.id);
+			await editTelegramMessageText(
+				chatId,
+				callbackQuery.message.message_id,
+				callbackQuery.message.text,
+			);
+
+			const user = await ctx.runQuery(internal.users.getUserByTelegramChatId, {
+				telegramChatId: telegramUserId,
+			});
+			if (!user) {
+				return;
+			}
+
+			const result = await ctx.runMutation(
+				internal.vouchers.requestReplacement,
+				{
+					userId: user._id,
+					originalVoucherId: voucherId as Id<"vouchers">,
+				},
+			);
+
+			if (result.status === "replaced" && result.voucher) {
 				await sendTelegramPhoto(
 					chatId,
 					result.voucher.imageUrl,
@@ -715,14 +779,23 @@ export const handleTelegramCallback = internalAction({
 						],
 					},
 				);
-			} else if (result.status === "refunded") {
+			} else {
 				await sendTelegramMessage(
 					chatId,
 					"⚠️ No replacement vouchers available. Your coins have been refunded.",
 				);
-			} else if (result.status === "reported") {
-				await sendTelegramMessage(chatId, "✅ Report received.");
 			}
+		} else if (data.startsWith("report:replacement:no:")) {
+			await answerTelegramCallback(callbackQuery.id);
+			await editTelegramMessageText(
+				chatId,
+				callbackQuery.message.message_id,
+				callbackQuery.message.text,
+			);
+			await sendTelegramMessage(
+				chatId,
+				"✅ No replacement needed. Thank you for reporting!",
+			);
 		} else if (data.startsWith("report:cancel:")) {
 			await editTelegramMessageText(
 				chatId,
@@ -761,9 +834,24 @@ export const handleTelegramCallback = internalAction({
 				return;
 			}
 
+			const existingReport = await ctx.runQuery(
+				internal.vouchers.checkExistingReport,
+				{
+					userId: user._id,
+					voucherId: voucherId as Id<"vouchers">,
+				},
+			);
+			if (existingReport) {
+				await sendTelegramMessage(
+					chatId,
+					"⚠️ You have already reported this voucher.",
+				);
+				return;
+			}
+
 			await sendTelegramMessage(
 				chatId,
-				"⚠️ <b>Report this voucher as not working?</b>\n\nA replacement voucher will be sent if available. If not, your coins will be refunded.",
+				"⚠️ <b>Report this voucher as not working?</b>\n\nYou can request a replacement voucher if you need one.",
 				{
 					inline_keyboard: [
 						[{ text: "✅ Yes", callback_data: `report:confirm:${voucherId}` }],
@@ -793,17 +881,6 @@ export const handleTelegramCallback = internalAction({
 					await sendFaqMenu(chatId);
 					break;
 				}
-				case "feedback": {
-					await ctx.runMutation(internal.users.setUserTelegramState, {
-						userId: user._id,
-						state: "waiting_for_feedback_message",
-					});
-					await sendTelegramMessage(
-						chatId,
-						"Please reply with your feedback message",
-					);
-					break;
-				}
 				case "availability": {
 					const counts = await ctx.runQuery(
 						internal.vouchers.getAvailableVoucherCount,
@@ -821,6 +898,56 @@ export const handleTelegramCallback = internalAction({
 					);
 					break;
 				}
+				case "transactions": {
+					const transactions = await ctx.runQuery(
+						internal.users.getUserTransactions,
+						{ userId: user._id },
+					);
+
+					if (transactions.length === 0) {
+						await sendTelegramMessage(chatId, "📋 No transactions yet.");
+						break;
+					}
+
+					const formatType = (type: string) => {
+						switch (type) {
+							case "signup_bonus":
+								return "🎁 Signup Bonus";
+							case "upload_reward":
+								return "📤 Upload Reward";
+							case "claim_spend":
+								return "💳 Claim Spent";
+							case "refund":
+								return "↩️ Refund";
+							case "report_refund":
+								return "↩️ Refund";
+							case "uploader_denied":
+								return "❌ Upload Denied";
+							default:
+								return type;
+						}
+					};
+
+					const transactionList = transactions.map((t) => {
+						const date = dayjs(t.createdAt).format("MMM D, YYYY");
+						const formattedType = formatType(t.type);
+						const amountPrefix = t.type === "claim_spend" ? "-" : "+";
+						return `${formattedType}: ${amountPrefix}${t.amount} (${date})`;
+					});
+
+					await sendTelegramMessage(
+						chatId,
+						`📋 <b>Your Last 25 Transactions:</b>\n\n${transactionList.join("\n")}`,
+					);
+					break;
+				}
+				case "updates": {
+					await sendTelegramMessage(
+						chatId,
+						"🆕 <b>Latest Updates</b>\n\nCheck out what's new:\nhttps://www.openvouchers.org#updates",
+					);
+					break;
+				}
 				case "upload": {
 					await sendTelegramMessage(
 						chatId,
@@ -835,65 +962,22 @@ export const handleTelegramCallback = internalAction({
 					);
 					break;
 				}
-			case "transactions": {
-				const transactions = await ctx.runQuery(
-					internal.users.getUserTransactions,
-					{ userId: user._id },
-				);
-
-				if (transactions.length === 0) {
-					await sendTelegramMessage(chatId, "📋 No transactions yet.");
+				case "donate": {
+					await sendTelegramMessage(
+						chatId,
+						"☕ <b>Support Open Vouchers</b>\n\nThe service is free, but servers and AI-powered OCR aren't. Your support helps keep the lights on!\n\nhttps://buymeacoffee.com/openvouchers",
+					);
 					break;
 				}
-
-				const formatType = (type: string) => {
-					switch (type) {
-						case "signup_bonus":
-							return "🎁 Signup Bonus";
-						case "upload_reward":
-							return "📤 Upload Reward";
-						case "claim_spend":
-							return "💳 Claim Spent";
-						case "refund":
-							return "↩️ Refund";
-						case "report_refund":
-							return "↩️ Refund";
-						case "uploader_denied":
-							return "❌ Upload Denied";
-						default:
-							return type;
-					}
-				};
-
-				const transactionList = transactions.map((t) => {
-					const date = dayjs(t.createdAt).format("MMM D, YYYY");
-					const formattedType = formatType(t.type);
-					const amountPrefix = t.type === "claim_spend" ? "-" : "+";
-					return `${formattedType}: ${amountPrefix}${t.amount} (${date})`;
-				});
-
-				await sendTelegramMessage(
-					chatId,
-					`📋 <b>Your Last 25 Transactions:</b>\n\n${transactionList.join("\n")}`,
-				);
-				break;
-			}
-			case "updates": {
-				await sendTelegramMessage(
-					chatId,
-					"🆕 <b>Latest Updates</b>\n\nCheck out what's new:\nhttps://www.openvouchers.org#updates",
-				);
-				break;
-			}
-			case "donate": {
-				await sendTelegramMessage(
-					chatId,
-					"☕ <b>Support Open Vouchers</b>\n\nThe service is free, but servers and AI-powered OCR aren't. Your support helps keep the lights on!\n\nhttps://buymeacoffee.com/openvouchers",
-				);
-				break;
-			}
+				case "share": {
+					await sendTelegramMessage(
+						chatId,
+						"🔗 Swap and share Dunnes Storesvouchers:\nhttps://openvouchers.org/telegram\n\nNew users get a <b>10-coin welcome bonus</b>!",
+					);
+					break;
+				}
 		}
-	} else if (data.startsWith("faq:")) {
+		} else if (data.startsWith("faq:")) {
 			await answerTelegramCallback(callbackQuery.id);
 
 			const faqAction = data.split(":")[1];
@@ -940,6 +1024,13 @@ export const handleTelegramCallback = internalAction({
 				return;
 			}
 
+			const uploader = await ctx.runQuery(internal.users.getUserById, {
+				userId: voucher.uploaderId,
+			});
+			if (!uploader || uploader.telegramChatId !== telegramUserId) {
+				return;
+			}
+
 			const reward = UPLOAD_REWARDS[voucher.type];
 
 			await ctx.runMutation(internal.vouchers.confirmUploaderUsedVoucher, {
@@ -969,12 +1060,21 @@ export const handleTelegramCallback = internalAction({
 				},
 			);
 
-			if (uploadedVoucher) {
-				await ctx.runMutation(internal.vouchers.recordUploaderDenied, {
-					uploaderId: uploadedVoucher.uploaderId,
-					voucherId: uploadedVoucher._id,
-				});
+			if (!uploadedVoucher) {
+				return;
 			}
+
+			const uploader = await ctx.runQuery(internal.users.getUserById, {
+				userId: uploadedVoucher.uploaderId,
+			});
+			if (!uploader || uploader.telegramChatId !== telegramUserId) {
+				return;
+			}
+
+			await ctx.runMutation(internal.vouchers.recordUploaderDenied, {
+				uploaderId: uploadedVoucher.uploaderId,
+				voucherId: uploadedVoucher._id,
+			});
 
 			await sendTelegramMessage(
 				chatId,

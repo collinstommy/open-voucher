@@ -122,13 +122,23 @@ describe("Report Flow", () => {
 			claimedAt: Date.now(),
 		});
 
-		// Report the voucher
+		// Report the voucher — should return "reported" (replacement is opt-in now)
 		const result = await t.mutation(internal.vouchers.reportVoucher, {
 			userId: claimerId,
 			voucherId,
 		});
 
-		expect(result.status).toBe("refunded");
+		expect(result.status).toBe("reported");
+
+		const replacementResult = await t.mutation(
+			internal.vouchers.requestReplacement,
+			{
+				userId: claimerId,
+				originalVoucherId: voucherId,
+			},
+		);
+
+		expect(replacementResult.status).toBe("refunded");
 
 		// Check claimer got coins back
 		const claimer = await t.run(async (ctx) => {
@@ -340,7 +350,7 @@ describe("Ban Flow Tests", () => {
 			voucherId: voucherIds[3],
 		});
 
-		expect(result4.status).toBe("refunded");
+		expect(result4.status).toBe("reported");
 
 		await t.finishAllScheduledFunctions(vi.runAllTimers);
 
@@ -624,6 +634,62 @@ describe("Ban Flow Tests", () => {
 
 		await t.finishAllScheduledFunctions(vi.runAllTimers);
 		vi.useRealTimers();
+	});
+});
+
+describe("Uploader report callbacks", () => {
+	beforeEach(() => {
+		setupFetchMock();
+		vi.stubEnv("TELEGRAM_BOT_TOKEN", "test-bot-token");
+	});
+
+	afterEach(() => {
+		vi.unstubAllGlobals();
+		vi.unstubAllEnvs();
+	});
+
+	test("uploader_admitted ignores clicks from non-uploader", async () => {
+		const t = convexTest(schema, modules);
+		const uploaderChatId = "uploader_cb";
+		const attackerChatId = "attacker_cb";
+
+		const uploaderId = await createUser(t, {
+			telegramChatId: uploaderChatId,
+			coins: 50,
+		});
+		await createUser(t, {
+			telegramChatId: attackerChatId,
+			coins: 10,
+		});
+
+		const voucherId = await createVoucher(t, {
+			type: "10",
+			uploaderId,
+			status: "reported",
+		});
+
+		await t.action(internal.telegram.handleTelegramCallback, {
+			callbackQuery: {
+				id: "callback_attacker",
+				from: {
+					id: attackerChatId,
+					is_bot: false,
+					first_name: "Attacker",
+				},
+				message: {
+					message_id: 1,
+					chat: { id: attackerChatId, type: "private" },
+					text: "Did you use this voucher?",
+				},
+				data: `uploader_admitted:${voucherId}`,
+			},
+		});
+
+		const voucher = await t.run(async (ctx) => ctx.db.get(voucherId));
+		expect(voucher?.status).toBe("reported");
+
+		const uploader = await t.run(async (ctx) => ctx.db.get(uploaderId));
+		expect(uploader?.coins).toBe(50);
 	});
 });
 

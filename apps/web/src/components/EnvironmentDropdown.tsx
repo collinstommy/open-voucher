@@ -10,9 +10,36 @@ import { ChevronDownIcon } from "lucide-react";
 
 export type Deployment = "dev" | "prod";
 
+const DEV_HOSTNAME = "dev.openvouchers.org";
+
+/** Dev Cloudflare Worker build — always uses dev Convex; no env switcher. */
+export function isDeploymentLocked(): boolean {
+	if (import.meta.env.VITE_DEPLOYMENT === "dev") {
+		return true;
+	}
+	if (
+		typeof window !== "undefined" &&
+		window.location.hostname === DEV_HOSTNAME
+	) {
+		return true;
+	}
+	return false;
+}
+
 export function getDeployment(): Deployment {
-	if (typeof window === "undefined") return "prod";
-	return (localStorage.getItem("convex-deployment") as Deployment) || "prod";
+	if (import.meta.env.VITE_DEPLOYMENT === "dev") {
+		return "dev";
+	}
+	if (typeof window === "undefined") {
+		return "prod";
+	}
+	if (window.location.hostname === DEV_HOSTNAME) {
+		return "dev";
+	}
+	return (
+		(localStorage.getItem("convex-deployment") as Deployment) ||
+		(window.location.hostname === "localhost" ? "dev" : "prod")
+	);
 }
 
 export function EnvironmentDropdown() {

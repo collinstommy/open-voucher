@@ -1,6 +1,4 @@
 import { Toaster } from "@/components/ui/sonner";
-import { NavigationLayout } from "@/components/NavigationLayout";
-import { AdminApp } from "@/components/AdminApp";
 
 import {
 	HeadContent,
@@ -31,7 +29,7 @@ export const Route = createRootRouteWithContext<RouterAppContext>()({
 				content: "width=device-width, initial-scale=1",
 			},
 			{
-				title: "My App",
+				title: "Open Vouchers",
 			},
 		],
 		links: [
@@ -47,17 +45,12 @@ export const Route = createRootRouteWithContext<RouterAppContext>()({
 
 function RootDocument() {
 	return (
-		<html lang="en" className="dark">
+		<html lang="en" className="dark" suppressHydrationWarning>
 			<head>
 				<HeadContent />
 			</head>
-			<body>
-				<AdminApp>
-					<div className="px-4 py-2">
-						<NavigationLayout />
-						<Outlet />
-					</div>
-				</AdminApp>
+			<body suppressHydrationWarning>
+				<Outlet />
 				<Toaster richColors />
 				<TanStackRouterDevtools position="bottom-left" />
 				<Scripts />

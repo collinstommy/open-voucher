@@ -7,7 +7,6 @@ import {
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import type { ActionCtx, QueryCtx } from "./_generated/server";
-import { MIN_COINS, UPLOAD_REWARDS, CLAIM_COSTS } from "./constants";
 import {
 	action,
 	internalAction,
@@ -16,6 +15,11 @@ import {
 	mutation,
 	query,
 } from "./_generated/server";
+import { CLAIM_COSTS, MIN_COINS, UPLOAD_REWARDS } from "./constants";
+import {
+	buildAnalyticsEventCounts,
+	buildMessageAnalytics,
+} from "./lib/messageAnalytics";
 
 const SESSION_DURATION_MS = 24 * 60 * 60 * 1000;
 
@@ -350,6 +354,24 @@ export const getUsersWithStats = adminQuery({
 	},
 });
 
+export const getMessageAnalytics = adminQuery({
+	args: {
+		since: v.optional(v.number()),
+	},
+	handler: async (ctx, { since }) => {
+		return await buildMessageAnalytics(ctx, since);
+	},
+});
+
+export const getAnalyticsEventCounts = adminQuery({
+	args: {
+		since: v.optional(v.number()),
+	},
+	handler: async (ctx, { since }) => {
+		return await buildAnalyticsEventCounts(ctx, since);
+	},
+});
+
 export const getAllFeedback = adminQuery({
 	args: {},
 	handler: async (ctx) => {
@@ -416,7 +438,9 @@ export const getUserDetails = adminQuery({
 		const uploadedVouchersWithDetails = await Promise.all(
 			uploadedVouchers.map(async (voucher) => {
 				const imageUrl = await ctx.storage.getUrl(voucher.imageStorageId);
-				const claimer = voucher.claimerId ? await ctx.db.get(voucher.claimerId) : null;
+				const claimer = voucher.claimerId
+					? await ctx.db.get(voucher.claimerId)
+					: null;
 				return {
 					_id: voucher._id,
 					type: voucher.type,
@@ -1006,9 +1030,7 @@ export const getFailedUploads = adminQuery({
 		].sort();
 
 		const filtered = excludeReasons?.length
-			? failedUploads.filter(
-					(u) => !excludeReasons.includes(u.failureReason),
-				)
+			? failedUploads.filter((u) => !excludeReasons.includes(u.failureReason))
 			: failedUploads;
 
 		const total = filtered.length;
@@ -1248,6 +1270,18 @@ export const getUserGrowth = adminQuery({
 	},
 });
 
+export const getSampleVoucherImageUrl = adminQuery({
+	args: {},
+	handler: async (ctx) => {
+		const setting = await ctx.db
+			.query("settings")
+			.withIndex("by_key", (q) => q.eq("key", "sample-voucher-image"))
+			.first();
+		if (!setting?.value) return null;
+		return await ctx.storage.getUrl(setting.value as Id<"_storage">);
+	},
+});
+
 export const runOcrEvals = adminAction({
 	args: {
 		token: v.string(),
@@ -1330,19 +1364,26 @@ export const getExpiredVouchersForCleanup = internalQuery({
 		const now = Date.now();
 
 		if (mode === "mark") {
-			// Find expired vouchers older than 60 days that haven't been marked yet
+			// Find vouchers (expired, claimed, or uploader_admitted_used) older than 90 days
+			// that haven't been marked yet. We always use expiryDate so we never delete
+			// non-expired vouchers regardless of their current status.
+			// No batch limit here — marking is just a cheap DB patch.
 			const cutoff = now - MARK_DELAY_DAYS * MS_PER_DAY;
 			const vouchers = await ctx.db
 				.query("vouchers")
-				.withIndex("by_status_created", (q) => q.eq("status", "expired"))
 				.filter((q) =>
 					q.and(
+						q.or(
+							q.eq(q.field("status"), "expired"),
+							q.eq(q.field("status"), "claimed"),
+							q.eq(q.field("status"), "uploader_admitted_used"),
+						),
 						q.lt(q.field("expiryDate"), cutoff),
 						q.eq(q.field("imageMarkedForDeletionAt"), undefined),
 						q.eq(q.field("imageDeletedAt"), undefined),
 					),
 				)
-				.take(BATCH_SIZE);
+				.collect();
 
 			return vouchers.map((v) => ({
 				_id: v._id,

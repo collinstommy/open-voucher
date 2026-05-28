@@ -2,7 +2,12 @@ import { v } from "convex/values";
 import dayjs from "dayjs";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
-import { internalMutation, internalQuery } from "./_generated/server";
+import {
+	internalMutation,
+	internalQuery,
+	type QueryCtx,
+} from "./_generated/server";
+import { userMutation, userQuery } from "./auth";
 import { CLAIM_COSTS, MIN_COINS, UPLOAD_REWARDS } from "./constants";
 
 export const getVoucherByBarcode = internalQuery({
@@ -198,6 +203,21 @@ export const refundFailedClaimDelivery = internalMutation({
 		});
 
 		return { refunded: true, refundAmount };
+	},
+});
+
+export const checkExistingReport = internalQuery({
+	args: {
+		userId: v.id("users"),
+		voucherId: v.id("vouchers"),
+	},
+	handler: async (ctx, { userId, voucherId }) => {
+		const existing = await ctx.db
+			.query("reports")
+			.withIndex("by_voucher", (q) => q.eq("voucherId", voucherId))
+			.filter((q) => q.eq(q.field("reporterId"), userId))
+			.first();
+		return existing !== null;
 	},
 });
 
@@ -398,11 +418,37 @@ export const reportVoucher = internalMutation({
 			}
 		}
 
-		// Find replacement of same type
+		return {
+			status: "reported",
+			reportId: reportId,
+			message:
+				"Report received. You can request a replacement voucher if you need one.",
+		};
+	},
+});
+
+export const requestReplacement = internalMutation({
+	args: {
+		userId: v.id("users"),
+		originalVoucherId: v.id("vouchers"),
+	},
+	handler: async (ctx, { userId, originalVoucherId }) => {
+		const originalVoucher = await ctx.db.get(originalVoucherId);
+		if (!originalVoucher) {
+			return { status: "not_found" };
+		}
+
+		const user = await ctx.db.get(userId);
+		if (!user) {
+			return { status: "not_found" };
+		}
+
+		const now = Date.now();
+
 		const replacement = await ctx.db
 			.query("vouchers")
 			.withIndex("by_status_type", (q) =>
-				q.eq("status", "available").eq("type", voucher.type),
+				q.eq("status", "available").eq("type", originalVoucher.type),
 			)
 			.filter((q) =>
 				q.or(
@@ -412,48 +458,53 @@ export const reportVoucher = internalMutation({
 			)
 			.first();
 
-		if (replacement) {
-			const imageUrl = await ctx.storage.getUrl(replacement.imageStorageId);
-			if (!imageUrl) {
-				// Edge case: image missing. Refund coins.
-				await ctx.db.patch(user._id, {
-					coins: user.coins + CLAIM_COSTS[voucher.type],
-				});
-				return {
-					status: "refunded",
-					message: "Replacement found but image missing. Coins refunded.",
-				};
-			}
-
-			await ctx.db.patch(replacement._id, {
-				status: "claimed",
-				claimerId: user._id,
-				claimedAt: Date.now(),
-			});
-
+		if (!replacement) {
 			await ctx.db.patch(user._id, {
-				claimCount: (user.claimCount || 0) + 1,
+				coins: user.coins + CLAIM_COSTS[originalVoucher.type],
 			});
+			return { status: "refunded" };
+		}
 
-			// Link replacement to report
-			if (reportId) {
-				await ctx.db.patch(reportId, { replacementVoucherId: replacement._id });
-			}
-
+		const imageUrl = await ctx.storage.getUrl(replacement.imageStorageId);
+		if (!imageUrl) {
+			await ctx.db.patch(user._id, {
+				coins: user.coins + CLAIM_COSTS[originalVoucher.type],
+			});
 			return {
-				status: "replaced",
-				voucher: {
-					_id: replacement._id,
-					type: replacement.type,
-					imageUrl,
-					expiryDate: replacement.expiryDate,
-				},
+				status: "refunded",
+				message: "Replacement found but image missing. Coins refunded.",
 			};
 		}
-		await ctx.db.patch(user._id, {
-			coins: user.coins + CLAIM_COSTS[voucher.type],
+
+		await ctx.db.patch(replacement._id, {
+			status: "claimed",
+			claimerId: user._id,
+			claimedAt: now,
 		});
-		return { status: "refunded" };
+
+		await ctx.db.patch(user._id, {
+			claimCount: (user.claimCount || 0) + 1,
+		});
+
+		const report = await ctx.db
+			.query("reports")
+			.withIndex("by_voucher", (q) => q.eq("voucherId", originalVoucherId))
+			.first();
+		if (report) {
+			await ctx.db.patch(report._id, {
+				replacementVoucherId: replacement._id,
+			});
+		}
+
+		return {
+			status: "replaced",
+			voucher: {
+				_id: replacement._id,
+				type: replacement.type,
+				imageUrl,
+				expiryDate: replacement.expiryDate,
+			},
+		};
 	},
 });
 
@@ -484,19 +535,173 @@ export const expireOldVouchers = internalMutation({
 	},
 });
 
+async function countAvailableVouchersByType(ctx: QueryCtx) {
+	const availableVouchers = await ctx.db
+		.query("vouchers")
+		.withIndex("by_status_type", (q) => q.eq("status", "available"))
+		.collect();
+
+	const counts: Record<string, number> = { "5": 0, "10": 0, "20": 0 };
+	for (const v of availableVouchers) {
+		counts[v.type] = (counts[v.type] || 0) + 1;
+	}
+	return counts;
+}
+
 export const getAvailableVoucherCount = internalQuery({
 	args: {},
-	handler: async (ctx) => {
-		const availableVouchers = await ctx.db
+	handler: async (ctx) => countAvailableVouchersByType(ctx),
+});
+
+export const getVoucherAvailability = userQuery({
+	args: {},
+	handler: async (ctx, { userId: _userId }) => countAvailableVouchersByType(ctx),
+});
+
+export const getMyAvailableUploads = userQuery({
+	args: {},
+	handler: async (ctx, { userId }) => {
+		const vouchers = await ctx.db
 			.query("vouchers")
-			.withIndex("by_status_type", (q) => q.eq("status", "available"))
+			.withIndex("by_uploader_created", (q) => q.eq("uploaderId", userId))
+			.order("desc")
 			.collect();
 
-		const counts: Record<string, number> = { "5": 0, "10": 0, "20": 0 };
-		for (const v of availableVouchers) {
-			counts[v.type] = (counts[v.type] || 0) + 1;
+		const filtered = vouchers.filter((v) =>
+			v.status === "available" || v.status === "invalidated"
+		);
+
+		return await Promise.all(
+			filtered.map(async (v) => ({
+				_id: v._id,
+				type: v.type,
+				status: v.status,
+				barcodeNumber: v.barcodeNumber,
+				expiryDate: v.expiryDate,
+				createdAt: v.createdAt,
+				imageUrl: await ctx.storage.getUrl(v.imageStorageId),
+				coinValue: UPLOAD_REWARDS[v.type] ?? 0,
+			})),
+		);
+	},
+});
+
+export const invalidateMyUpload = userMutation({
+	args: {
+		voucherId: v.id("vouchers"),
+	},
+	handler: async (ctx, { userId, voucherId }) => {
+		const voucher = await ctx.db.get(voucherId);
+		if (!voucher) throw new Error("Voucher not found");
+		if (voucher.uploaderId !== userId)
+			throw new Error("You can only invalidate your own vouchers");
+		if (voucher.status !== "available")
+			throw new Error("This voucher has already been claimed");
+
+		await ctx.db.patch(voucherId, { status: "invalidated" });
+
+		const user = await ctx.db.get(userId);
+		const deduction = UPLOAD_REWARDS[voucher.type] || 0;
+		const newCoins = Math.max(MIN_COINS, (user?.coins ?? 0) - deduction);
+
+		await ctx.db.patch(userId, { coins: newCoins });
+
+		await ctx.db.insert("transactions", {
+			userId,
+			type: "self_invalidated",
+			amount: -deduction,
+			voucherId,
+			createdAt: Date.now(),
+		});
+
+		return { success: true, deduction, newCoins };
+	},
+});
+
+export const getMyClaimedVouchers = userQuery({
+	args: {},
+	handler: async (ctx, { userId }) => {
+		const now = Date.now();
+
+		const vouchers = await ctx.db
+			.query("vouchers")
+			.withIndex("by_claimer_claimed_at", (q) => q.eq("claimerId", userId))
+			.order("desc")
+			.collect();
+
+		const active = vouchers.filter(
+			(v) =>
+				v.status === "claimed" &&
+				v.expiryDate > now,
+		);
+
+		return await Promise.all(
+			active.map(async (v) => ({
+				_id: v._id,
+				type: v.type,
+				barcodeNumber: v.barcodeNumber,
+				expiryDate: v.expiryDate,
+				claimedAt: v.claimedAt,
+				imageUrl: v.imageStorageId
+					? await ctx.storage.getUrl(v.imageStorageId)
+					: null,
+				coinValue: CLAIM_COSTS[v.type] ?? 0,
+			})),
+		);
+	},
+});
+
+export const returnClaimedVoucher = userMutation({
+	args: {
+		voucherId: v.id("vouchers"),
+	},
+	handler: async (ctx, { userId, voucherId }) => {
+		const voucher = await ctx.db.get(voucherId);
+		if (!voucher) throw new Error("Voucher not found");
+		if (voucher.claimerId !== userId)
+			throw new Error("You did not claim this voucher");
+		if (voucher.status !== "claimed")
+			throw new Error("This voucher is not currently claimed");
+
+		// 9pm rule: can't return a voucher that expires today after 9pm Irish time
+		const irishHour = Number(
+			new Intl.DateTimeFormat("en-IE", {
+				timeZone: "Europe/Dublin",
+				hour: "numeric",
+				hour12: false,
+			}).format(new Date()),
+		);
+		const expiryDay = dayjs(voucher.expiryDate).startOf("day");
+		const today = dayjs().startOf("day");
+		if (expiryDay.isSame(today) && irishHour >= 21) {
+			throw new Error(
+				"This voucher expires today and it's after 9 PM. It can no longer be returned.",
+			);
 		}
-		return counts;
+
+		const refundAmount = CLAIM_COSTS[voucher.type] ?? 0;
+
+		await ctx.db.patch(voucherId, {
+			status: "available",
+			claimerId: undefined,
+			claimedAt: undefined,
+		});
+
+		const user = await ctx.db.get(userId);
+		await ctx.db.patch(userId, {
+			coins: (user?.coins ?? 0) + refundAmount,
+			claimCount: Math.max(0, (user?.claimCount ?? 0) - 1),
+		});
+
+		await ctx.db.insert("transactions", {
+			userId,
+			type: "claim_returned",
+			amount: refundAmount,
+			voucherId,
+			createdAt: Date.now(),
+		});
+
+		return { success: true, refundAmount };
 	},
 });
 

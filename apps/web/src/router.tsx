@@ -2,21 +2,18 @@ import { createRouter as createTanStackRouter } from "@tanstack/react-router";
 import { QueryClient } from "@tanstack/react-query";
 import { routerWithQueryClient } from "@tanstack/react-router-with-query";
 import { ConvexQueryClient } from "@convex-dev/react-query";
-import { ConvexProvider, ConvexReactClient } from "convex/react";
+import { ConvexReactClient } from "convex/react";
 import { routeTree } from "./routeTree.gen";
 import Loader from "./components/loader";
 import { getDeployment } from "@/components/EnvironmentDropdown";
+import { CONVEX_URLS } from "@/lib/convexConfig";
+import { JwtAuthProvider } from "@/auth/JwtAuthProvider";
 import "./index.css";
-
-const DEPLOYMENTS = {
-	dev: "https://fastidious-okapi-116.convex.cloud",
-	prod: "https://whimsical-kudu-895.convex.cloud",
-};
 
 export function getRouter() {
 	const deployment = getDeployment();
 	const CONVEX_URL =
-		DEPLOYMENTS[deployment] || (import.meta as any).env.VITE_CONVEX_URL!;
+		CONVEX_URLS[deployment] || (import.meta as any).env.VITE_CONVEX_URL!;
 	if (!CONVEX_URL) {
 		console.error("missing convex URL");
 	}
@@ -44,9 +41,9 @@ export function getRouter() {
 			defaultNotFoundComponent: () => <div>Not Found</div>,
 			context: { queryClient, convexClient: convex, convexQueryClient },
 			Wrap: ({ children }) => (
-				<ConvexProvider client={convexQueryClient.convexClient}>
+				<JwtAuthProvider client={convex}>
 					{children}
-				</ConvexProvider>
+				</JwtAuthProvider>
 			),
 		}),
 		queryClient,

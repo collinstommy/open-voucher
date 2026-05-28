@@ -9,50 +9,42 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as VouchersRouteImport } from './routes/vouchers'
-import { Route as SettingsRouteImport } from './routes/settings'
-import { Route as HealthCheckRouteImport } from './routes/health-check'
-import { Route as FeedbackRouteImport } from './routes/feedback'
-import { Route as FailedUploadsRouteImport } from './routes/failed-uploads'
-import { Route as EvalsRouteImport } from './routes/evals'
-import { Route as BannedRouteImport } from './routes/banned'
+import { Route as TelegramRouteImport } from './routes/telegram'
+import { Route as AppRouteImport } from './routes/app'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as UsersIndexRouteImport } from './routes/users/index'
-import { Route as UsersUserIdRouteImport } from './routes/users/$userId'
+import { Route as AppIndexRouteImport } from './routes/app/index'
+import { Route as AdminIndexRouteImport } from './routes/admin/index'
+import { Route as AppTransactionsRouteImport } from './routes/app/transactions'
+import { Route as AppMyUploadsRouteImport } from './routes/app/my-uploads'
+import { Route as AppMyClaimsRouteImport } from './routes/app/my-claims'
+import { Route as AppFeedbackRouteImport } from './routes/app/feedback'
+import { Route as AppFaqRouteImport } from './routes/app/faq'
+import { Route as AppAvailabilityRouteImport } from './routes/app/availability'
+import { Route as AdminVouchersRouteImport } from './routes/admin/vouchers'
+import { Route as AdminSettingsRouteImport } from './routes/admin/settings'
+import { Route as AdminMessagesRouteImport } from './routes/admin/messages'
+import { Route as AdminHealthCheckRouteImport } from './routes/admin/health-check'
+import { Route as AdminFeedbackRouteImport } from './routes/admin/feedback'
+import { Route as AdminFailedUploadsRouteImport } from './routes/admin/failed-uploads'
+import { Route as AdminEvalsRouteImport } from './routes/admin/evals'
+import { Route as AdminBannedRouteImport } from './routes/admin/banned'
+import { Route as AdminUsersIndexRouteImport } from './routes/admin/users/index'
+import { Route as AdminUsersUserIdRouteImport } from './routes/admin/users/$userId'
 
-const VouchersRoute = VouchersRouteImport.update({
-  id: '/vouchers',
-  path: '/vouchers',
+const TelegramRoute = TelegramRouteImport.update({
+  id: '/telegram',
+  path: '/telegram',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SettingsRoute = SettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
+const AppRoute = AppRouteImport.update({
+  id: '/app',
+  path: '/app',
   getParentRoute: () => rootRouteImport,
 } as any)
-const HealthCheckRoute = HealthCheckRouteImport.update({
-  id: '/health-check',
-  path: '/health-check',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const FeedbackRoute = FeedbackRouteImport.update({
-  id: '/feedback',
-  path: '/feedback',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const FailedUploadsRoute = FailedUploadsRouteImport.update({
-  id: '/failed-uploads',
-  path: '/failed-uploads',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const EvalsRoute = EvalsRouteImport.update({
-  id: '/evals',
-  path: '/evals',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const BannedRoute = BannedRouteImport.update({
-  id: '/banned',
-  path: '/banned',
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -60,155 +52,269 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const UsersIndexRoute = UsersIndexRouteImport.update({
+const AppIndexRoute = AppIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AdminIndexRoute = AdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AppTransactionsRoute = AppTransactionsRouteImport.update({
+  id: '/transactions',
+  path: '/transactions',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppMyUploadsRoute = AppMyUploadsRouteImport.update({
+  id: '/my-uploads',
+  path: '/my-uploads',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppMyClaimsRoute = AppMyClaimsRouteImport.update({
+  id: '/my-claims',
+  path: '/my-claims',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppFeedbackRoute = AppFeedbackRouteImport.update({
+  id: '/feedback',
+  path: '/feedback',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppFaqRoute = AppFaqRouteImport.update({
+  id: '/faq',
+  path: '/faq',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAvailabilityRoute = AppAvailabilityRouteImport.update({
+  id: '/availability',
+  path: '/availability',
+  getParentRoute: () => AppRoute,
+} as any)
+const AdminVouchersRoute = AdminVouchersRouteImport.update({
+  id: '/vouchers',
+  path: '/vouchers',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminSettingsRoute = AdminSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminMessagesRoute = AdminMessagesRouteImport.update({
+  id: '/messages',
+  path: '/messages',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminHealthCheckRoute = AdminHealthCheckRouteImport.update({
+  id: '/health-check',
+  path: '/health-check',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminFeedbackRoute = AdminFeedbackRouteImport.update({
+  id: '/feedback',
+  path: '/feedback',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminFailedUploadsRoute = AdminFailedUploadsRouteImport.update({
+  id: '/failed-uploads',
+  path: '/failed-uploads',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminEvalsRoute = AdminEvalsRouteImport.update({
+  id: '/evals',
+  path: '/evals',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminBannedRoute = AdminBannedRouteImport.update({
+  id: '/banned',
+  path: '/banned',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminUsersIndexRoute = AdminUsersIndexRouteImport.update({
   id: '/users/',
   path: '/users/',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => AdminRoute,
 } as any)
-const UsersUserIdRoute = UsersUserIdRouteImport.update({
+const AdminUsersUserIdRoute = AdminUsersUserIdRouteImport.update({
   id: '/users/$userId',
   path: '/users/$userId',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => AdminRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/banned': typeof BannedRoute
-  '/evals': typeof EvalsRoute
-  '/failed-uploads': typeof FailedUploadsRoute
-  '/feedback': typeof FeedbackRoute
-  '/health-check': typeof HealthCheckRoute
-  '/settings': typeof SettingsRoute
-  '/vouchers': typeof VouchersRoute
-  '/users/$userId': typeof UsersUserIdRoute
-  '/users': typeof UsersIndexRoute
+  '/admin': typeof AdminRouteWithChildren
+  '/app': typeof AppRouteWithChildren
+  '/telegram': typeof TelegramRoute
+  '/admin/banned': typeof AdminBannedRoute
+  '/admin/evals': typeof AdminEvalsRoute
+  '/admin/failed-uploads': typeof AdminFailedUploadsRoute
+  '/admin/feedback': typeof AdminFeedbackRoute
+  '/admin/health-check': typeof AdminHealthCheckRoute
+  '/admin/messages': typeof AdminMessagesRoute
+  '/admin/settings': typeof AdminSettingsRoute
+  '/admin/vouchers': typeof AdminVouchersRoute
+  '/app/availability': typeof AppAvailabilityRoute
+  '/app/faq': typeof AppFaqRoute
+  '/app/feedback': typeof AppFeedbackRoute
+  '/app/my-claims': typeof AppMyClaimsRoute
+  '/app/my-uploads': typeof AppMyUploadsRoute
+  '/app/transactions': typeof AppTransactionsRoute
+  '/admin/': typeof AdminIndexRoute
+  '/app/': typeof AppIndexRoute
+  '/admin/users/$userId': typeof AdminUsersUserIdRoute
+  '/admin/users': typeof AdminUsersIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/banned': typeof BannedRoute
-  '/evals': typeof EvalsRoute
-  '/failed-uploads': typeof FailedUploadsRoute
-  '/feedback': typeof FeedbackRoute
-  '/health-check': typeof HealthCheckRoute
-  '/settings': typeof SettingsRoute
-  '/vouchers': typeof VouchersRoute
-  '/users/$userId': typeof UsersUserIdRoute
-  '/users': typeof UsersIndexRoute
+  '/telegram': typeof TelegramRoute
+  '/admin/banned': typeof AdminBannedRoute
+  '/admin/evals': typeof AdminEvalsRoute
+  '/admin/failed-uploads': typeof AdminFailedUploadsRoute
+  '/admin/feedback': typeof AdminFeedbackRoute
+  '/admin/health-check': typeof AdminHealthCheckRoute
+  '/admin/messages': typeof AdminMessagesRoute
+  '/admin/settings': typeof AdminSettingsRoute
+  '/admin/vouchers': typeof AdminVouchersRoute
+  '/app/availability': typeof AppAvailabilityRoute
+  '/app/faq': typeof AppFaqRoute
+  '/app/feedback': typeof AppFeedbackRoute
+  '/app/my-claims': typeof AppMyClaimsRoute
+  '/app/my-uploads': typeof AppMyUploadsRoute
+  '/app/transactions': typeof AppTransactionsRoute
+  '/admin': typeof AdminIndexRoute
+  '/app': typeof AppIndexRoute
+  '/admin/users/$userId': typeof AdminUsersUserIdRoute
+  '/admin/users': typeof AdminUsersIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/banned': typeof BannedRoute
-  '/evals': typeof EvalsRoute
-  '/failed-uploads': typeof FailedUploadsRoute
-  '/feedback': typeof FeedbackRoute
-  '/health-check': typeof HealthCheckRoute
-  '/settings': typeof SettingsRoute
-  '/vouchers': typeof VouchersRoute
-  '/users/$userId': typeof UsersUserIdRoute
-  '/users/': typeof UsersIndexRoute
+  '/admin': typeof AdminRouteWithChildren
+  '/app': typeof AppRouteWithChildren
+  '/telegram': typeof TelegramRoute
+  '/admin/banned': typeof AdminBannedRoute
+  '/admin/evals': typeof AdminEvalsRoute
+  '/admin/failed-uploads': typeof AdminFailedUploadsRoute
+  '/admin/feedback': typeof AdminFeedbackRoute
+  '/admin/health-check': typeof AdminHealthCheckRoute
+  '/admin/messages': typeof AdminMessagesRoute
+  '/admin/settings': typeof AdminSettingsRoute
+  '/admin/vouchers': typeof AdminVouchersRoute
+  '/app/availability': typeof AppAvailabilityRoute
+  '/app/faq': typeof AppFaqRoute
+  '/app/feedback': typeof AppFeedbackRoute
+  '/app/my-claims': typeof AppMyClaimsRoute
+  '/app/my-uploads': typeof AppMyUploadsRoute
+  '/app/transactions': typeof AppTransactionsRoute
+  '/admin/': typeof AdminIndexRoute
+  '/app/': typeof AppIndexRoute
+  '/admin/users/$userId': typeof AdminUsersUserIdRoute
+  '/admin/users/': typeof AdminUsersIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/banned'
-    | '/evals'
-    | '/failed-uploads'
-    | '/feedback'
-    | '/health-check'
-    | '/settings'
-    | '/vouchers'
-    | '/users/$userId'
-    | '/users'
+    | '/admin'
+    | '/app'
+    | '/telegram'
+    | '/admin/banned'
+    | '/admin/evals'
+    | '/admin/failed-uploads'
+    | '/admin/feedback'
+    | '/admin/health-check'
+    | '/admin/messages'
+    | '/admin/settings'
+    | '/admin/vouchers'
+    | '/app/availability'
+    | '/app/faq'
+    | '/app/feedback'
+    | '/app/my-claims'
+    | '/app/my-uploads'
+    | '/app/transactions'
+    | '/admin/'
+    | '/app/'
+    | '/admin/users/$userId'
+    | '/admin/users'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/banned'
-    | '/evals'
-    | '/failed-uploads'
-    | '/feedback'
-    | '/health-check'
-    | '/settings'
-    | '/vouchers'
-    | '/users/$userId'
-    | '/users'
+    | '/telegram'
+    | '/admin/banned'
+    | '/admin/evals'
+    | '/admin/failed-uploads'
+    | '/admin/feedback'
+    | '/admin/health-check'
+    | '/admin/messages'
+    | '/admin/settings'
+    | '/admin/vouchers'
+    | '/app/availability'
+    | '/app/faq'
+    | '/app/feedback'
+    | '/app/my-claims'
+    | '/app/my-uploads'
+    | '/app/transactions'
+    | '/admin'
+    | '/app'
+    | '/admin/users/$userId'
+    | '/admin/users'
   id:
     | '__root__'
     | '/'
-    | '/banned'
-    | '/evals'
-    | '/failed-uploads'
-    | '/feedback'
-    | '/health-check'
-    | '/settings'
-    | '/vouchers'
-    | '/users/$userId'
-    | '/users/'
+    | '/admin'
+    | '/app'
+    | '/telegram'
+    | '/admin/banned'
+    | '/admin/evals'
+    | '/admin/failed-uploads'
+    | '/admin/feedback'
+    | '/admin/health-check'
+    | '/admin/messages'
+    | '/admin/settings'
+    | '/admin/vouchers'
+    | '/app/availability'
+    | '/app/faq'
+    | '/app/feedback'
+    | '/app/my-claims'
+    | '/app/my-uploads'
+    | '/app/transactions'
+    | '/admin/'
+    | '/app/'
+    | '/admin/users/$userId'
+    | '/admin/users/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  BannedRoute: typeof BannedRoute
-  EvalsRoute: typeof EvalsRoute
-  FailedUploadsRoute: typeof FailedUploadsRoute
-  FeedbackRoute: typeof FeedbackRoute
-  HealthCheckRoute: typeof HealthCheckRoute
-  SettingsRoute: typeof SettingsRoute
-  VouchersRoute: typeof VouchersRoute
-  UsersUserIdRoute: typeof UsersUserIdRoute
-  UsersIndexRoute: typeof UsersIndexRoute
+  AdminRoute: typeof AdminRouteWithChildren
+  AppRoute: typeof AppRouteWithChildren
+  TelegramRoute: typeof TelegramRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/vouchers': {
-      id: '/vouchers'
-      path: '/vouchers'
-      fullPath: '/vouchers'
-      preLoaderRoute: typeof VouchersRouteImport
+    '/telegram': {
+      id: '/telegram'
+      path: '/telegram'
+      fullPath: '/telegram'
+      preLoaderRoute: typeof TelegramRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/settings': {
-      id: '/settings'
-      path: '/settings'
-      fullPath: '/settings'
-      preLoaderRoute: typeof SettingsRouteImport
+    '/app': {
+      id: '/app'
+      path: '/app'
+      fullPath: '/app'
+      preLoaderRoute: typeof AppRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/health-check': {
-      id: '/health-check'
-      path: '/health-check'
-      fullPath: '/health-check'
-      preLoaderRoute: typeof HealthCheckRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/feedback': {
-      id: '/feedback'
-      path: '/feedback'
-      fullPath: '/feedback'
-      preLoaderRoute: typeof FeedbackRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/failed-uploads': {
-      id: '/failed-uploads'
-      path: '/failed-uploads'
-      fullPath: '/failed-uploads'
-      preLoaderRoute: typeof FailedUploadsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/evals': {
-      id: '/evals'
-      path: '/evals'
-      fullPath: '/evals'
-      preLoaderRoute: typeof EvalsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/banned': {
-      id: '/banned'
-      path: '/banned'
-      fullPath: '/banned'
-      preLoaderRoute: typeof BannedRouteImport
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -218,34 +324,192 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/users/': {
-      id: '/users/'
-      path: '/users'
-      fullPath: '/users'
-      preLoaderRoute: typeof UsersIndexRouteImport
-      parentRoute: typeof rootRouteImport
+    '/app/': {
+      id: '/app/'
+      path: '/'
+      fullPath: '/app/'
+      preLoaderRoute: typeof AppIndexRouteImport
+      parentRoute: typeof AppRoute
     }
-    '/users/$userId': {
-      id: '/users/$userId'
+    '/admin/': {
+      id: '/admin/'
+      path: '/'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/app/transactions': {
+      id: '/app/transactions'
+      path: '/transactions'
+      fullPath: '/app/transactions'
+      preLoaderRoute: typeof AppTransactionsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/my-uploads': {
+      id: '/app/my-uploads'
+      path: '/my-uploads'
+      fullPath: '/app/my-uploads'
+      preLoaderRoute: typeof AppMyUploadsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/my-claims': {
+      id: '/app/my-claims'
+      path: '/my-claims'
+      fullPath: '/app/my-claims'
+      preLoaderRoute: typeof AppMyClaimsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/feedback': {
+      id: '/app/feedback'
+      path: '/feedback'
+      fullPath: '/app/feedback'
+      preLoaderRoute: typeof AppFeedbackRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/faq': {
+      id: '/app/faq'
+      path: '/faq'
+      fullPath: '/app/faq'
+      preLoaderRoute: typeof AppFaqRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/availability': {
+      id: '/app/availability'
+      path: '/availability'
+      fullPath: '/app/availability'
+      preLoaderRoute: typeof AppAvailabilityRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/admin/vouchers': {
+      id: '/admin/vouchers'
+      path: '/vouchers'
+      fullPath: '/admin/vouchers'
+      preLoaderRoute: typeof AdminVouchersRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/settings': {
+      id: '/admin/settings'
+      path: '/settings'
+      fullPath: '/admin/settings'
+      preLoaderRoute: typeof AdminSettingsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/messages': {
+      id: '/admin/messages'
+      path: '/messages'
+      fullPath: '/admin/messages'
+      preLoaderRoute: typeof AdminMessagesRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/health-check': {
+      id: '/admin/health-check'
+      path: '/health-check'
+      fullPath: '/admin/health-check'
+      preLoaderRoute: typeof AdminHealthCheckRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/feedback': {
+      id: '/admin/feedback'
+      path: '/feedback'
+      fullPath: '/admin/feedback'
+      preLoaderRoute: typeof AdminFeedbackRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/failed-uploads': {
+      id: '/admin/failed-uploads'
+      path: '/failed-uploads'
+      fullPath: '/admin/failed-uploads'
+      preLoaderRoute: typeof AdminFailedUploadsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/evals': {
+      id: '/admin/evals'
+      path: '/evals'
+      fullPath: '/admin/evals'
+      preLoaderRoute: typeof AdminEvalsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/banned': {
+      id: '/admin/banned'
+      path: '/banned'
+      fullPath: '/admin/banned'
+      preLoaderRoute: typeof AdminBannedRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/users/': {
+      id: '/admin/users/'
+      path: '/users'
+      fullPath: '/admin/users'
+      preLoaderRoute: typeof AdminUsersIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/users/$userId': {
+      id: '/admin/users/$userId'
       path: '/users/$userId'
-      fullPath: '/users/$userId'
-      preLoaderRoute: typeof UsersUserIdRouteImport
-      parentRoute: typeof rootRouteImport
+      fullPath: '/admin/users/$userId'
+      preLoaderRoute: typeof AdminUsersUserIdRouteImport
+      parentRoute: typeof AdminRoute
     }
   }
 }
 
+interface AdminRouteChildren {
+  AdminBannedRoute: typeof AdminBannedRoute
+  AdminEvalsRoute: typeof AdminEvalsRoute
+  AdminFailedUploadsRoute: typeof AdminFailedUploadsRoute
+  AdminFeedbackRoute: typeof AdminFeedbackRoute
+  AdminHealthCheckRoute: typeof AdminHealthCheckRoute
+  AdminMessagesRoute: typeof AdminMessagesRoute
+  AdminSettingsRoute: typeof AdminSettingsRoute
+  AdminVouchersRoute: typeof AdminVouchersRoute
+  AdminIndexRoute: typeof AdminIndexRoute
+  AdminUsersUserIdRoute: typeof AdminUsersUserIdRoute
+  AdminUsersIndexRoute: typeof AdminUsersIndexRoute
+}
+
+const AdminRouteChildren: AdminRouteChildren = {
+  AdminBannedRoute: AdminBannedRoute,
+  AdminEvalsRoute: AdminEvalsRoute,
+  AdminFailedUploadsRoute: AdminFailedUploadsRoute,
+  AdminFeedbackRoute: AdminFeedbackRoute,
+  AdminHealthCheckRoute: AdminHealthCheckRoute,
+  AdminMessagesRoute: AdminMessagesRoute,
+  AdminSettingsRoute: AdminSettingsRoute,
+  AdminVouchersRoute: AdminVouchersRoute,
+  AdminIndexRoute: AdminIndexRoute,
+  AdminUsersUserIdRoute: AdminUsersUserIdRoute,
+  AdminUsersIndexRoute: AdminUsersIndexRoute,
+}
+
+const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
+
+interface AppRouteChildren {
+  AppAvailabilityRoute: typeof AppAvailabilityRoute
+  AppFaqRoute: typeof AppFaqRoute
+  AppFeedbackRoute: typeof AppFeedbackRoute
+  AppMyClaimsRoute: typeof AppMyClaimsRoute
+  AppMyUploadsRoute: typeof AppMyUploadsRoute
+  AppTransactionsRoute: typeof AppTransactionsRoute
+  AppIndexRoute: typeof AppIndexRoute
+}
+
+const AppRouteChildren: AppRouteChildren = {
+  AppAvailabilityRoute: AppAvailabilityRoute,
+  AppFaqRoute: AppFaqRoute,
+  AppFeedbackRoute: AppFeedbackRoute,
+  AppMyClaimsRoute: AppMyClaimsRoute,
+  AppMyUploadsRoute: AppMyUploadsRoute,
+  AppTransactionsRoute: AppTransactionsRoute,
+  AppIndexRoute: AppIndexRoute,
+}
+
+const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  BannedRoute: BannedRoute,
-  EvalsRoute: EvalsRoute,
-  FailedUploadsRoute: FailedUploadsRoute,
-  FeedbackRoute: FeedbackRoute,
-  HealthCheckRoute: HealthCheckRoute,
-  SettingsRoute: SettingsRoute,
-  VouchersRoute: VouchersRoute,
-  UsersUserIdRoute: UsersUserIdRoute,
-  UsersIndexRoute: UsersIndexRoute,
+  AdminRoute: AdminRouteWithChildren,
+  AppRoute: AppRouteWithChildren,
+  TelegramRoute: TelegramRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

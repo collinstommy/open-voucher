@@ -5,7 +5,7 @@ import { CheckCircle2, ClipboardCheck, RefreshCw, XCircle } from "lucide-react";
 import { useState } from "react";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
 
-export const Route = createFileRoute("/evals")({
+export const Route = createFileRoute("/admin/evals")({
 	component: EvalsPage,
 });
 
@@ -109,6 +109,7 @@ const TEST_IMAGE_FILES = [
 	"mar15-mar21.png",
 	"mar23-mar-29-paper.png",
 	"threeplus-expire-mar-31.png",
+	"apr23-may9",
 ];
 
 async function fetchImageAsBase64(url: string): Promise<string> {

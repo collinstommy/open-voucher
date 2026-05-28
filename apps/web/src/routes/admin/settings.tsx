@@ -1,13 +1,18 @@
+import { convexQuery } from "@convex-dev/react-query";
 import { api } from "@open-voucher/backend/convex/_generated/api";
+import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "convex/react";
+import { useAdminAuth } from "@/hooks/useAdminAuth";
 
-export const Route = createFileRoute("/settings")({
+export const Route = createFileRoute("/admin/settings")({
 	component: SettingsComponent,
 });
 
 function SettingsComponent() {
-	const imageUrl = useQuery(api.settings.getSampleVoucherImageUrl);
+	const { token } = useAdminAuth();
+	const { data: imageUrl } = useQuery(
+		convexQuery(api.admin.getSampleVoucherImageUrl, token ? { token } : "skip"),
+	);
 
 	return (
 		<div className="grid gap-6">
