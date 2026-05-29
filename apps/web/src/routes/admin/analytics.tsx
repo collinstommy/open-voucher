@@ -47,9 +47,9 @@ const TRANSACTION_LABELS: Record<string, string> = {
 	uploader_refund: "Uploader refund",
 	uploader_denied: "Uploader denied",
 	admin_expiry_deduction: "Admin expiry deduction",
-	claim_reversed: "Claim reversed",
+	claim_reversed: "User returned",
 	self_invalidated: "Self invalidated",
-	claim_returned: "Claim returned",
+	claim_returned: "Admin claim returned",
 };
 
 export const Route = createFileRoute("/admin/analytics")({
