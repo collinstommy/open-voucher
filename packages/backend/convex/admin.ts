@@ -369,6 +369,29 @@ export const getAnalyticsEventCounts = adminQuery({
 	},
 });
 
+export const getTransactionTotalsByType = adminQuery({
+	args: {
+		since: v.optional(v.number()),
+	},
+	handler: async (ctx, { since }) => {
+		const filtered = since
+			? await ctx.db
+					.query("transactions")
+					.withIndex("by_creation_time", (q) =>
+						q.gte("_creationTime", since),
+					)
+					.collect()
+			: await ctx.db.query("transactions").collect();
+
+		const totals: Record<string, number> = {};
+		for (const t of filtered) {
+			totals[t.type] = (totals[t.type] ?? 0) + 1;
+		}
+
+		return { totals, totalCount: filtered.length };
+	},
+});
+
 export const getAllFeedback = adminQuery({
 	args: {},
 	handler: async (ctx) => {

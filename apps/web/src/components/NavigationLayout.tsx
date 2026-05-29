@@ -63,10 +63,10 @@ export function NavigationLayout() {
 					Feedback
 				</Link>
 				<Link
-					to="/admin/messages"
+					to="/admin/analytics"
 					className="text-muted-foreground hover:text-foreground"
 				>
-					Messages
+					Analytics
 				</Link>
 				<Link
 					to="/admin/banned"

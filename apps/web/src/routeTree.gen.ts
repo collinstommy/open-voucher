@@ -23,12 +23,12 @@ import { Route as AppFaqRouteImport } from './routes/app/faq'
 import { Route as AppAvailabilityRouteImport } from './routes/app/availability'
 import { Route as AdminVouchersRouteImport } from './routes/admin/vouchers'
 import { Route as AdminSettingsRouteImport } from './routes/admin/settings'
-import { Route as AdminMessagesRouteImport } from './routes/admin/messages'
 import { Route as AdminHealthCheckRouteImport } from './routes/admin/health-check'
 import { Route as AdminFeedbackRouteImport } from './routes/admin/feedback'
 import { Route as AdminFailedUploadsRouteImport } from './routes/admin/failed-uploads'
 import { Route as AdminEvalsRouteImport } from './routes/admin/evals'
 import { Route as AdminBannedRouteImport } from './routes/admin/banned'
+import { Route as AdminAnalyticsRouteImport } from './routes/admin/analytics'
 import { Route as AdminUsersIndexRouteImport } from './routes/admin/users/index'
 import { Route as AdminUsersUserIdRouteImport } from './routes/admin/users/$userId'
 
@@ -102,11 +102,6 @@ const AdminSettingsRoute = AdminSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => AdminRoute,
 } as any)
-const AdminMessagesRoute = AdminMessagesRouteImport.update({
-  id: '/messages',
-  path: '/messages',
-  getParentRoute: () => AdminRoute,
-} as any)
 const AdminHealthCheckRoute = AdminHealthCheckRouteImport.update({
   id: '/health-check',
   path: '/health-check',
@@ -132,6 +127,11 @@ const AdminBannedRoute = AdminBannedRouteImport.update({
   path: '/banned',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminAnalyticsRoute = AdminAnalyticsRouteImport.update({
+  id: '/analytics',
+  path: '/analytics',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminUsersIndexRoute = AdminUsersIndexRouteImport.update({
   id: '/users/',
   path: '/users/',
@@ -148,12 +148,12 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AdminRouteWithChildren
   '/app': typeof AppRouteWithChildren
   '/telegram': typeof TelegramRoute
+  '/admin/analytics': typeof AdminAnalyticsRoute
   '/admin/banned': typeof AdminBannedRoute
   '/admin/evals': typeof AdminEvalsRoute
   '/admin/failed-uploads': typeof AdminFailedUploadsRoute
   '/admin/feedback': typeof AdminFeedbackRoute
   '/admin/health-check': typeof AdminHealthCheckRoute
-  '/admin/messages': typeof AdminMessagesRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/vouchers': typeof AdminVouchersRoute
   '/app/availability': typeof AppAvailabilityRoute
@@ -170,12 +170,12 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/telegram': typeof TelegramRoute
+  '/admin/analytics': typeof AdminAnalyticsRoute
   '/admin/banned': typeof AdminBannedRoute
   '/admin/evals': typeof AdminEvalsRoute
   '/admin/failed-uploads': typeof AdminFailedUploadsRoute
   '/admin/feedback': typeof AdminFeedbackRoute
   '/admin/health-check': typeof AdminHealthCheckRoute
-  '/admin/messages': typeof AdminMessagesRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/vouchers': typeof AdminVouchersRoute
   '/app/availability': typeof AppAvailabilityRoute
@@ -195,12 +195,12 @@ export interface FileRoutesById {
   '/admin': typeof AdminRouteWithChildren
   '/app': typeof AppRouteWithChildren
   '/telegram': typeof TelegramRoute
+  '/admin/analytics': typeof AdminAnalyticsRoute
   '/admin/banned': typeof AdminBannedRoute
   '/admin/evals': typeof AdminEvalsRoute
   '/admin/failed-uploads': typeof AdminFailedUploadsRoute
   '/admin/feedback': typeof AdminFeedbackRoute
   '/admin/health-check': typeof AdminHealthCheckRoute
-  '/admin/messages': typeof AdminMessagesRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/vouchers': typeof AdminVouchersRoute
   '/app/availability': typeof AppAvailabilityRoute
@@ -221,12 +221,12 @@ export interface FileRouteTypes {
     | '/admin'
     | '/app'
     | '/telegram'
+    | '/admin/analytics'
     | '/admin/banned'
     | '/admin/evals'
     | '/admin/failed-uploads'
     | '/admin/feedback'
     | '/admin/health-check'
-    | '/admin/messages'
     | '/admin/settings'
     | '/admin/vouchers'
     | '/app/availability'
@@ -243,12 +243,12 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/telegram'
+    | '/admin/analytics'
     | '/admin/banned'
     | '/admin/evals'
     | '/admin/failed-uploads'
     | '/admin/feedback'
     | '/admin/health-check'
-    | '/admin/messages'
     | '/admin/settings'
     | '/admin/vouchers'
     | '/app/availability'
@@ -267,12 +267,12 @@ export interface FileRouteTypes {
     | '/admin'
     | '/app'
     | '/telegram'
+    | '/admin/analytics'
     | '/admin/banned'
     | '/admin/evals'
     | '/admin/failed-uploads'
     | '/admin/feedback'
     | '/admin/health-check'
-    | '/admin/messages'
     | '/admin/settings'
     | '/admin/vouchers'
     | '/app/availability'
@@ -394,13 +394,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminSettingsRouteImport
       parentRoute: typeof AdminRoute
     }
-    '/admin/messages': {
-      id: '/admin/messages'
-      path: '/messages'
-      fullPath: '/admin/messages'
-      preLoaderRoute: typeof AdminMessagesRouteImport
-      parentRoute: typeof AdminRoute
-    }
     '/admin/health-check': {
       id: '/admin/health-check'
       path: '/health-check'
@@ -436,6 +429,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminBannedRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/analytics': {
+      id: '/admin/analytics'
+      path: '/analytics'
+      fullPath: '/admin/analytics'
+      preLoaderRoute: typeof AdminAnalyticsRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/users/': {
       id: '/admin/users/'
       path: '/users'
@@ -454,12 +454,12 @@ declare module '@tanstack/react-router' {
 }
 
 interface AdminRouteChildren {
+  AdminAnalyticsRoute: typeof AdminAnalyticsRoute
   AdminBannedRoute: typeof AdminBannedRoute
   AdminEvalsRoute: typeof AdminEvalsRoute
   AdminFailedUploadsRoute: typeof AdminFailedUploadsRoute
   AdminFeedbackRoute: typeof AdminFeedbackRoute
   AdminHealthCheckRoute: typeof AdminHealthCheckRoute
-  AdminMessagesRoute: typeof AdminMessagesRoute
   AdminSettingsRoute: typeof AdminSettingsRoute
   AdminVouchersRoute: typeof AdminVouchersRoute
   AdminIndexRoute: typeof AdminIndexRoute
@@ -468,12 +468,12 @@ interface AdminRouteChildren {
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
+  AdminAnalyticsRoute: AdminAnalyticsRoute,
   AdminBannedRoute: AdminBannedRoute,
   AdminEvalsRoute: AdminEvalsRoute,
   AdminFailedUploadsRoute: AdminFailedUploadsRoute,
   AdminFeedbackRoute: AdminFeedbackRoute,
   AdminHealthCheckRoute: AdminHealthCheckRoute,
-  AdminMessagesRoute: AdminMessagesRoute,
   AdminSettingsRoute: AdminSettingsRoute,
   AdminVouchersRoute: AdminVouchersRoute,
   AdminIndexRoute: AdminIndexRoute,
