@@ -43,28 +43,23 @@ function AvailabilityPage() {
 					</p>
 				)}
 				{availability && (
-					<>
-						<p className="text-xs text-slate-500 mb-3">
-							Pool levels before you claim in chat
-						</p>
-						<div className="grid grid-cols-3 gap-2">
-							{(["5", "10", "20"] as const).map((denom) => {
-								const count = availability[denom];
-								const status = getAvailabilityStatus(count);
-								return (
-									<div
-										key={denom}
-										className={`rounded-xl border p-3 text-center ${statusStyles[status]}`}
-									>
-										<div className="text-lg font-bold">€{denom}</div>
-										<div className="text-[10px] mt-1 font-medium">
-											{formatAvailabilityLabel(count)}
-										</div>
+					<div className="grid grid-cols-3 gap-2">
+						{(["5", "10", "20"] as const).map((denom) => {
+							const count = availability[denom];
+							const status = getAvailabilityStatus(count);
+							return (
+								<div
+									key={denom}
+									className={`rounded-xl border p-3 text-center ${statusStyles[status]}`}
+								>
+									<div className="text-lg font-bold">€{denom}</div>
+									<div className="text-[10px] mt-1 font-medium">
+										{formatAvailabilityLabel(count)}
 									</div>
-								);
-							})}
-						</div>
-					</>
+								</div>
+							);
+						})}
+					</div>
 				)}
 			</div>
 		</div>

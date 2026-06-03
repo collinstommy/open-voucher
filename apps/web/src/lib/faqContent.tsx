@@ -8,7 +8,7 @@ export type FaqItem = {
 const UPLOAD_CLAIM_FAQ: FaqItem[] = [
 	{
 		q: "How do I upload a voucher?",
-		a: "Send a screenshot of your voucher to the bot in Telegram. Make sure the barcode is clearly visible. Paper vouchers, app screenshots, and email vouchers all work.",
+		a: "Send a screenshot of your voucher to the bot in Telegram. Make sure the barcode is clearly visible. Paper vouchers and app screenshots are accepted.",
 	},
 	{
 		q: "How do I claim a voucher?",
