@@ -146,6 +146,56 @@ describe("Report Flow", () => {
 		});
 		expect(claimer?.coins).toBe(20);
 	});
+
+	test("refundReportedVoucher refunds coins and records transaction", async () => {
+		const t = convexTest(schema, modules);
+
+		const uploaderId = await createUser(t, {
+			telegramChatId: "uploader999",
+			coins: 10,
+		});
+
+		const claimerId = await createUser(t, {
+			telegramChatId: "claimer888",
+			coins: 10,
+		});
+
+		const voucherId = await createVoucher(t, {
+			type: "10",
+			uploaderId,
+			status: "claimed",
+			claimerId,
+			claimedAt: Date.now(),
+		});
+
+		const refundResult = await t.mutation(
+			internal.vouchers.refundReportedVoucher,
+			{
+				userId: claimerId,
+				voucherId,
+			},
+		);
+
+		expect(refundResult.status).toBe("refunded");
+		expect(refundResult.refundAmount).toBe(10);
+
+		const claimer = await t.run(async (ctx) => {
+			return await ctx.db.get(claimerId);
+		});
+		expect(claimer?.coins).toBe(20);
+
+		const transactions = await t.run(async (ctx) => {
+			return await ctx.db
+				.query("transactions")
+				.withIndex("by_user", (q) => q.eq("userId", claimerId))
+				.collect();
+		});
+		const refundTx = transactions.find(
+			(tx) => tx.type === "refund" && tx.voucherId === voucherId,
+		);
+		expect(refundTx).toBeTruthy();
+		expect(refundTx?.amount).toBe(10);
+	});
 });
 
 // ============================================================================

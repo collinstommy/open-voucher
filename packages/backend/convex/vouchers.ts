@@ -5,6 +5,7 @@ import type { Id } from "./_generated/dataModel";
 import {
 	internalMutation,
 	internalQuery,
+	type MutationCtx,
 	type QueryCtx,
 } from "./_generated/server";
 import { userMutation, userQuery } from "./auth";
@@ -427,6 +428,58 @@ export const reportVoucher = internalMutation({
 	},
 });
 
+export const refundReportedVoucher = internalMutation({
+	args: {
+		userId: v.id("users"),
+		voucherId: v.id("vouchers"),
+	},
+	handler: async (ctx, { userId, voucherId }) => {
+		const voucher = await ctx.db.get(voucherId);
+		if (!voucher) return { status: "not_found" };
+
+		const user = await ctx.db.get(userId);
+		if (!user) return { status: "not_found" };
+
+		const refundAmount = CLAIM_COSTS[voucher.type];
+
+		await refundCoins({
+			ctx,
+			userId: user._id,
+			voucherType: voucher.type,
+			voucherId,
+			currentCoinBalance: user.coins,
+		});
+
+		return { status: "refunded", refundAmount };
+	},
+});
+
+async function refundCoins({
+	ctx,
+	userId,
+	voucherType,
+	voucherId,
+	currentCoinBalance,
+}: {
+	ctx: MutationCtx;
+	userId: Id<"users">;
+	voucherType: string;
+	voucherId: Id<"vouchers">;
+	currentCoinBalance: number;
+}) {
+	const refundAmount = CLAIM_COSTS[voucherType];
+	await ctx.db.patch(userId, {
+		coins: currentCoinBalance + refundAmount,
+	});
+	await ctx.db.insert("transactions", {
+		userId,
+		type: "refund",
+		amount: refundAmount,
+		voucherId,
+		createdAt: Date.now(),
+	});
+}
+
 export const requestReplacement = internalMutation({
 	args: {
 		userId: v.id("users"),
@@ -459,16 +512,24 @@ export const requestReplacement = internalMutation({
 			.first();
 
 		if (!replacement) {
-			await ctx.db.patch(user._id, {
-				coins: user.coins + CLAIM_COSTS[originalVoucher.type],
+			await refundCoins({
+				ctx,
+				userId,
+				voucherType: originalVoucher.type,
+				voucherId: originalVoucherId,
+				currentCoinBalance: user.coins,
 			});
 			return { status: "refunded" };
 		}
 
 		const imageUrl = await ctx.storage.getUrl(replacement.imageStorageId);
 		if (!imageUrl) {
-			await ctx.db.patch(user._id, {
-				coins: user.coins + CLAIM_COSTS[originalVoucher.type],
+			await refundCoins({
+				ctx,
+				userId,
+				voucherType: originalVoucher.type,
+				voucherId: originalVoucherId,
+				currentCoinBalance: user.coins,
 			});
 			return {
 				status: "refunded",

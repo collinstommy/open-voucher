@@ -785,24 +785,48 @@ export const handleTelegramCallback = internalAction({
 					"⚠️ No replacement vouchers available. Your coins have been refunded.",
 				);
 			}
-		} else if (data.startsWith("report:replacement:no:")) {
+	} else if (data.startsWith("report:replacement:no:")) {
+			const voucherId = data.split(":")[3];
+
 			await answerTelegramCallback(callbackQuery.id);
 			await editTelegramMessageText(
 				chatId,
 				callbackQuery.message.message_id,
 				callbackQuery.message.text,
 			);
-			await sendTelegramMessage(
-				chatId,
-				"✅ No replacement needed. Thank you for reporting!",
+
+			const user = await ctx.runQuery(internal.users.getUserByTelegramChatId, {
+				telegramChatId: telegramUserId,
+			});
+			if (!user) {
+				return;
+			}
+
+			const refundResult = await ctx.runMutation(
+				internal.vouchers.refundReportedVoucher,
+				{
+					userId: user._id,
+					voucherId: voucherId as Id<"vouchers">,
+				},
 			);
+			if (refundResult.status === "refunded") {
+				await sendTelegramMessage(
+					chatId,
+					"✅ Your coins have been refunded. Thank you for reporting!",
+				);
+			} else {
+				await sendTelegramMessage(
+					chatId,
+					"⚠️ Unable to process refund. Please contact support.",
+				);
+			}
 		} else if (data.startsWith("report:cancel:")) {
+			await answerTelegramCallback(callbackQuery.id);
 			await editTelegramMessageText(
 				chatId,
 				callbackQuery.message.message_id,
 				callbackQuery.message.text,
 			);
-			await answerTelegramCallback(callbackQuery.id);
 			await sendTelegramMessage(chatId, "✅ Cancelled. No action taken.");
 		} else if (data.startsWith("report:")) {
 			// General report request (2 parts: report:id)

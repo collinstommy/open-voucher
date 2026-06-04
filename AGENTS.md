@@ -10,6 +10,9 @@ Do not run `git commit` or `git push` unless the user explicitly asks you to, or
 
 This project, `open-voucher`, is a modern TypeScript monorepo built with Better-T-Stack. It combines React, TanStack Start, and Convex to provide a full-stack application development experience.
 
+## Guidelines
+- IMPORTANT - never ever mention support. No user support exists.
+
 ## Key Technologies
 
 *   **TypeScript:** Ensures type safety and enhances developer experience.
