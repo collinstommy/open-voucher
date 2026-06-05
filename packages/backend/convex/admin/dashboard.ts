@@ -1,5 +1,5 @@
 import { internalQuery } from "../_generated/server";
-import { adminQuery } from "../admin";
+import { adminQuery } from "./auth";
 
 export const getStats = adminQuery({
 	args: {},

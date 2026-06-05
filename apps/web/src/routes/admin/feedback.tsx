@@ -24,7 +24,7 @@ function FeedbackPage() {
 	const [statusFilter, setStatusFilter] = useState<"open" | "archived">("open");
 
 	const { data, isLoading, error } = useQuery(
-		convexQuery(api.admin.getAllFeedback, token ? { token } : "skip"),
+		convexQuery(api.admin.feedback.getAllFeedback, token ? { token } : "skip"),
 	);
 
 	const updateStatusMutation = useMutation({
@@ -35,7 +35,7 @@ function FeedbackPage() {
 			feedbackId: Id<"feedback">;
 			status: string;
 		}) =>
-			convex.mutation(api.admin.updateFeedbackStatus, {
+			convex.mutation(api.admin.feedback.updateFeedbackStatus, {
 				token: token!,
 				feedbackId,
 				status,

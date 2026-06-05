@@ -36,7 +36,7 @@ function HomeComponent() {
 		convexQuery(api.admin.dashboard.getStats, token ? { token } : "skip"),
 	);
 	const userGrowth = useQuery(
-		convexQuery(api.admin.getUserGrowth, token ? { token, range } : "skip"),
+		convexQuery(api.admin.analytics.getUserGrowth, token ? { token, range } : "skip"),
 	);
 	const weeklyVouchers = useQuery(
 		convexQuery(api.admin.dashboard.getWeeklyVouchers, token ? { token } : "skip"),
@@ -50,7 +50,7 @@ function HomeComponent() {
 
 	const cleanupMutation = useMutation({
 		mutationFn: () =>
-			convex.action(api.admin.cleanupExpiredVoucherImages, {
+			convex.action(api.admin.imageCleanup.cleanupExpiredVoucherImages, {
 				token: token!,
 				dryRun,
 			}),

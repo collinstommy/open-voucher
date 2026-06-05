@@ -906,11 +906,11 @@ describe("Review System", () => {
 			telegramChatId: "normal1",
 		});
 
-		const loginResult = await t.mutation(api.admin.login, {
+		const loginResult = await t.mutation(api.admin.auth.login, {
 			password: "test-admin-password",
 		});
 
-		const flagged = await t.query(api.admin.getFlaggedUsers, {
+		const flagged = await t.query(api.admin.users.getFlaggedUsers, {
 			token: loginResult.token,
 		});
 
@@ -927,11 +927,11 @@ describe("Review System", () => {
 			flaggedForReviewAt: Date.now(),
 		});
 
-		const loginResult = await t.mutation(api.admin.login, {
+		const loginResult = await t.mutation(api.admin.auth.login, {
 			password: "test-admin-password",
 		});
 
-		await t.mutation(api.admin.banUser, {
+		await t.mutation(api.admin.users.banUser, {
 			token: loginResult.token,
 			userId,
 		});
@@ -955,11 +955,11 @@ describe("Review System", () => {
 			flaggedForReviewAt: Date.now(),
 		});
 
-		const loginResult = await t.mutation(api.admin.login, {
+		const loginResult = await t.mutation(api.admin.auth.login, {
 			password: "test-admin-password",
 		});
 
-		await t.mutation(api.admin.unbanUser, {
+		await t.mutation(api.admin.users.unbanUser, {
 			token: loginResult.token,
 			userId,
 		});
@@ -981,11 +981,11 @@ describe("Review System", () => {
 			flaggedForReviewAt: Date.now(),
 		});
 
-		const loginResult = await t.mutation(api.admin.login, {
+		const loginResult = await t.mutation(api.admin.auth.login, {
 			password: "test-admin-password",
 		});
 
-		await t.mutation(api.admin.dismissFlag, {
+		await t.mutation(api.admin.users.dismissFlag, {
 			token: loginResult.token,
 			userId,
 		});

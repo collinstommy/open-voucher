@@ -13,7 +13,7 @@ type EvalResult = {
 	filename: string;
 	testDate: string;
 	success: boolean;
-	expectedValidFrom: string;
+	expectedValidFrom?: string;
 	expectedExpiry: string;
 	actualValidFrom?: string;
 	actualExpiry?: string;
@@ -154,7 +154,7 @@ function EvalsPage() {
 
 			const results = await Promise.all(
 				TEST_IMAGE_FILES.map((filename) =>
-					convex.action(api.admin.runSingleOcrEval, {
+					convex.action(api.admin.healthChecks.runSingleOcrEval, {
 						token,
 						filename,
 						imageBase64: imagesMap.get(filename)!,

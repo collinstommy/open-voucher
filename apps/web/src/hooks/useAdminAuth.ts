@@ -22,7 +22,7 @@ export function useAdminAuth() {
 		}
 
 		convex
-			.query(api.admin.checkSession, { token: storedToken })
+			.query(api.admin.auth.checkSession, { token: storedToken })
 			.then((session) => {
 				if (session?.valid) {
 					setToken(storedToken);
@@ -41,7 +41,7 @@ export function useAdminAuth() {
 
 	const login = useCallback(
 		async (password: string) => {
-			const result = await convex.mutation(api.admin.login, { password });
+			const result = await convex.mutation(api.admin.auth.login, { password });
 			localStorage.setItem(getTokenKey(), result.token);
 			setToken(result.token);
 			setIsValid(true);
@@ -52,7 +52,7 @@ export function useAdminAuth() {
 
 	const logout = useCallback(async () => {
 		if (token) {
-			await convex.mutation(api.admin.logout, { token });
+			await convex.mutation(api.admin.auth.logout, { token });
 		}
 		localStorage.removeItem(getTokenKey());
 		setToken(null);
