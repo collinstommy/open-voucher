@@ -18,28 +18,28 @@ function BannedUsers() {
 	const queryClient = useQueryClient();
 
 	const { data: bannedUsers, isLoading: bannedLoading } = useQuery(
-		convexQuery(api.admin.getBannedUsers, token ? { token } : "skip"),
+		convexQuery(api.admin.users.getBannedUsers, token ? { token } : "skip"),
 	);
 
 	const { data: flaggedUsers, isLoading: flaggedLoading } = useQuery(
-		convexQuery(api.admin.getFlaggedUsers, token ? { token } : "skip"),
+		convexQuery(api.admin.users.getFlaggedUsers, token ? { token } : "skip"),
 	);
 
 	const banMutation = useMutation({
 		mutationFn: (userId: Id<"users">) =>
-			convex.mutation(api.admin.banUser, { token: token!, userId }),
+			convex.mutation(api.admin.users.banUser, { token: token!, userId }),
 		onSuccess: () => queryClient.invalidateQueries(),
 	});
 
 	const dismissMutation = useMutation({
 		mutationFn: (userId: Id<"users">) =>
-			convex.mutation(api.admin.dismissFlag, { token: token!, userId }),
+			convex.mutation(api.admin.users.dismissFlag, { token: token!, userId }),
 		onSuccess: () => queryClient.invalidateQueries(),
 	});
 
 	const unbanMutation = useMutation({
 		mutationFn: (userId: Id<"users">) =>
-			convex.mutation(api.admin.unbanUser, { token: token!, userId }),
+			convex.mutation(api.admin.users.unbanUser, { token: token!, userId }),
 		onSuccess: () => queryClient.invalidateQueries(),
 	});
 

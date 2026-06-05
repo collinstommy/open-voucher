@@ -29,7 +29,7 @@ describe("Voucher Image Cleanup", () => {
 			});
 
 			const result = await t.query(
-				internal.admin.getExpiredVouchersForCleanup,
+				internal.admin.imageCleanup.getExpiredVouchersForCleanup,
 				{ mode: "mark" },
 			);
 
@@ -50,7 +50,7 @@ describe("Voucher Image Cleanup", () => {
 			});
 
 			const result = await t.query(
-				internal.admin.getExpiredVouchersForCleanup,
+				internal.admin.imageCleanup.getExpiredVouchersForCleanup,
 				{ mode: "mark" },
 			);
 
@@ -70,7 +70,7 @@ describe("Voucher Image Cleanup", () => {
 			});
 
 			const result = await t.query(
-				internal.admin.getExpiredVouchersForCleanup,
+				internal.admin.imageCleanup.getExpiredVouchersForCleanup,
 				{ mode: "mark" },
 			);
 
@@ -90,7 +90,7 @@ describe("Voucher Image Cleanup", () => {
 			});
 
 			const result = await t.query(
-				internal.admin.getExpiredVouchersForCleanup,
+				internal.admin.imageCleanup.getExpiredVouchersForCleanup,
 				{ mode: "mark" },
 			);
 
@@ -110,7 +110,7 @@ describe("Voucher Image Cleanup", () => {
 			});
 
 			const result = await t.query(
-				internal.admin.getExpiredVouchersForCleanup,
+				internal.admin.imageCleanup.getExpiredVouchersForCleanup,
 				{ mode: "mark" },
 			);
 
@@ -131,7 +131,7 @@ describe("Voucher Image Cleanup", () => {
 			});
 
 			const result = await t.query(
-				internal.admin.getExpiredVouchersForCleanup,
+				internal.admin.imageCleanup.getExpiredVouchersForCleanup,
 				{ mode: "mark" },
 			);
 
@@ -158,7 +158,7 @@ describe("Voucher Image Cleanup", () => {
 			});
 
 			const result = await t.query(
-				internal.admin.getExpiredVouchersForCleanup,
+				internal.admin.imageCleanup.getExpiredVouchersForCleanup,
 				{ mode: "mark" },
 			);
 
@@ -184,7 +184,7 @@ describe("Voucher Image Cleanup", () => {
 			});
 
 			const result = await t.query(
-				internal.admin.getExpiredVouchersForCleanup,
+				internal.admin.imageCleanup.getExpiredVouchersForCleanup,
 				{ mode: "mark" },
 			);
 
@@ -206,7 +206,7 @@ describe("Voucher Image Cleanup", () => {
 			}
 
 			const result = await t.query(
-				internal.admin.getExpiredVouchersForCleanup,
+				internal.admin.imageCleanup.getExpiredVouchersForCleanup,
 				{ mode: "mark" },
 			);
 
@@ -239,7 +239,7 @@ describe("Voucher Image Cleanup", () => {
 			});
 
 			const result = await t.query(
-				internal.admin.getExpiredVouchersForCleanup,
+				internal.admin.imageCleanup.getExpiredVouchersForCleanup,
 				{ mode: "delete" },
 			);
 
@@ -266,7 +266,7 @@ describe("Voucher Image Cleanup", () => {
 			});
 
 			const result = await t.query(
-				internal.admin.getExpiredVouchersForCleanup,
+				internal.admin.imageCleanup.getExpiredVouchersForCleanup,
 				{ mode: "delete" },
 			);
 
@@ -292,7 +292,7 @@ describe("Voucher Image Cleanup", () => {
 			});
 
 			const result = await t.query(
-				internal.admin.getExpiredVouchersForCleanup,
+				internal.admin.imageCleanup.getExpiredVouchersForCleanup,
 				{ mode: "delete" },
 			);
 
@@ -319,7 +319,7 @@ describe("Voucher Image Cleanup", () => {
 			});
 
 			const result = await t.query(
-				internal.admin.getExpiredVouchersForCleanup,
+				internal.admin.imageCleanup.getExpiredVouchersForCleanup,
 				{ mode: "delete" },
 			);
 
@@ -339,7 +339,7 @@ describe("Voucher Image Cleanup", () => {
 			});
 
 			const result = await t.query(
-				internal.admin.getExpiredVouchersForCleanup,
+				internal.admin.imageCleanup.getExpiredVouchersForCleanup,
 				{ mode: "delete" },
 			);
 
@@ -380,7 +380,7 @@ describe("Voucher Image Cleanup", () => {
 			});
 
 			const deleteResult = await t.mutation(
-				internal.admin.deleteVoucherImages,
+				internal.admin.imageCleanup.deleteVoucherImages,
 				{
 					vouchers: [{ voucherId: voucherId1, imageStorageId }],
 				},
@@ -428,7 +428,7 @@ describe("Voucher Image Cleanup", () => {
 			});
 
 			const deleteResult = await t.mutation(
-				internal.admin.deleteVoucherImages,
+				internal.admin.imageCleanup.deleteVoucherImages,
 				{
 					vouchers: [{ voucherId, imageStorageId }],
 				},
@@ -464,7 +464,7 @@ describe("Voucher Image Cleanup", () => {
 			});
 
 			const deleteResult = await t.mutation(
-				internal.admin.deleteVoucherImages,
+				internal.admin.imageCleanup.deleteVoucherImages,
 				{
 					vouchers: [{ voucherId, imageStorageId }],
 				},
@@ -504,7 +504,7 @@ describe("Voucher Image Cleanup", () => {
 				expiryDate: now - 100 * MS_PER_DAY,
 			});
 
-			await t.mutation(internal.admin.markVoucherImagesForDeletion, {
+			await t.mutation(internal.admin.imageCleanup.markVoucherImagesForDeletion, {
 				voucherIds: [id1, id2],
 			});
 

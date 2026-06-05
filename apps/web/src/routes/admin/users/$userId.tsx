@@ -46,14 +46,14 @@ function UserDetailPage() {
 
 	const { data, isLoading, error } = useQuery(
 		convexQuery(
-			api.admin.getUserDetails,
+			api.admin.users.getUserDetails,
 			token ? { token, userId: userId as Id<"users"> } : "skip",
 		),
 	);
 
 	const banMutation = useMutation({
 		mutationFn: () =>
-			convex.mutation(api.admin.banUser, {
+			convex.mutation(api.admin.users.banUser, {
 				token: token!,
 				userId: userId as Id<"users">,
 			}),
@@ -62,7 +62,7 @@ function UserDetailPage() {
 
 	const unbanMutation = useMutation({
 		mutationFn: () =>
-			convex.mutation(api.admin.unbanUser, {
+			convex.mutation(api.admin.users.unbanUser, {
 				token: token!,
 				userId: userId as Id<"users">,
 			}),
@@ -71,7 +71,7 @@ function UserDetailPage() {
 
 	const dismissFlagMutation = useMutation({
 		mutationFn: () =>
-			convex.mutation(api.admin.dismissFlag, {
+			convex.mutation(api.admin.users.dismissFlag, {
 				token: token!,
 				userId: userId as Id<"users">,
 			}),
@@ -80,7 +80,7 @@ function UserDetailPage() {
 
 	const sendMessageMutation = useMutation({
 		mutationFn: (text: string) =>
-			convex.mutation(api.admin.sendMessageToUser, {
+			convex.mutation(api.admin.vouchers.sendMessageToUser, {
 				token: token!,
 				userId: userId as Id<"users">,
 				messageText: text,
@@ -99,7 +99,7 @@ function UserDetailPage() {
 			reportId: Id<"reports">;
 			newStatus: "expired" | "available";
 		}) =>
-			convex.mutation(api.admin.clearReportAndUpdateVoucher, {
+			convex.mutation(api.admin.vouchers.clearReportAndUpdateVoucher, {
 				token: token!,
 				reportId,
 				newVoucherStatus: newStatus,
@@ -109,7 +109,7 @@ function UserDetailPage() {
 
 	const expireVoucherMutation = useMutation({
 		mutationFn: (voucherId: Id<"vouchers">) =>
-			convex.mutation(api.admin.expireVoucherAndDeductCoins, {
+			convex.mutation(api.admin.vouchers.expireVoucherAndDeductCoins, {
 				token: token!,
 				voucherId,
 			}),
@@ -118,7 +118,7 @@ function UserDetailPage() {
 
 	const reverseClaimMutation = useMutation({
 		mutationFn: (voucherId: Id<"vouchers">) =>
-			convex.mutation(api.admin.reverseClaim, {
+			convex.mutation(api.admin.vouchers.reverseClaim, {
 				token: token!,
 				voucherId,
 			}),

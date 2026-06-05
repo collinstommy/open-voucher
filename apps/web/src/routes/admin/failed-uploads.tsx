@@ -32,7 +32,7 @@ function FailedUploadsPage() {
 
 	const { data, isLoading, error } = useQuery(
 		convexQuery(
-			api.admin.getFailedUploads,
+			api.admin.feedback.getFailedUploads,
 			token
 				? { token, excludeReasons: [...excludedReasons], page }
 				: "skip",

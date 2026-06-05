@@ -8,8 +8,14 @@
  * @module
  */
 
-import type * as admin from "../admin.js";
+import type * as admin_analytics from "../admin/analytics.js";
+import type * as admin_auth from "../admin/auth.js";
 import type * as admin_dashboard from "../admin/dashboard.js";
+import type * as admin_feedback from "../admin/feedback.js";
+import type * as admin_healthChecks from "../admin/healthChecks.js";
+import type * as admin_imageCleanup from "../admin/imageCleanup.js";
+import type * as admin_users from "../admin/users.js";
+import type * as admin_vouchers from "../admin/vouchers.js";
 import type * as analytics from "../analytics.js";
 import type * as auth from "../auth.js";
 import type * as constants from "../constants.js";
@@ -37,8 +43,14 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
-  admin: typeof admin;
+  "admin/analytics": typeof admin_analytics;
+  "admin/auth": typeof admin_auth;
   "admin/dashboard": typeof admin_dashboard;
+  "admin/feedback": typeof admin_feedback;
+  "admin/healthChecks": typeof admin_healthChecks;
+  "admin/imageCleanup": typeof admin_imageCleanup;
+  "admin/users": typeof admin_users;
+  "admin/vouchers": typeof admin_vouchers;
   analytics: typeof analytics;
   auth: typeof auth;
   constants: typeof constants;

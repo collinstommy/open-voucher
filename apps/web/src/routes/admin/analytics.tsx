@@ -67,14 +67,14 @@ function AnalyticsPage() {
 
 	const { data, isLoading, error } = useQuery(
 		convexQuery(
-			api.admin.getMessageAnalytics,
+			api.admin.analytics.getMessageAnalytics,
 			token ? { token, since } : "skip",
 		),
 	);
 
 	const { data: analyticsData, isLoading: analyticsLoading } = useQuery(
 		convexQuery(
-			api.admin.getAnalyticsEventCounts,
+			api.admin.analytics.getAnalyticsEventCounts,
 			token ? { token, since } : "skip",
 		),
 	);
@@ -82,7 +82,7 @@ function AnalyticsPage() {
 	const { data: transactionData, isLoading: transactionLoading } =
 		useQuery(
 			convexQuery(
-				api.admin.getTransactionTotalsByType,
+				api.admin.analytics.getTransactionTotalsByType,
 				token ? { token, since } : "skip",
 			),
 		);

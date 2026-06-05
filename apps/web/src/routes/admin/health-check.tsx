@@ -63,7 +63,7 @@ function HealthCheckPage() {
 		if (!token) return;
 		setIsLoading(true);
 		try {
-			const result = await convex.action(api.admin.runHealthCheck, {
+			const result = await convex.action(api.admin.healthChecks.runHealthCheck, {
 				token,
 			});
 			setResults(result as HealthCheckResult);

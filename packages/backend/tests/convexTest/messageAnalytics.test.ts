@@ -38,7 +38,7 @@ describe("getMessageAnalytics", () => {
 			});
 		});
 
-		const result = await t.query(api.admin.getMessageAnalytics, {
+		const result = await t.query(api.admin.analytics.getMessageAnalytics, {
 			token,
 		});
 
