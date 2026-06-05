@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { internal } from "../_generated/api";
-import { CLAIM_COSTS, MIN_COINS, UPLOAD_REWARDS } from "../constants";
+import { CLAIM_COSTS, UPLOAD_REWARDS } from "../constants";
+import { applyCoinDelta } from "../lib/coinLedger";
 import { adminMutation, adminQuery } from "./auth";
 
 export const getTodaysVouchers = adminQuery({
@@ -94,26 +95,21 @@ export const expireVoucherAndDeductCoins = adminMutation({
 			throw new Error("Uploader not found");
 		}
 
-		const now = Date.now();
 		const deductionAmount = UPLOAD_REWARDS[voucher.type] ?? 0;
-		const newCoins = Math.max(MIN_COINS, uploader.coins - deductionAmount);
 
 		await ctx.db.patch(voucherId, { status: "expired" });
 
-		await ctx.db.patch(voucher.uploaderId, { coins: newCoins });
-
-		await ctx.db.insert("transactions", {
+		const { newBalance } = await applyCoinDelta(ctx, {
 			userId: voucher.uploaderId,
+			delta: -deductionAmount,
 			type: "admin_expiry_deduction",
-			amount: -deductionAmount,
 			voucherId,
-			createdAt: now,
 		});
 
 		return {
 			success: true,
 			deductedAmount: deductionAmount,
-			newBalance: newCoins,
+			newBalance,
 		};
 	},
 });
@@ -142,7 +138,6 @@ export const reverseClaim = adminMutation({
 		}
 
 		const refundAmount = CLAIM_COSTS[voucher.type] ?? 0;
-		const now = Date.now();
 
 		await ctx.db.patch(voucherId, {
 			status: "available",
@@ -150,23 +145,21 @@ export const reverseClaim = adminMutation({
 			claimedAt: undefined,
 		});
 
-		await ctx.db.patch(voucher.claimerId, {
-			coins: claimer.coins + refundAmount,
-			claimCount: Math.max(0, (claimer.claimCount || 0) - 1),
+		const { newBalance } = await applyCoinDelta(ctx, {
+			userId: voucher.claimerId,
+			delta: refundAmount,
+			type: "claim_reversed",
+			voucherId,
 		});
 
-		await ctx.db.insert("transactions", {
-			userId: voucher.claimerId,
-			type: "claim_reversed",
-			amount: refundAmount,
-			voucherId,
-			createdAt: now,
+		await ctx.db.patch(voucher.claimerId, {
+			claimCount: Math.max(0, (claimer.claimCount || 0) - 1),
 		});
 
 		return {
 			success: true,
 			refundAmount,
-			newClaimerBalance: claimer.coins + refundAmount,
+			newClaimerBalance: newBalance,
 		};
 	},
 });

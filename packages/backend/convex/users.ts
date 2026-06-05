@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { internalMutation, internalQuery } from "./_generated/server";
 import { SIGNUP_BONUS } from "./constants";
 import { userMutation, userQuery } from "./auth";
+import { applyCoinDelta } from "./lib/coinLedger";
 import { messageIntentValidator } from "./lib/messageIntent";
 
 /**
@@ -33,17 +34,16 @@ export const createUser = internalMutation({
 			telegramChatId,
 			username,
 			firstName,
-			coins: SIGNUP_BONUS,
+			coins: 0,
 			isBanned: false,
 			createdAt: now,
 			lastActiveAt: now,
 		});
 
-		await ctx.db.insert("transactions", {
+		await applyCoinDelta(ctx, {
 			userId,
+			delta: SIGNUP_BONUS,
 			type: "signup_bonus",
-			amount: SIGNUP_BONUS,
-			createdAt: now,
 		});
 
 		return {
