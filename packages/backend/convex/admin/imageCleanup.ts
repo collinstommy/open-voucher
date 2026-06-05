@@ -157,12 +157,12 @@ export const cleanupExpiredVoucherImages = adminAction({
 			toDelete: [],
 		};
 
-		const toMark = await ctx.runQuery(
+		const toMark: Array<{ _id: Id<"vouchers">; imageStorageId: Id<"_storage">; expiryDate: number; status: string }> = await ctx.runQuery(
 			internal.admin.imageCleanup.getExpiredVouchersForCleanup,
 			{ mode: "mark" },
 		);
 
-		result.toMark = (toMark as Array<{ _id: Id<"vouchers">; expiryDate: number }>).map((v) => ({
+		result.toMark = toMark.map((v) => ({
 			id: v._id,
 			expiryDate: v.expiryDate,
 		}));
@@ -171,18 +171,18 @@ export const cleanupExpiredVoucherImages = adminAction({
 			await ctx.runMutation(
 				internal.admin.imageCleanup.markVoucherImagesForDeletion,
 				{
-					voucherIds: (toMark as Array<{ _id: Id<"vouchers"> }>).map((v) => v._id),
+					voucherIds: toMark.map((v) => v._id),
 				},
 			);
 			result.marked = toMark.length;
 		}
 
-		const toDelete = await ctx.runQuery(
+		const toDelete: Array<{ _id: Id<"vouchers">; imageStorageId: Id<"_storage">; expiryDate: number; status: string; imageMarkedForDeletionAt?: number }> = await ctx.runQuery(
 			internal.admin.imageCleanup.getExpiredVouchersForCleanup,
 			{ mode: "delete" },
 		);
 
-		result.toDelete = (toDelete as Array<{ _id: Id<"vouchers">; imageStorageId: Id<"_storage"> }>).map((v) => ({
+		result.toDelete = toDelete.map((v) => ({
 			id: v._id,
 			imageStorageId: v.imageStorageId,
 		}));
@@ -191,7 +191,7 @@ export const cleanupExpiredVoucherImages = adminAction({
 			const deleteResult = await ctx.runMutation(
 				internal.admin.imageCleanup.deleteVoucherImages,
 				{
-					vouchers: (toDelete as Array<{ _id: Id<"vouchers">; imageStorageId: Id<"_storage"> }>).map((v) => ({
+					vouchers: toDelete.map((v) => ({
 						voucherId: v._id,
 						imageStorageId: v.imageStorageId,
 					})),

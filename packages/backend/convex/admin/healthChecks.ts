@@ -134,7 +134,6 @@ async function performHealthCheck(ctx: ActionCtx): Promise<HealthCheckResult> {
 export const runHealthCheck = adminAction({
 	args: { token: v.string() },
 	handler: async (ctx, { token }) => {
-		await verifyAdminSession(ctx, token);
 		return performHealthCheck(ctx);
 	},
 });
