@@ -731,7 +731,7 @@ describe("Uploader report callbacks", () => {
 					chat: { id: attackerChatId, type: "private" },
 					text: "Did you use this voucher?",
 				},
-				data: `uploader_admitted:${voucherId}`,
+				data: JSON.stringify({ k: "uploader_admitted", v: String(voucherId) }),
 			},
 		});
 
@@ -781,7 +781,7 @@ describe("Report Confirmation Flow", () => {
 					chat: { id: chatId, type: "private" },
 					text: "Here's your €10 voucher!",
 				},
-				data: `report:${voucherId}`,
+				data: JSON.stringify({ k: "report:init", v: String(voucherId) }),
 			},
 		});
 
@@ -801,7 +801,7 @@ describe("Report Confirmation Flow", () => {
 					chat: { id: chatId, type: "private" },
 					text: confirmationMsg?.text,
 				},
-				data: `report:cancel:${voucherId}`,
+				data: JSON.stringify({ k: "report:cancel", v: String(voucherId) }),
 			},
 		});
 
@@ -846,7 +846,7 @@ describe("Report Confirmation Flow", () => {
 					chat: { id: chatId, type: "private" },
 					text: "Here's your €10 voucher!",
 				},
-				data: `report:${voucherId}`,
+				data: JSON.stringify({ k: "report:init", v: String(voucherId) }),
 			},
 		});
 
@@ -864,7 +864,7 @@ describe("Report Confirmation Flow", () => {
 					chat: { id: chatId, type: "private" },
 					text: confirmationMsg?.text,
 				},
-				data: `report:confirm:${voucherId}`,
+				data: JSON.stringify({ k: "report:confirm", v: String(voucherId) }),
 			},
 		});
 

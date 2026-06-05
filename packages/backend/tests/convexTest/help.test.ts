@@ -160,7 +160,7 @@ describe("Help Callback Responses", () => {
 		const userId = await createUser(t, { telegramChatId: chatId, coins: 42 });
 
 		await t.action(internal.telegram.handleTelegramCallback, {
-			callbackQuery: createTelegramCallback({ data: "help:balance", chatId }),
+			callbackQuery: createTelegramCallback({ data: JSON.stringify({ k: "help", a: "balance" }), chatId }),
 		});
 
 		const balanceMsg = sentMessages.find(
@@ -176,7 +176,7 @@ describe("Help Callback Responses", () => {
 		await createUser(t, { telegramChatId: chatId, coins: 100 });
 
 		await t.action(internal.telegram.handleTelegramCallback, {
-			callbackQuery: createTelegramCallback({ data: "help:upload", chatId }),
+			callbackQuery: createTelegramCallback({ data: JSON.stringify({ k: "help", a: "upload" }), chatId }),
 		});
 
 		const uploadMsg = sentMessages.find(
@@ -192,7 +192,7 @@ describe("Help Callback Responses", () => {
 		await createUser(t, { telegramChatId: chatId, coins: 100 });
 
 		await t.action(internal.telegram.handleTelegramCallback, {
-			callbackQuery: createTelegramCallback({ data: "help:claim", chatId }),
+			callbackQuery: createTelegramCallback({ data: JSON.stringify({ k: "help", a: "claim" }), chatId }),
 		});
 
 		const claimMsg = sentMessages.find(
