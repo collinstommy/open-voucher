@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { api, internal } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import schema from "../../convex/schema";
+import { reportData, uploaderData } from "../../convex/telegram/router";
 import { modules } from "../test.setup";
 import {
 	createUser,
@@ -731,7 +732,7 @@ describe("Uploader report callbacks", () => {
 					chat: { id: attackerChatId, type: "private" },
 					text: "Did you use this voucher?",
 				},
-				data: JSON.stringify({ k: "uploader_admitted", v: String(voucherId) }),
+				data: uploaderData("uploader_admitted", String(voucherId)),
 			},
 		});
 
@@ -781,7 +782,7 @@ describe("Report Confirmation Flow", () => {
 					chat: { id: chatId, type: "private" },
 					text: "Here's your €10 voucher!",
 				},
-				data: JSON.stringify({ k: "report:init", v: String(voucherId) }),
+				data: reportData("report_init", String(voucherId)),
 			},
 		});
 
@@ -801,7 +802,7 @@ describe("Report Confirmation Flow", () => {
 					chat: { id: chatId, type: "private" },
 					text: confirmationMsg?.text,
 				},
-				data: JSON.stringify({ k: "report:cancel", v: String(voucherId) }),
+				data: reportData("report_cancel", String(voucherId)),
 			},
 		});
 
@@ -846,7 +847,7 @@ describe("Report Confirmation Flow", () => {
 					chat: { id: chatId, type: "private" },
 					text: "Here's your €10 voucher!",
 				},
-				data: JSON.stringify({ k: "report:init", v: String(voucherId) }),
+				data: reportData("report_init", String(voucherId)),
 			},
 		});
 
@@ -864,7 +865,7 @@ describe("Report Confirmation Flow", () => {
 					chat: { id: chatId, type: "private" },
 					text: confirmationMsg?.text,
 				},
-				data: JSON.stringify({ k: "report:confirm", v: String(voucherId) }),
+				data: reportData("report_confirm", String(voucherId)),
 			},
 		});
 

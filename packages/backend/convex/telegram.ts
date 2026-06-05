@@ -338,7 +338,7 @@ async function handleVoucherRequest(
 					[
 						{
 							text: "⚠️ Its not working",
-							callback_data: reportData("report:init", String(result.voucherId)),
+							callback_data: reportData("report_init", String(result.voucherId)),
 						},
 					],
 				],

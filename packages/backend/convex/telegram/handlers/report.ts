@@ -7,7 +7,7 @@ import { on, reportData } from "../router";
 
 dayjs.extend(advancedFormat);
 
-on("report:init", async (c, event, bot) => {
+on("report_init", async (c, event, bot) => {
 	await bot.answerCallback(c.callbackId);
 
 	const user = await c.ctx.runQuery(internal.users.getUserByTelegramChatId, {
@@ -53,13 +53,13 @@ on("report:init", async (c, event, bot) => {
 				[
 					{
 						text: "✅ Yes",
-						callback_data: reportData("report:confirm", event.voucherId),
+						callback_data: reportData("report_confirm", event.voucherId),
 					},
 				],
 				[
 					{
 						text: "❌ No",
-						callback_data: reportData("report:cancel", event.voucherId),
+						callback_data: reportData("report_cancel", event.voucherId),
 					},
 				],
 			],
@@ -67,7 +67,7 @@ on("report:init", async (c, event, bot) => {
 	);
 });
 
-on("report:confirm", async (c, event, bot) => {
+on("report_confirm", async (c, event, bot) => {
 	await bot.answerCallback(c.callbackId);
 
 	const user = await c.ctx.runQuery(internal.users.getUserByTelegramChatId, {
@@ -103,7 +103,7 @@ on("report:confirm", async (c, event, bot) => {
 						{
 							text: "✅ Yes, send a replacement",
 							callback_data: reportData(
-								"report:replacement_yes",
+								"report_replacement_yes",
 								event.voucherId,
 							),
 						},
@@ -112,7 +112,7 @@ on("report:confirm", async (c, event, bot) => {
 						{
 							text: "❌ No thanks",
 							callback_data: reportData(
-								"report:replacement_no",
+								"report_replacement_no",
 								event.voucherId,
 							),
 						},
@@ -123,7 +123,7 @@ on("report:confirm", async (c, event, bot) => {
 	}
 });
 
-on("report:replacement_yes", async (c, event, bot) => {
+on("report_replacement_yes", async (c, event, bot) => {
 	await bot.answerCallback(c.callbackId);
 	await bot.editMessageText(c.chatId, c.messageId, c.messageText);
 
@@ -153,7 +153,7 @@ on("report:replacement_yes", async (c, event, bot) => {
 						{
 							text: "⚠️ Its not working",
 							callback_data: reportData(
-								"report:init",
+								"report_init",
 								result.voucher._id,
 							),
 						},
@@ -169,7 +169,7 @@ on("report:replacement_yes", async (c, event, bot) => {
 	}
 });
 
-on("report:replacement_no", async (c, event, bot) => {
+on("report_replacement_no", async (c, event, bot) => {
 	await bot.answerCallback(c.callbackId);
 	await bot.editMessageText(c.chatId, c.messageId, c.messageText);
 
@@ -200,7 +200,7 @@ on("report:replacement_no", async (c, event, bot) => {
 	}
 });
 
-on("report:cancel", async (c, _event, bot) => {
+on("report_cancel", async (c, _event, bot) => {
 	await bot.answerCallback(c.callbackId);
 	await bot.editMessageText(c.chatId, c.messageId, c.messageText);
 	await bot.sendMessage(c.chatId, "✅ Cancelled. No action taken.");

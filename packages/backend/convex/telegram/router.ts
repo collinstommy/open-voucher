@@ -1,6 +1,25 @@
 import type { ActionCtx } from "../_generated/server";
 import type { BotAdapter } from "./botAdapter";
 
+export const CALLBACK_KINDS = {
+	report_init: "ri",
+	report_confirm: "rc",
+	report_replacement_yes: "rpy",
+	report_replacement_no: "rpn",
+	report_cancel: "rx",
+	uploader_admitted: "ua",
+	uploader_denied: "ud",
+	help: "h",
+	faq: "f",
+} as const;
+
+type CallbackKindKey = keyof typeof CALLBACK_KINDS;
+
+const REVERSE_KINDS: Record<string, CallbackKindKey> = {};
+for (const [key, code] of Object.entries(CALLBACK_KINDS)) {
+	REVERSE_KINDS[code] = key as CallbackKindKey;
+}
+
 export type HelpAction =
 	| "balance"
 	| "upload"
@@ -13,11 +32,11 @@ export type HelpAction =
 export type FaqAction = "back" | "return_cancel" | "processing_failed";
 
 export type CallbackEvent =
-	| { kind: "report:init"; voucherId: string }
-	| { kind: "report:confirm"; voucherId: string }
-	| { kind: "report:replacement_yes"; voucherId: string }
-	| { kind: "report:replacement_no"; voucherId: string }
-	| { kind: "report:cancel"; voucherId: string }
+	| { kind: "report_init"; voucherId: string }
+	| { kind: "report_confirm"; voucherId: string }
+	| { kind: "report_replacement_yes"; voucherId: string }
+	| { kind: "report_replacement_no"; voucherId: string }
+	| { kind: "report_cancel"; voucherId: string }
 	| { kind: "help"; action: HelpAction }
 	| { kind: "faq"; action: FaqAction }
 	| { kind: "uploader_admitted"; voucherId: string }
@@ -50,28 +69,29 @@ export function on<K extends CallbackEvent["kind"]>(
 export function parseCallbackData(data: string): CallbackEvent | null {
 	try {
 		const raw = JSON.parse(data);
-		const k = raw.k as string;
+		const code = raw.k as string;
 		const v = raw.v as string | undefined;
 		const a = raw.a as string | undefined;
 
-		switch (k) {
-			case "report:init":
-			case "report:confirm":
-			case "report:replacement_yes":
-			case "report:replacement_no":
-			case "report:cancel":
+		const kind = REVERSE_KINDS[code];
+		if (!kind) return null;
+
+		switch (kind) {
+			case "report_init":
+			case "report_confirm":
+			case "report_replacement_yes":
+			case "report_replacement_no":
+			case "report_cancel":
+			case "uploader_admitted":
+			case "uploader_denied":
 				if (!v) return null;
-				return { kind: k, voucherId: v };
+				return { kind, voucherId: v };
 			case "help":
 				if (!a) return null;
 				return { kind: "help", action: a as HelpAction };
 			case "faq":
 				if (!a) return null;
 				return { kind: "faq", action: a as FaqAction };
-			case "uploader_admitted":
-			case "uploader_denied":
-				if (!v) return null;
-				return { kind: k, voucherId: v };
 			default:
 				return null;
 		}
@@ -81,30 +101,25 @@ export function parseCallbackData(data: string): CallbackEvent | null {
 }
 
 export function reportData(
-	kind:
-		| "report:init"
-		| "report:confirm"
-		| "report:replacement_yes"
-		| "report:replacement_no"
-		| "report:cancel",
+	kind: "report_init" | "report_confirm" | "report_replacement_yes" | "report_replacement_no" | "report_cancel",
 	voucherId: string,
 ): string {
-	return JSON.stringify({ k: kind, v: voucherId });
+	return JSON.stringify({ k: CALLBACK_KINDS[kind], v: voucherId });
 }
 
 export function helpData(action: HelpAction): string {
-	return JSON.stringify({ k: "help", a: action });
+	return JSON.stringify({ k: CALLBACK_KINDS.help, a: action });
 }
 
 export function faqData(action: FaqAction): string {
-	return JSON.stringify({ k: "faq", a: action });
+	return JSON.stringify({ k: CALLBACK_KINDS.faq, a: action });
 }
 
 export function uploaderData(
 	kind: "uploader_admitted" | "uploader_denied",
 	voucherId: string,
 ): string {
-	return JSON.stringify({ k: kind, v: voucherId });
+	return JSON.stringify({ k: CALLBACK_KINDS[kind], v: voucherId });
 }
 
 export async function dispatch(
