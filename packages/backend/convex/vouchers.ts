@@ -5,11 +5,11 @@ import type { Id } from "./_generated/dataModel";
 import {
 	internalMutation,
 	internalQuery,
-	type MutationCtx,
 	type QueryCtx,
 } from "./_generated/server";
 import { userMutation, userQuery } from "./auth";
-import { CLAIM_COSTS, MIN_COINS, UPLOAD_REWARDS } from "./constants";
+import { CLAIM_COSTS, UPLOAD_REWARDS } from "./constants";
+import { applyCoinDelta } from "./lib/coinLedger";
 
 export const getVoucherByBarcode = internalQuery({
 	args: { barcodeNumber: v.string() },
@@ -124,7 +124,6 @@ export const requestVoucher = internalMutation({
 		}
 
 		const voucher = vouchers.sort((a, b) => a.expiryDate - b.expiryDate)[0];
-		const newCoins = user.coins - cost;
 
 		const imageUrl = await ctx.storage.getUrl(voucher.imageStorageId);
 		if (!imageUrl) {
@@ -135,8 +134,14 @@ export const requestVoucher = internalMutation({
 			};
 		}
 
+		const { newBalance } = await applyCoinDelta(ctx, {
+			userId,
+			delta: -cost,
+			type: "claim_spend",
+			voucherId: voucher._id,
+		});
+
 		await ctx.db.patch(userId, {
-			coins: newCoins,
 			claimCount: (user.claimCount || 0) + 1,
 		});
 
@@ -146,19 +151,11 @@ export const requestVoucher = internalMutation({
 			claimedAt: now,
 		});
 
-		await ctx.db.insert("transactions", {
-			userId,
-			type: "claim_spend",
-			amount: -cost,
-			voucherId: voucher._id,
-			createdAt: now,
-		});
-
 		return {
 			success: true,
 			voucherId: voucher._id,
 			imageUrl,
-			remainingCoins: newCoins,
+			remainingCoins: newBalance,
 			expiryDate: voucher.expiryDate,
 		};
 	},
@@ -182,10 +179,15 @@ export const refundFailedClaimDelivery = internalMutation({
 		}
 
 		const refundAmount = CLAIM_COSTS[type];
-		const now = Date.now();
+
+		await applyCoinDelta(ctx, {
+			userId,
+			delta: refundAmount,
+			type: "refund",
+			voucherId,
+		});
 
 		await ctx.db.patch(userId, {
-			coins: user.coins + refundAmount,
 			claimCount: Math.max(0, (user.claimCount || 0) - 1),
 		});
 
@@ -193,14 +195,6 @@ export const refundFailedClaimDelivery = internalMutation({
 			status: "available",
 			claimerId: undefined,
 			claimedAt: undefined,
-		});
-
-		await ctx.db.insert("transactions", {
-			userId,
-			type: "refund",
-			amount: refundAmount,
-			voucherId,
-			createdAt: now,
 		});
 
 		return { refunded: true, refundAmount };
@@ -442,43 +436,16 @@ export const refundReportedVoucher = internalMutation({
 
 		const refundAmount = CLAIM_COSTS[voucher.type];
 
-		await refundCoins({
-			ctx,
+		await applyCoinDelta(ctx, {
 			userId: user._id,
-			voucherType: voucher.type,
+			delta: refundAmount,
+			type: "refund",
 			voucherId,
-			currentCoinBalance: user.coins,
 		});
 
 		return { status: "refunded", refundAmount };
 	},
 });
-
-async function refundCoins({
-	ctx,
-	userId,
-	voucherType,
-	voucherId,
-	currentCoinBalance,
-}: {
-	ctx: MutationCtx;
-	userId: Id<"users">;
-	voucherType: string;
-	voucherId: Id<"vouchers">;
-	currentCoinBalance: number;
-}) {
-	const refundAmount = CLAIM_COSTS[voucherType];
-	await ctx.db.patch(userId, {
-		coins: currentCoinBalance + refundAmount,
-	});
-	await ctx.db.insert("transactions", {
-		userId,
-		type: "refund",
-		amount: refundAmount,
-		voucherId,
-		createdAt: Date.now(),
-	});
-}
 
 export const requestReplacement = internalMutation({
 	args: {
@@ -512,24 +479,22 @@ export const requestReplacement = internalMutation({
 			.first();
 
 		if (!replacement) {
-			await refundCoins({
-				ctx,
+			await applyCoinDelta(ctx, {
 				userId,
-				voucherType: originalVoucher.type,
+				delta: CLAIM_COSTS[originalVoucher.type],
+				type: "refund",
 				voucherId: originalVoucherId,
-				currentCoinBalance: user.coins,
 			});
 			return { status: "refunded" };
 		}
 
 		const imageUrl = await ctx.storage.getUrl(replacement.imageStorageId);
 		if (!imageUrl) {
-			await refundCoins({
-				ctx,
+			await applyCoinDelta(ctx, {
 				userId,
-				voucherType: originalVoucher.type,
+				delta: CLAIM_COSTS[originalVoucher.type],
+				type: "refund",
 				voucherId: originalVoucherId,
-				currentCoinBalance: user.coins,
 			});
 			return {
 				status: "refunded",
@@ -616,7 +581,8 @@ export const getAvailableVoucherCount = internalQuery({
 
 export const getVoucherAvailability = userQuery({
 	args: {},
-	handler: async (ctx, { userId: _userId }) => countAvailableVouchersByType(ctx),
+	handler: async (ctx, { userId: _userId }) =>
+		countAvailableVouchersByType(ctx),
 });
 
 export const getMyAvailableUploads = userQuery({
@@ -628,8 +594,8 @@ export const getMyAvailableUploads = userQuery({
 			.order("desc")
 			.collect();
 
-		const filtered = vouchers.filter((v) =>
-			v.status === "available" || v.status === "invalidated"
+		const filtered = vouchers.filter(
+			(v) => v.status === "available" || v.status === "invalidated",
 		);
 
 		return await Promise.all(
@@ -661,21 +627,15 @@ export const invalidateMyUpload = userMutation({
 
 		await ctx.db.patch(voucherId, { status: "invalidated" });
 
-		const user = await ctx.db.get(userId);
 		const deduction = UPLOAD_REWARDS[voucher.type] || 0;
-		const newCoins = Math.max(MIN_COINS, (user?.coins ?? 0) - deduction);
-
-		await ctx.db.patch(userId, { coins: newCoins });
-
-		await ctx.db.insert("transactions", {
+		const { newBalance } = await applyCoinDelta(ctx, {
 			userId,
+			delta: -deduction,
 			type: "self_invalidated",
-			amount: -deduction,
 			voucherId,
-			createdAt: Date.now(),
 		});
 
-		return { success: true, deduction, newCoins };
+		return { success: true, deduction, newCoins: newBalance };
 	},
 });
 
@@ -691,9 +651,7 @@ export const getMyClaimedVouchers = userQuery({
 			.collect();
 
 		const active = vouchers.filter(
-			(v) =>
-				v.status === "claimed" &&
-				v.expiryDate > now,
+			(v) => v.status === "claimed" && v.expiryDate > now,
 		);
 
 		return await Promise.all(
@@ -749,17 +707,15 @@ export const returnClaimedVoucher = userMutation({
 		});
 
 		const user = await ctx.db.get(userId);
-		await ctx.db.patch(userId, {
-			coins: (user?.coins ?? 0) + refundAmount,
-			claimCount: Math.max(0, (user?.claimCount ?? 0) - 1),
+		await applyCoinDelta(ctx, {
+			userId,
+			delta: refundAmount,
+			type: "claim_returned",
+			voucherId,
 		});
 
-		await ctx.db.insert("transactions", {
-			userId,
-			type: "claim_returned",
-			amount: refundAmount,
-			voucherId,
-			createdAt: Date.now(),
+		await ctx.db.patch(userId, {
+			claimCount: Math.max(0, (user?.claimCount ?? 0) - 1),
 		});
 
 		return { success: true, refundAmount };
@@ -783,8 +739,12 @@ export const confirmUploaderUsedVoucher = internalMutation({
 		const uploader = await ctx.db.get(uploaderId);
 		if (!uploader) return;
 
-		const newCoins = Math.max(MIN_COINS, uploader.coins - amount);
-		await ctx.db.patch(uploaderId, { coins: newCoins });
+		await applyCoinDelta(ctx, {
+			userId: uploaderId,
+			delta: -amount,
+			type: "uploader_refund",
+			voucherId,
+		});
 
 		await ctx.db.patch(voucherId, { status: "uploader_admitted_used" });
 
@@ -797,14 +757,6 @@ export const confirmUploaderUsedVoucher = internalMutation({
 		if (report) {
 			await ctx.db.delete(report._id);
 		}
-
-		await ctx.db.insert("transactions", {
-			userId: uploaderId,
-			type: "uploader_refund",
-			amount: -amount,
-			voucherId,
-			createdAt: Date.now(),
-		});
 	},
 });
 

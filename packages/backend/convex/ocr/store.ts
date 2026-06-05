@@ -4,6 +4,7 @@ import { internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import { internalMutation, type MutationCtx } from "../_generated/server";
 import { UPLOAD_REWARDS } from "../constants";
+import { applyCoinDelta } from "../lib/coinLedger";
 
 type VoucherOcrFailureReason =
 	| "EXPIRED"
@@ -245,23 +246,20 @@ export const storeVoucherFromOcr = internalMutation({
 		});
 
 		const reward = UPLOAD_REWARDS[type];
-		const newCoins = user.coins + reward;
-		await ctx.db.patch(userId, {
-			coins: newCoins,
-			uploadCount: (user.uploadCount || 0) + 1,
+		const { newBalance } = await applyCoinDelta(ctx, {
+			userId,
+			delta: reward,
+			type: "upload_reward",
+			voucherId,
 		});
 
-		await ctx.db.insert("transactions", {
-			userId,
-			type: "upload_reward",
-			amount: reward,
-			voucherId,
-			createdAt: nowMs,
+		await ctx.db.patch(userId, {
+			uploadCount: (user.uploadCount || 0) + 1,
 		});
 
 		await ctx.scheduler.runAfter(0, internal.telegram.sendMessageAction, {
 			chatId: user.telegramChatId,
-			text: `✅ <b>Voucher Accepted!</b>\n\nThanks for sharing a €${type} voucher.\nCoins earned: +${reward}\nNew balance: ${newCoins}`,
+			text: `✅ <b>Voucher Accepted!</b>\n\nThanks for sharing a €${type} voucher.\nCoins earned: +${reward}\nNew balance: ${newBalance}`,
 		});
 
 		console.log(
