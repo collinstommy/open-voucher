@@ -66,8 +66,7 @@ We've given you a welcome bonus of <b>${coins} coins</b> to get you started! �
 
 📤 <b>Got a voucher?</b> Upload a screenshot via the paperclip icon
 🙏 <b>Need a voucher?</b> Reply with just <b>5</b>, <b>10</b>, or <b>20</b>
-💰 <b>Check Balance:</b> Send <b>balance</b>
-❓ <b>Get Help:</b> Send <b>help</b>
+📱 <b>Check balance & get help:</b> Tap the "My Account" button below
 
 <b>Important</b>
 • Please do not use vouchers you have already uploaded. Request a voucher through the bot instead.
