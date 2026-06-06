@@ -5,6 +5,7 @@ import { convexTest } from "convex-test";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { internal } from "../../convex/_generated/api";
 import schema from "../../convex/schema";
+import { helpData } from "../../convex/telegram/router";
 import { modules } from "../test.setup";
 import {
 	createTelegramCallback,
@@ -160,7 +161,7 @@ describe("Help Callback Responses", () => {
 		const userId = await createUser(t, { telegramChatId: chatId, coins: 42 });
 
 		await t.action(internal.telegram.handleTelegramCallback, {
-			callbackQuery: createTelegramCallback({ data: "help:balance", chatId }),
+			callbackQuery: createTelegramCallback({ data: helpData("balance"), chatId }),
 		});
 
 		const balanceMsg = sentMessages.find(
@@ -176,7 +177,7 @@ describe("Help Callback Responses", () => {
 		await createUser(t, { telegramChatId: chatId, coins: 100 });
 
 		await t.action(internal.telegram.handleTelegramCallback, {
-			callbackQuery: createTelegramCallback({ data: "help:upload", chatId }),
+			callbackQuery: createTelegramCallback({ data: helpData("upload"), chatId }),
 		});
 
 		const uploadMsg = sentMessages.find(
@@ -192,7 +193,7 @@ describe("Help Callback Responses", () => {
 		await createUser(t, { telegramChatId: chatId, coins: 100 });
 
 		await t.action(internal.telegram.handleTelegramCallback, {
-			callbackQuery: createTelegramCallback({ data: "help:claim", chatId }),
+			callbackQuery: createTelegramCallback({ data: helpData("claim"), chatId }),
 		});
 
 		const claimMsg = sentMessages.find(

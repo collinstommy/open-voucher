@@ -7,6 +7,15 @@ import type { ActionCtx } from "./_generated/server";
 import { internalAction } from "./_generated/server";
 import { UPLOAD_REWARDS } from "./constants";
 import { classifyInboundMessage } from "./lib/messageIntent";
+import { realBotAdapter } from "./telegram/botAdapter";
+import { reportData, uploaderData } from "./telegram/router";
+import { helpMenuKeyboard, faqMenuKeyboard, appWebAppKeyboard } from "./telegram/keyboards";
+import "./telegram/handlers/report";
+import "./telegram/handlers/help";
+import "./telegram/handlers/faq";
+import "./telegram/handlers/uploader";
+import { dispatch } from "./telegram/router";
+import type { CallbackContext } from "./telegram/router";
 
 dayjs.extend(advancedFormat);
 
@@ -57,8 +66,7 @@ We've given you a welcome bonus of <b>${coins} coins</b> to get you started! �
 
 📤 <b>Got a voucher?</b> Upload a screenshot via the paperclip icon
 🙏 <b>Need a voucher?</b> Reply with just <b>5</b>, <b>10</b>, or <b>20</b>
-💰 <b>Check Balance:</b> Send <b>balance</b>
-❓ <b>Get Help:</b> Send <b>help</b>
+📱 <b>Check balance & get help:</b> Tap the "My Account" button below
 
 <b>Important</b>
 • Please do not use vouchers you have already uploaded. Request a voucher through the bot instead.
@@ -233,59 +241,18 @@ function getMiniAppUrl(): string {
 }
 
 async function sendHelpMenu(chatId: string) {
-	await sendTelegramMessage(chatId, "Choose an option below", {
-		inline_keyboard: [
-			[
-				{ text: "💰 Balance", callback_data: "help:balance" },
-				{
-					text: "📱 My Account",
-					web_app: { url: getMiniAppUrl() },
-				},
-			],
-			[
-				{ text: "📸 How to Upload", callback_data: "help:upload" },
-				{ text: "🎫 How to Claim", callback_data: "help:claim" },
-			],
-			[{ text: "🔗 Share Bot", callback_data: "help:share" }],
-		[{ text: "☕ Donate", callback_data: "help:donate" }],
-		],
-	});
+	await sendTelegramMessage(chatId, "Choose an option below", helpMenuKeyboard());
 }
 
 async function sendFaqMenu(chatId: string) {
-	await sendTelegramMessage(chatId, "Choose a FAQ question below", {
-		inline_keyboard: [
-			[
-				{
-					text: "Can I return/cancel a voucher?",
-					callback_data: "faq:return_cancel",
-				},
-			],
-			[
-				{
-					text: "Voucher processing failed",
-					callback_data: "faq:processing_failed",
-				},
-			],
-			[{ text: "Back to Help", callback_data: "faq:back" }],
-		],
-	});
+	await sendTelegramMessage(chatId, "Choose a FAQ question below", faqMenuKeyboard());
 }
 
 async function sendAppWebAppButton(chatId: string) {
 	await sendTelegramMessage(
 		chatId,
 		"📱 <b>My Account</b>\n\nView your balance, transactions, and voucher availability.",
-		{
-			inline_keyboard: [
-				[
-					{
-						text: "📱 Open My Account",
-						web_app: { url: getMiniAppUrl() },
-					},
-				],
-			],
-		},
+		appWebAppKeyboard(),
 	);
 }
 
@@ -370,7 +337,7 @@ async function handleVoucherRequest(
 					[
 						{
 							text: "⚠️ Its not working",
-							callback_data: `report:${result.voucherId}`,
+							callback_data: reportData("report_init", String(result.voucherId)),
 						},
 					],
 				],
@@ -497,13 +464,13 @@ export const sendUploaderReportMessage = internalAction({
 					[
 						{
 							text: "I've used this voucher",
-							callback_data: `uploader_admitted:${voucherId}`,
+							callback_data: uploaderData("uploader_admitted", voucherId),
 						},
 					],
 					[
 						{
 							text: "They're lying",
-							callback_data: `uploader_denied:${voucherId}`,
+							callback_data: uploaderData("uploader_denied", voucherId),
 						},
 					],
 				],
@@ -679,432 +646,15 @@ export const handleTelegramCallback = internalAction({
 		callbackQuery: v.any(),
 	},
 	handler: async (ctx, { callbackQuery }) => {
-		const chatId = String(callbackQuery.message.chat.id);
-		const telegramUserId = String(callbackQuery.from.id);
-		const data = callbackQuery.data;
-
-		if (data.startsWith("report:confirm:")) {
-			const voucherId = data.split(":")[2];
-
-			await answerTelegramCallback(callbackQuery.id);
-
-			const user = await ctx.runQuery(internal.users.getUserByTelegramChatId, {
-				telegramChatId: telegramUserId,
-			});
-
-			if (!user) {
-				return;
-			}
-
-			const result = await ctx.runMutation(internal.vouchers.reportVoucher, {
-				userId: user._id,
-				voucherId: voucherId as Id<"vouchers">,
-			});
-
-			if (!result) {
-				return;
-			}
-
-			// Remove inline keyboard from confirmation message
-			await editTelegramMessageText(
-				chatId,
-				callbackQuery.message.message_id,
-				callbackQuery.message.text,
-			);
-
-			if (result.status === "rate_limited") {
-				await sendTelegramMessage(chatId, `⏰ ${result.message}`);
-			} else if (result.status === "already_reported") {
-				await sendTelegramMessage(chatId, `⚠️ ${result.message}`);
-			} else if (result.status === "reported") {
-				await sendTelegramMessage(
-					chatId,
-					"✅ Report received.\n\nDo you want a replacement voucher?",
-					{
-						inline_keyboard: [
-							[
-								{
-									text: "✅ Yes, send a replacement",
-									callback_data: `report:replacement:yes:${voucherId}`,
-								},
-							],
-							[
-								{
-									text: "❌ No thanks",
-									callback_data: `report:replacement:no:${voucherId}`,
-								},
-							],
-						],
-					},
-				);
-			}
-		} else if (data.startsWith("report:replacement:yes:")) {
-			const voucherId = data.split(":")[3];
-
-			await answerTelegramCallback(callbackQuery.id);
-			await editTelegramMessageText(
-				chatId,
-				callbackQuery.message.message_id,
-				callbackQuery.message.text,
-			);
-
-			const user = await ctx.runQuery(internal.users.getUserByTelegramChatId, {
-				telegramChatId: telegramUserId,
-			});
-			if (!user) {
-				return;
-			}
-
-			const result = await ctx.runMutation(
-				internal.vouchers.requestReplacement,
-				{
-					userId: user._id,
-					originalVoucherId: voucherId as Id<"vouchers">,
-				},
-			);
-
-			if (result.status === "replaced" && result.voucher) {
-				await sendTelegramPhoto(
-					chatId,
-					result.voucher.imageUrl,
-					`🔄 <b>Here is a replacement €${result.voucher.type} voucher.</b>\n\nExpires: ${dayjs(result.voucher.expiryDate).format("MMM Do")}`,
-					{
-						inline_keyboard: [
-							[
-								{
-									text: "⚠️ Its not working",
-									callback_data: `report:${result.voucher._id}`,
-								},
-							],
-						],
-					},
-				);
-			} else {
-				await sendTelegramMessage(
-					chatId,
-					"⚠️ No replacement vouchers available. Your coins have been refunded.",
-				);
-			}
-	} else if (data.startsWith("report:replacement:no:")) {
-			const voucherId = data.split(":")[3];
-
-			await answerTelegramCallback(callbackQuery.id);
-			await editTelegramMessageText(
-				chatId,
-				callbackQuery.message.message_id,
-				callbackQuery.message.text,
-			);
-
-			const user = await ctx.runQuery(internal.users.getUserByTelegramChatId, {
-				telegramChatId: telegramUserId,
-			});
-			if (!user) {
-				return;
-			}
-
-			const refundResult = await ctx.runMutation(
-				internal.vouchers.refundReportedVoucher,
-				{
-					userId: user._id,
-					voucherId: voucherId as Id<"vouchers">,
-				},
-			);
-			if (refundResult.status === "refunded") {
-				await sendTelegramMessage(
-					chatId,
-					"✅ Your coins have been refunded. Thank you for reporting!",
-				);
-			} else {
-				await sendTelegramMessage(
-					chatId,
-					"⚠️ Unable to process refund. Please contact support.",
-				);
-			}
-		} else if (data.startsWith("report:cancel:")) {
-			await answerTelegramCallback(callbackQuery.id);
-			await editTelegramMessageText(
-				chatId,
-				callbackQuery.message.message_id,
-				callbackQuery.message.text,
-			);
-			await sendTelegramMessage(chatId, "✅ Cancelled. No action taken.");
-		} else if (data.startsWith("report:")) {
-			// General report request (2 parts: report:id)
-			const voucherId = data.split(":")[1];
-			console.log(
-				"Processing initial report request for voucherId:",
-				voucherId,
-			);
-
-			await answerTelegramCallback(callbackQuery.id);
-
-			const user = await ctx.runQuery(internal.users.getUserByTelegramChatId, {
-				telegramChatId: telegramUserId,
-			});
-
-			if (!user) {
-				return;
-			}
-
-			if (user.isBanned) {
-				await ctx.runMutation(internal.users.setUserTelegramState, {
-					userId: user._id,
-					state: "waiting_for_ban_appeal",
-				});
-				await sendTelegramMessage(
-					chatId,
-					"🚫 Your account has been banned for misuse.\n\nPlease reply with a message describing if you think this is an error.",
-				);
-				return;
-			}
-
-			const existingReport = await ctx.runQuery(
-				internal.vouchers.checkExistingReport,
-				{
-					userId: user._id,
-					voucherId: voucherId as Id<"vouchers">,
-				},
-			);
-			if (existingReport) {
-				await sendTelegramMessage(
-					chatId,
-					"⚠️ You have already reported this voucher.",
-				);
-				return;
-			}
-
-			await sendTelegramMessage(
-				chatId,
-				"⚠️ <b>Report this voucher as not working?</b>\n\nYou can request a replacement voucher if you need one.",
-				{
-					inline_keyboard: [
-						[{ text: "✅ Yes", callback_data: `report:confirm:${voucherId}` }],
-						[{ text: "❌ No", callback_data: `report:cancel:${voucherId}` }],
-					],
-				},
-			);
-		} else if (data.startsWith("help:")) {
-			await answerTelegramCallback(callbackQuery.id);
-
-			const helpAction = data.split(":")[1];
-			const user = await ctx.runQuery(internal.users.getUserByTelegramChatId, {
-				telegramChatId: chatId,
-			});
-
-			if (!user) {
-				return;
-			}
-
-			switch (helpAction) {
-				case "balance": {
-					await sendTelegramMessage(chatId, `💰 You have ${user.coins} coins.`);
-					break;
-				}
-				case "support":
-				case "faq": {
-					await sendFaqMenu(chatId);
-					break;
-				}
-				case "availability": {
-					const counts = await ctx.runQuery(
-						internal.vouchers.getAvailableVoucherCount,
-					);
-
-					const getStatus = (count: number) => {
-						if (count === 0) return "🔴 none";
-						if (count < 10) return `🟡 low - ${count} vouchers`;
-						return "🟢 good availability";
-					};
-
-					await sendTelegramMessage(
-						chatId,
-						`€5 vouchers: ${getStatus(counts["5"])}\n€10 vouchers: ${getStatus(counts["10"])}\n€20 vouchers: ${getStatus(counts["20"])}`,
-					);
-					break;
-				}
-				case "transactions": {
-					const transactions = await ctx.runQuery(
-						internal.users.getUserTransactions,
-						{ userId: user._id },
-					);
-
-					if (transactions.length === 0) {
-						await sendTelegramMessage(chatId, "📋 No transactions yet.");
-						break;
-					}
-
-					const formatType = (type: string) => {
-						switch (type) {
-							case "signup_bonus":
-								return "🎁 Signup Bonus";
-							case "upload_reward":
-								return "📤 Upload Reward";
-							case "claim_spend":
-								return "💳 Claim Spent";
-							case "refund":
-								return "↩️ Refund";
-							case "report_refund":
-								return "↩️ Refund";
-							case "uploader_denied":
-								return "❌ Upload Denied";
-							default:
-								return type;
-						}
-					};
-
-					const transactionList = transactions.map((t) => {
-						const date = dayjs(t.createdAt).format("MMM D, YYYY");
-						const formattedType = formatType(t.type);
-						const amountPrefix = t.type === "claim_spend" ? "-" : "+";
-						return `${formattedType}: ${amountPrefix}${t.amount} (${date})`;
-					});
-
-					await sendTelegramMessage(
-						chatId,
-						`📋 <b>Your Last 25 Transactions:</b>\n\n${transactionList.join("\n")}`,
-					);
-					break;
-				}
-				case "updates": {
-					await sendTelegramMessage(
-						chatId,
-						"🆕 <b>Latest Updates</b>\n\nCheck out what's new:\nhttps://www.openvouchers.org#updates",
-					);
-					break;
-				}
-				case "upload": {
-					await sendTelegramMessage(
-						chatId,
-						"📸 To upload a voucher, simply send a screenshot of your voucher. Make sure the screenshot shows the barcode clearly.",
-					);
-					break;
-				}
-				case "claim": {
-					await sendTelegramMessage(
-						chatId,
-						"💳 To claim a voucher, send <b>5</b>, <b>10</b>, or <b>20</b> depending on the voucher value you want.",
-					);
-					break;
-				}
-				case "donate": {
-					await sendTelegramMessage(
-						chatId,
-						"☕ <b>Support Open Vouchers</b>\n\nThe service is free, but servers and AI-powered OCR aren't. Your support helps keep the lights on!\n\nhttps://buymeacoffee.com/openvouchers",
-					);
-					break;
-				}
-				case "share": {
-					await sendTelegramMessage(
-						chatId,
-						"🔗 Swap and share Dunnes Storesvouchers:\nhttps://openvouchers.org/telegram\n\nNew users get a <b>10-coin welcome bonus</b>!",
-					);
-					break;
-				}
-		}
-		} else if (data.startsWith("faq:")) {
-			await answerTelegramCallback(callbackQuery.id);
-
-			const faqAction = data.split(":")[1];
-
-			switch (faqAction) {
-				case "back": {
-					await sendHelpMenu(chatId);
-					break;
-				}
-				case "return_cancel": {
-					await sendTelegramMessage(
-						chatId,
-						"Voucher return/cancel is currently <b>not supported</b>.",
-					);
-					break;
-				}
-				case "processing_failed": {
-					await sendTelegramMessage(
-						chatId,
-						"If uploading a paper voucher, retake the photo with clear lighting, the full voucher visible, and no blur.",
-					);
-					break;
-				}
-			}
-		} else if (data.startsWith("uploader_admitted:")) {
-			const voucherId = data.split(":")[1];
-			await answerTelegramCallback(callbackQuery.id);
-
-			await editTelegramMessageText(
-				chatId,
-				callbackQuery.message.message_id,
-				callbackQuery.message.text,
-			);
-
-			const voucher = await ctx.runQuery(
-				internal.vouchers.getVoucherForUploaderConfirm,
-				{
-					voucherId: voucherId as Id<"vouchers">,
-				},
-			);
-
-			if (!voucher) {
-				await sendTelegramMessage(chatId, "Voucher not found.");
-				return;
-			}
-
-			const uploader = await ctx.runQuery(internal.users.getUserById, {
-				userId: voucher.uploaderId,
-			});
-			if (!uploader || uploader.telegramChatId !== telegramUserId) {
-				return;
-			}
-
-			const reward = UPLOAD_REWARDS[voucher.type];
-
-			await ctx.runMutation(internal.vouchers.confirmUploaderUsedVoucher, {
-				uploaderId: voucher.uploaderId,
-				voucherId: voucher._id,
-				amount: reward,
-			});
-
-			await sendTelegramMessage(
-				chatId,
-				"Thanks for letting us know. We've updated your coin balance",
-			);
-		} else if (data.startsWith("uploader_denied:")) {
-			const voucherId = data.split(":")[1];
-			await answerTelegramCallback(callbackQuery.id);
-
-			await editTelegramMessageText(
-				chatId,
-				callbackQuery.message.message_id,
-				callbackQuery.message.text,
-			);
-
-			const uploadedVoucher = await ctx.runQuery(
-				internal.vouchers.getVoucherForUploaderConfirm,
-				{
-					voucherId: voucherId as Id<"vouchers">,
-				},
-			);
-
-			if (!uploadedVoucher) {
-				return;
-			}
-
-			const uploader = await ctx.runQuery(internal.users.getUserById, {
-				userId: uploadedVoucher.uploaderId,
-			});
-			if (!uploader || uploader.telegramChatId !== telegramUserId) {
-				return;
-			}
-
-			await ctx.runMutation(internal.vouchers.recordUploaderDenied, {
-				uploaderId: uploadedVoucher.uploaderId,
-				voucherId: uploadedVoucher._id,
-			});
-
-			await sendTelegramMessage(
-				chatId,
-				"Thanks for the info. We've recorded this in the system",
-			);
-		}
+		const c: CallbackContext = {
+			ctx,
+			chatId: String(callbackQuery.message.chat.id),
+			telegramUserId: String(callbackQuery.from.id),
+			callbackId: callbackQuery.id,
+			messageId: callbackQuery.message.message_id,
+			messageText: callbackQuery.message.text ?? "",
+		};
+		await dispatch(c, callbackQuery.data, realBotAdapter());
 	},
 });
 
