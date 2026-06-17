@@ -338,6 +338,8 @@ export const reportVoucher = internalMutation({
 						uploaderChatId: uploader.telegramChatId,
 						voucherId: voucher._id,
 						voucherType: voucher.type as "5" | "10" | "20",
+						imageStorageId: voucher.imageStorageId,
+						barcodeNumber: voucher.barcodeNumber,
 					},
 				);
 			}

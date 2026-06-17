@@ -449,33 +449,75 @@ export const sendMessageAction = internalAction({
 	},
 });
 
+function formatUploaderReportCaption(
+	voucherType: "5" | "10" | "20",
+	barcodeNumber?: string,
+): string {
+	const suffix =
+		barcodeNumber && barcodeNumber.length >= 4
+			? barcodeNumber.slice(-4)
+			: barcodeNumber;
+	const voucherLabel = suffix
+		? `€${voucherType} voucher (ending in ${suffix})`
+		: `€${voucherType} voucher`;
+
+	return (
+		"⚠️ <b>Someone has reported one of your vouchers as not working.</b>\n\n" +
+		`${voucherLabel}\n\n` +
+		"Did you use this voucher already?"
+	);
+}
+
 export const sendUploaderReportMessage = internalAction({
 	args: {
 		uploaderChatId: v.string(),
 		voucherId: v.id("vouchers"),
 		voucherType: v.union(v.literal("5"), v.literal("10"), v.literal("20")),
+		imageStorageId: v.id("_storage"),
+		barcodeNumber: v.optional(v.string()),
 	},
-	handler: async (_ctx, { uploaderChatId, voucherId, voucherType }) => {
-		await sendTelegramMessage(
+	handler: async (
+		ctx,
+		{
 			uploaderChatId,
-			"⚠️ <b>Someone has reported one of your vouchers as not working.</b>\n\nDid you use this voucher already?",
-			{
-				inline_keyboard: [
-					[
-						{
-							text: "I've used this voucher",
-							callback_data: uploaderData("uploader_admitted", voucherId),
-						},
-					],
-					[
-						{
-							text: "They're lying",
-							callback_data: uploaderData("uploader_denied", voucherId),
-						},
-					],
+			voucherId,
+			voucherType,
+			imageStorageId,
+			barcodeNumber,
+		},
+	) => {
+		const replyMarkup = {
+			inline_keyboard: [
+				[
+					{
+						text: "I've used this voucher",
+						callback_data: uploaderData("uploader_admitted", voucherId),
+					},
 				],
-			},
-		);
+				[
+					{
+						text: "They're lying",
+						callback_data: uploaderData("uploader_denied", voucherId),
+					},
+				],
+			],
+		};
+		const caption = formatUploaderReportCaption(voucherType, barcodeNumber);
+		const imageUrl = await ctx.storage.getUrl(imageStorageId);
+
+		if (imageUrl) {
+			const sent = await sendTelegramPhoto(
+				uploaderChatId,
+				imageUrl,
+				caption,
+				replyMarkup,
+			);
+			if (sent) {
+				return;
+			}
+		}
+
+		await sendTelegramMessage(uploaderChatId, caption, replyMarkup);
 	},
 });
 
@@ -652,7 +694,11 @@ export const handleTelegramCallback = internalAction({
 			telegramUserId: String(callbackQuery.from.id),
 			callbackId: callbackQuery.id,
 			messageId: callbackQuery.message.message_id,
-			messageText: callbackQuery.message.text ?? "",
+			messageText:
+				callbackQuery.message.text ?? callbackQuery.message.caption ?? "",
+			isPhotoMessage:
+				Array.isArray(callbackQuery.message.photo) &&
+				callbackQuery.message.photo.length > 0,
 		};
 		await dispatch(c, callbackQuery.data, realBotAdapter());
 	},

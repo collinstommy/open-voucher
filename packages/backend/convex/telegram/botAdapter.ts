@@ -19,6 +19,7 @@ export interface BotAdapter {
 		chatId: string,
 		messageId: number,
 		text: string,
+		opts?: { isPhoto?: boolean },
 	): Promise<void>;
 	sendPhoto(
 		chatId: string,
@@ -98,13 +99,16 @@ async function editTelegramMessageText(
 	chatId: string,
 	messageId: number,
 	text: string,
+	opts?: { isPhoto?: boolean },
 ) {
 	const token = process.env.TELEGRAM_BOT_TOKEN;
 	if (!token) {
 		return;
 	}
 
-	const url = `https://api.telegram.org/bot${token}/editMessageText`;
+	const method = opts?.isPhoto ? "editMessageCaption" : "editMessageText";
+	const contentField = opts?.isPhoto ? "caption" : "text";
+	const url = `https://api.telegram.org/bot${token}/${method}`;
 	try {
 		await fetch(url, {
 			method: "POST",
@@ -112,13 +116,13 @@ async function editTelegramMessageText(
 			body: JSON.stringify({
 				chat_id: chatId,
 				message_id: messageId,
-				text,
+				[contentField]: text,
 				parse_mode: "HTML",
 				reply_markup: { inline_keyboard: [] },
 			}),
 		});
 	} catch (error) {
-		console.error("Network error editing message text:", error);
+		console.error("Network error editing message:", error);
 	}
 }
 

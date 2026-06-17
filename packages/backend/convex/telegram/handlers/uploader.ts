@@ -6,7 +6,9 @@ import { on } from "../router";
 on("uploader_admitted", async (c, event, bot) => {
 	await bot.answerCallback(c.callbackId);
 
-	await bot.editMessageText(c.chatId, c.messageId, c.messageText);
+	await bot.editMessageText(c.chatId, c.messageId, c.messageText, {
+		isPhoto: c.isPhotoMessage,
+	});
 
 	const voucher = await c.ctx.runQuery(
 		internal.vouchers.getVoucherForUploaderConfirm,
@@ -44,7 +46,9 @@ on("uploader_admitted", async (c, event, bot) => {
 on("uploader_denied", async (c, event, bot) => {
 	await bot.answerCallback(c.callbackId);
 
-	await bot.editMessageText(c.chatId, c.messageId, c.messageText);
+	await bot.editMessageText(c.chatId, c.messageId, c.messageText, {
+		isPhoto: c.isPhotoMessage,
+	});
 
 	const uploadedVoucher = await c.ctx.runQuery(
 		internal.vouchers.getVoucherForUploaderConfirm,

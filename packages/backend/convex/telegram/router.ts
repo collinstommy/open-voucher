@@ -49,6 +49,7 @@ export interface CallbackContext {
 	callbackId: string;
 	messageId: number;
 	messageText: string;
+	isPhotoMessage: boolean;
 }
 
 export type CallbackHandler<E extends CallbackEvent = CallbackEvent> = (

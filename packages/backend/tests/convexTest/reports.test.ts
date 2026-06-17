@@ -16,10 +16,12 @@ import {
 } from "./fixtures/testHelpers";
 
 let sentMessages: { chatId: string; text?: string }[] = [];
+let sentPhotos: { chatId: string; caption?: string }[] = [];
 let editedMessages: { chatId: string; messageId: number; text?: string }[] = [];
 
 function setupFetchMock() {
 	sentMessages = [];
+	sentPhotos = [];
 	editedMessages = [];
 
 	vi.stubGlobal(
@@ -40,6 +42,19 @@ function setupFetchMock() {
 				} as Response;
 			}
 
+			// Mock Telegram sendPhoto
+			if (url.includes("api.telegram.org") && url.includes("/sendPhoto")) {
+				let body: any = {};
+				if (options?.body instanceof FormData) {
+					body = Object.fromEntries(options.body as any);
+				}
+				sentPhotos.push({ chatId: body.chat_id, caption: body.caption });
+				return {
+					ok: true,
+					json: async () => mockTelegramResponse(),
+				} as Response;
+			}
+
 			// Mock Telegram answerCallbackQuery
 			if (
 				url.includes("api.telegram.org") &&
@@ -51,10 +66,11 @@ function setupFetchMock() {
 				} as Response;
 			}
 
-			// Mock Telegram editMessageText (for removing inline keyboards)
+			// Mock Telegram editMessageText / editMessageCaption
 			if (
 				url.includes("api.telegram.org") &&
-				url.includes("/editMessageText")
+				(url.includes("/editMessageText") ||
+					url.includes("/editMessageCaption"))
 			) {
 				let body: any = {};
 				if (typeof options?.body === "string") {
@@ -63,7 +79,7 @@ function setupFetchMock() {
 				editedMessages.push({
 					chatId: body.chat_id,
 					messageId: body.message_id,
-					text: body.text,
+					text: body.text ?? body.caption,
 				});
 				return {
 					ok: true,
@@ -697,6 +713,44 @@ describe("Uploader report callbacks", () => {
 	afterEach(() => {
 		vi.unstubAllGlobals();
 		vi.unstubAllEnvs();
+	});
+
+	test("sendUploaderReportMessage sends voucher image with barcode suffix", async () => {
+		const t = convexTest(schema, modules);
+		const uploaderChatId = "uploader_report_photo";
+
+		const uploaderId = await createUser(t, {
+			telegramChatId: uploaderChatId,
+			coins: 50,
+		});
+
+		const voucherId = await createVoucher(t, {
+			type: "10",
+			uploaderId,
+			status: "reported",
+			barcodeNumber: "2226687019052",
+		});
+
+		const imageStorageId = await t.run(async (ctx) => {
+			const voucher = await ctx.db.get(voucherId);
+			return voucher!.imageStorageId;
+		});
+
+		await t.action(internal.telegram.sendUploaderReportMessage, {
+			uploaderChatId,
+			voucherId,
+			voucherType: "10",
+			imageStorageId,
+			barcodeNumber: "2226687019052",
+		});
+
+		expect(sentPhotos).toHaveLength(1);
+		expect(sentPhotos[0].chatId).toBe(uploaderChatId);
+		expect(sentPhotos[0].caption).toContain("ending in 9052");
+		expect(sentPhotos[0].caption).toContain(
+			"Someone has reported one of your vouchers as not working",
+		);
+		expect(sentMessages).toHaveLength(0);
 	});
 
 	test("uploader_admitted ignores clicks from non-uploader", async () => {
