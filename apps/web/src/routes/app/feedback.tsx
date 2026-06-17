@@ -74,10 +74,10 @@ function FeedbackPage() {
 	};
 
 	return (
-		<div className="flex min-h-0 flex-1 flex-col">
+		<div className="flex h-dvh flex-col overflow-hidden">
 			<AppHeader title="Feedback" />
-			<div className="flex min-h-0 flex-1 flex-col bg-slate-50">
-				<div className="border-b border-slate-200 bg-white px-4 py-2.5">
+			<div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-slate-50">
+				<div className="shrink-0 border-b border-slate-200 bg-white px-4 py-2.5">
 					<p className="text-xs text-slate-500">
 						Message the team — we read everything. For claim or upload issues,
 						use the report flow in the bot.
@@ -86,17 +86,17 @@ function FeedbackPage() {
 
 				<div
 					ref={scrollRef}
-					className="flex-1 space-y-3 overflow-y-auto px-4 py-4"
+					className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-4 py-4"
 				>
 					{thread === undefined && (
 						<p className="py-8 text-center text-sm text-slate-500">Loading...</p>
 					)}
 					{thread !== undefined && thread.length === 0 && (
-						<div className="flex h-full min-h-[200px] flex-col items-center justify-center px-6 text-center">
+						<div className="flex flex-col items-center justify-center px-6 py-16 text-center">
 							<p className="text-sm font-medium text-slate-700">No messages yet</p>
 							<p className="mt-1 text-xs text-slate-500">
-								Share bugs, ideas, or praise. We&apos;ll reply here and in
-								Telegram.
+								Share bugs, ideas, or praise. Replies appear here — we may also
+								notify you in Telegram.
 							</p>
 						</div>
 					)}
@@ -105,7 +105,7 @@ function FeedbackPage() {
 					))}
 				</div>
 
-				<div className="border-t border-slate-200 bg-white p-4">
+				<div className="shrink-0 border-t border-slate-200 bg-white p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
 					<div className="flex items-end gap-2">
 						<textarea
 							value={text}

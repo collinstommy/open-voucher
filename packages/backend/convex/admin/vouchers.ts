@@ -213,7 +213,7 @@ export const sendMessageToUser = adminMutation({
 			createdAt: Date.now(),
 		});
 
-		await ctx.scheduler.runAfter(0, internal.telegram.sendMessageAction, {
+		await ctx.scheduler.runAfter(0, internal.telegram.sendAdminMessageAction, {
 			chatId: user.telegramChatId,
 			text: messageText,
 		});

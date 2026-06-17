@@ -9,7 +9,7 @@ import { UPLOAD_REWARDS } from "./constants";
 import { classifyInboundMessage } from "./lib/messageIntent";
 import { realBotAdapter } from "./telegram/botAdapter";
 import { reportData, uploaderData } from "./telegram/router";
-import { helpMenuKeyboard, faqMenuKeyboard, appWebAppKeyboard } from "./telegram/keyboards";
+import { helpMenuKeyboard, faqMenuKeyboard, appWebAppKeyboard, feedbackWebAppKeyboard } from "./telegram/keyboards";
 import "./telegram/handlers/report";
 import "./telegram/handlers/help";
 import "./telegram/handlers/faq";
@@ -446,6 +446,28 @@ export const sendMessageAction = internalAction({
 	},
 	handler: async (_ctx, { chatId, text }) => {
 		await sendTelegramMessage(chatId, text);
+	},
+});
+
+function formatAdminTelegramMessage(messageText: string): string {
+	return (
+		`${messageText}\n\n` +
+		"—\n" +
+		"<i>Reply in the app (Feedback). Replies in this Telegram chat are not monitored.</i>"
+	);
+}
+
+export const sendAdminMessageAction = internalAction({
+	args: {
+		chatId: v.string(),
+		text: v.string(),
+	},
+	handler: async (_ctx, { chatId, text }) => {
+		await sendTelegramMessage(
+			chatId,
+			formatAdminTelegramMessage(text),
+			feedbackWebAppKeyboard(),
+		);
 	},
 });
 

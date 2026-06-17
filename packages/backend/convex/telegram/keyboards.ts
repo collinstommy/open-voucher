@@ -5,6 +5,10 @@ function getMiniAppUrl(): string {
 	return process.env.MINI_APP_URL ?? "https://openvouchers.org/app";
 }
 
+function getFeedbackAppUrl(): string {
+	return `${getMiniAppUrl().replace(/\/$/, "")}/feedback`;
+}
+
 export function helpMenuKeyboard(): { inline_keyboard: InlineKeyboardButton[][] } {
 	return {
 		inline_keyboard: [
@@ -52,6 +56,21 @@ export function appWebAppKeyboard(): { inline_keyboard: InlineKeyboardButton[][]
 				{
 					text: "📱 Open My Account",
 					web_app: { url: getMiniAppUrl() },
+				},
+			],
+		],
+	};
+}
+
+export function feedbackWebAppKeyboard(): {
+	inline_keyboard: InlineKeyboardButton[][];
+} {
+	return {
+		inline_keyboard: [
+			[
+				{
+					text: "💬 Reply in Feedback",
+					web_app: { url: getFeedbackAppUrl() },
 				},
 			],
 		],
