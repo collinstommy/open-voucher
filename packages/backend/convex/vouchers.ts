@@ -11,6 +11,30 @@ import { userMutation, userQuery } from "./auth";
 import { CLAIM_COSTS, UPLOAD_REWARDS } from "./constants";
 import { applyCoinDelta } from "./lib/coinLedger";
 
+function getVoucherExpiryCalendarDay(expiryDate: number): string {
+	const date = new Date(expiryDate);
+	const year = date.getUTCFullYear();
+	const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+	const day = String(date.getUTCDate()).padStart(2, "0");
+	return `${year}-${month}-${day}`;
+}
+
+function getIrishCalendarDay(now: number = Date.now()): string {
+	return new Intl.DateTimeFormat("en-CA", {
+		timeZone: "Europe/Dublin",
+		year: "numeric",
+		month: "2-digit",
+		day: "2-digit",
+	}).format(new Date(now));
+}
+
+function canReportClaimedVoucher(
+	expiryDate: number,
+	now: number = Date.now(),
+): boolean {
+	return getVoucherExpiryCalendarDay(expiryDate) >= getIrishCalendarDay(now);
+}
+
 export const getVoucherByBarcode = internalQuery({
 	args: { barcodeNumber: v.string() },
 	handler: async (ctx, { barcodeNumber }) => {
@@ -255,6 +279,14 @@ export const reportVoucher = internalMutation({
 		if (!voucher) throw new Error("Voucher not found");
 		if (voucher.claimerId !== user._id) {
 			throw new Error("You did not claim this voucher");
+		}
+
+		if (!canReportClaimedVoucher(voucher.expiryDate, now)) {
+			return {
+				status: "expired",
+				message:
+					"This voucher expired before today and can no longer be reported.",
+			};
 		}
 
 		const existingReport = await ctx.db

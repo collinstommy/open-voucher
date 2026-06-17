@@ -3,6 +3,7 @@
  */
 
 import { convexTest } from "convex-test";
+import dayjs from "dayjs";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { api, internal } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
@@ -113,6 +114,82 @@ describe("Report Flow", () => {
 
 	afterEach(() => {
 		vi.unstubAllGlobals();
+	});
+
+	test("rejects reports for vouchers that expired before today", async () => {
+		const t = convexTest(schema, modules);
+
+		const uploaderId = await createUser(t, {
+			telegramChatId: "uploader_expired_report",
+			coins: 10,
+		});
+		const claimerId = await createUser(t, {
+			telegramChatId: "claimer_expired_report",
+			coins: 10,
+		});
+
+		const yesterday = dayjs().subtract(1, "day");
+		const voucherId = await createVoucher(t, {
+			type: "10",
+			uploaderId,
+			status: "claimed",
+			claimerId,
+			claimedAt: Date.now(),
+			expiryDate: Date.UTC(
+				yesterday.year(),
+				yesterday.month(),
+				yesterday.date(),
+				22,
+				59,
+				0,
+				0,
+			),
+		});
+
+		const result = await t.mutation(internal.vouchers.reportVoucher, {
+			userId: claimerId,
+			voucherId,
+		});
+
+		expect(result.status).toBe("expired");
+	});
+
+	test("allows reports for vouchers expiring today", async () => {
+		const t = convexTest(schema, modules);
+
+		const uploaderId = await createUser(t, {
+			telegramChatId: "uploader_today_report",
+			coins: 10,
+		});
+		const claimerId = await createUser(t, {
+			telegramChatId: "claimer_today_report",
+			coins: 10,
+		});
+
+		const today = dayjs();
+		const voucherId = await createVoucher(t, {
+			type: "10",
+			uploaderId,
+			status: "claimed",
+			claimerId,
+			claimedAt: Date.now(),
+			expiryDate: Date.UTC(
+				today.year(),
+				today.month(),
+				today.date(),
+				22,
+				59,
+				0,
+				0,
+			),
+		});
+
+		const result = await t.mutation(internal.vouchers.reportVoucher, {
+			userId: claimerId,
+			voucherId,
+		});
+
+		expect(result.status).toBe("reported");
 	});
 
 	test("reporting voucher refunds coins when no replacement", async () => {

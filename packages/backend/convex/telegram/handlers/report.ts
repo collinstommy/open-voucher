@@ -91,6 +91,8 @@ on("report_confirm", async (c, event, bot) => {
 
 	if (result.status === "rate_limited") {
 		await bot.sendMessage(c.chatId, `⏰ ${result.message}`);
+	} else if (result.status === "expired") {
+		await bot.sendMessage(c.chatId, `⚠️ ${result.message}`);
 	} else if (result.status === "already_reported") {
 		await bot.sendMessage(c.chatId, `⚠️ ${result.message}`);
 	} else if (result.status === "reported") {

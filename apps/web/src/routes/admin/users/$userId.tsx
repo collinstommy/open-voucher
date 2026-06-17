@@ -36,6 +36,88 @@ const TAB_LABELS: Record<Tab, string> = {
 	messages: "Messages",
 };
 
+type ReportActivity = {
+	_id: string;
+	createdAt: number;
+	voucher?: {
+		type: string;
+		expiryDate?: number;
+	} | null;
+	uploader?: {
+		_id: Id<"users">;
+		username?: string;
+		firstName?: string;
+		telegramChatId: string;
+	} | null;
+	reporter?: {
+		_id: Id<"users">;
+		username?: string;
+		firstName?: string;
+		telegramChatId: string;
+	} | null;
+};
+
+type UserTransaction = {
+	_id: string;
+	type: string;
+	amount: number;
+	voucherId?: string;
+	createdAt: number;
+};
+
+type ActivityItem =
+	| { kind: "transaction"; id: string; createdAt: number; transaction: UserTransaction }
+	| { kind: "report_filed"; id: string; createdAt: number; report: ReportActivity }
+	| { kind: "report_against"; id: string; createdAt: number; report: ReportActivity };
+
+function buildActivityItems(
+	transactions: UserTransaction[],
+	reportsFiledByUser: ReportActivity[],
+	reportsAgainstUploads: ReportActivity[],
+): ActivityItem[] {
+	return [
+		...transactions.map((transaction) => ({
+			kind: "transaction" as const,
+			id: transaction._id,
+			createdAt: transaction.createdAt,
+			transaction,
+		})),
+		...reportsFiledByUser.map((report) => ({
+			kind: "report_filed" as const,
+			id: report._id,
+			createdAt: report.createdAt,
+			report,
+		})),
+		...reportsAgainstUploads.map((report) => ({
+			kind: "report_against" as const,
+			id: report._id,
+			createdAt: report.createdAt,
+			report,
+		})),
+	].sort((a, b) => b.createdAt - a.createdAt);
+}
+
+function UserLink({
+	user,
+}: {
+	user: {
+		_id: Id<"users">;
+		username?: string;
+		firstName?: string;
+		telegramChatId: string;
+	};
+}) {
+	return (
+		<Link
+			to="/admin/users/$userId"
+			params={{ userId: user._id }}
+			className="text-blue-600 hover:underline"
+		>
+			{user.username || user.firstName || user.telegramChatId}
+		</Link>
+	);
+}
+
 function UserDetailPage() {
 	const { userId } = Route.useParams();
 	const { token } = useAdminAuth();
@@ -143,9 +225,14 @@ function UserDetailPage() {
 	const feedbackAndSupport = [...(data?.feedbackAndSupport ?? [])].sort((a, b) => b.createdAt - a.createdAt);
 	const adminMessages = [...(data?.adminMessages ?? [])].sort((a, b) => b.createdAt - a.createdAt);
 	const transactions = [...(data?.transactions ?? [])].sort((a, b) => b.createdAt - a.createdAt);
+	const activityItems = buildActivityItems(
+		transactions,
+		reportsFiledByUser,
+		reportsAgainstUploads,
+	);
 
 	const tabCounts: Record<Tab, number> = {
-		transactions: transactions.length,
+		transactions: activityItems.length,
 		uploaded: uploadedVouchers.length,
 		claimed: claimedVouchers.length,
 		failed: failedUploads.length,
@@ -277,10 +364,10 @@ function UserDetailPage() {
 						</div>
 					</div>
 
-					{/* Transactions Table */}
-					{transactions.length === 0 ? (
+					{/* Activity Table */}
+					{activityItems.length === 0 ? (
 						<div className="rounded-lg border p-12 text-center text-muted-foreground">
-							No transactions
+							No transactions or reports
 						</div>
 					) : (
 						<div className="rounded-lg border">
@@ -289,50 +376,115 @@ function UserDetailPage() {
 									<tr>
 										<th className="p-3 text-left font-medium">Type</th>
 										<th className="p-3 text-left font-medium">Amount</th>
+										<th className="p-3 text-left font-medium">Details</th>
 										<th className="p-3 text-left font-medium">Date</th>
 									</tr>
 								</thead>
 								<tbody>
-									{transactions.map((tx) => (
-										<tr key={tx._id} className="border-b last:border-0">
-											<td className="p-3">
-												<span
-													className={`rounded-full px-2 py-1 font-medium text-xs ${
-														tx.type === "signup_bonus"
-															? "bg-green-100 text-green-800"
-															: tx.type === "upload_reward"
-																? "bg-blue-100 text-blue-800"
-																: tx.type === "claim_spend"
-																	? "bg-red-100 text-red-800"
-																	: tx.type === "report_refund"
-																		? "bg-purple-100 text-purple-800"
-																		: tx.type === "uploader_denied"
+									{activityItems.map((item) => {
+										if (item.kind === "transaction") {
+											const tx = item.transaction;
+											return (
+												<tr key={item.id} className="border-b last:border-0">
+													<td className="p-3">
+														<span
+															className={`rounded-full px-2 py-1 font-medium text-xs ${
+																tx.type === "signup_bonus"
+																	? "bg-green-100 text-green-800"
+																	: tx.type === "upload_reward"
+																		? "bg-blue-100 text-blue-800"
+																		: tx.type === "claim_spend"
 																			? "bg-red-100 text-red-800"
-																			: tx.type === "admin_expiry_deduction"
-																				? "bg-rose-100 text-rose-800"
-																				: tx.type === "claim_reversed"
-																					? "bg-teal-100 text-teal-800"
-																					: "bg-amber-100 text-amber-800"
-													}`}
-												>
-													{tx.type.replace(/_/g, " ")}
-												</span>
-											</td>
-											<td className="p-3">
-												<span
-													className={
-														tx.amount > 0 ? "text-green-600" : "text-red-600"
-													}
-												>
-													{tx.amount > 0 ? "+" : ""}
-													{tx.amount}
-												</span>
-											</td>
-											<td className="p-3 text-muted-foreground">
-												{formatDateTime(tx.createdAt)}
-											</td>
-										</tr>
-									))}
+																			: tx.type === "report_refund"
+																				? "bg-purple-100 text-purple-800"
+																				: tx.type === "uploader_denied"
+																					? "bg-red-100 text-red-800"
+																					: tx.type === "admin_expiry_deduction"
+																						? "bg-rose-100 text-rose-800"
+																						: tx.type === "claim_reversed"
+																							? "bg-teal-100 text-teal-800"
+																							: "bg-amber-100 text-amber-800"
+															}`}
+														>
+															{tx.type.replace(/_/g, " ")}
+														</span>
+													</td>
+													<td className="p-3">
+														<span
+															className={
+																tx.amount > 0 ? "text-green-600" : "text-red-600"
+															}
+														>
+															{tx.amount > 0 ? "+" : ""}
+															{tx.amount}
+														</span>
+													</td>
+													<td className="p-3 text-muted-foreground">
+														{tx.voucherId ? `Voucher ${tx.voucherId}` : "—"}
+													</td>
+													<td className="p-3 text-muted-foreground">
+														{formatDateTime(tx.createdAt)}
+													</td>
+												</tr>
+											);
+										}
+
+										const report = item.report;
+										const voucherLabel = report.voucher
+											? `€${report.voucher.type} voucher`
+											: "Voucher";
+
+										return (
+											<tr key={item.id} className="border-b last:border-0">
+												<td className="p-3">
+													<span
+														className={`rounded-full px-2 py-1 font-medium text-xs ${
+															item.kind === "report_filed"
+																? "bg-orange-100 text-orange-800"
+																: "bg-red-100 text-red-800"
+														}`}
+													>
+														{item.kind === "report_filed"
+															? "report filed"
+															: "report against"}
+													</span>
+												</td>
+												<td className="p-3 text-muted-foreground">—</td>
+												<td className="p-3 text-muted-foreground">
+													<div>{voucherLabel}</div>
+													<div className="text-xs">
+														{item.kind === "report_filed" ? (
+															<>
+																Uploaded by{" "}
+																{report.uploader ? (
+																	<UserLink user={report.uploader} />
+																) : (
+																	"Unknown"
+																)}
+															</>
+														) : (
+															<>
+																Reported by{" "}
+																{report.reporter ? (
+																	<UserLink user={report.reporter} />
+																) : (
+																	"Unknown"
+																)}
+															</>
+														)}
+													</div>
+													{report.voucher?.expiryDate && (
+														<div className="text-xs">
+															Expires {formatDate(report.voucher.expiryDate)}
+														</div>
+													)}
+												</td>
+												<td className="p-3 text-muted-foreground">
+													{formatDateTime(report.createdAt)}
+												</td>
+											</tr>
+										);
+									})}
 								</tbody>
 							</table>
 						</div>
@@ -480,6 +632,9 @@ function UserDetailPage() {
 												{formatDate(voucher.expiryDate)}
 											</div>
 										)}
+										<div className="mb-1 text-muted-foreground text-sm">
+											Uploaded {formatDateTime(voucher.createdAt)}
+										</div>
 										{voucher.claimedAt && (
 											<div className="text-muted-foreground text-sm">
 												Claimed {formatDateTime(voucher.claimedAt)}
@@ -640,6 +795,11 @@ function UserDetailPage() {
 										<div className="mb-1 text-muted-foreground text-sm">
 											Reported on {formatDateTime(report.createdAt)}
 										</div>
+										{report.voucher?.createdAt && (
+											<div className="mb-1 text-muted-foreground text-sm">
+												Uploaded {formatDateTime(report.voucher.createdAt)}
+											</div>
+										)}
 										<div className="text-muted-foreground text-sm">
 											Uploaded by{" "}
 											{report.uploader ? (
@@ -733,6 +893,11 @@ function UserDetailPage() {
 										<div className="mb-1 text-muted-foreground text-sm">
 											Reported on {formatDateTime(report.createdAt)}
 										</div>
+										{report.voucher?.createdAt && (
+											<div className="mb-1 text-muted-foreground text-sm">
+												Uploaded {formatDateTime(report.voucher.createdAt)}
+											</div>
+										)}
 										<div className="text-muted-foreground text-sm">
 											Reported by{" "}
 											{report.reporter ? (

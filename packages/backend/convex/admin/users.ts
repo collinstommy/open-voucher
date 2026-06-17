@@ -200,6 +200,7 @@ export const getUserDetails = adminQuery({
 					status: voucher.status,
 					imageUrl,
 					expiryDate: voucher.expiryDate,
+					createdAt: voucher.createdAt,
 					claimedAt: voucher.claimedAt,
 					uploader: uploader
 						? {
@@ -241,6 +242,7 @@ export const getUserDetails = adminQuery({
 								status: voucher.status,
 								imageUrl,
 								expiryDate: voucher.expiryDate,
+								createdAt: voucher.createdAt,
 							}
 						: null,
 					uploader: uploader
@@ -273,6 +275,7 @@ export const getUserDetails = adminQuery({
 								status: voucher.status,
 								imageUrl,
 								expiryDate: voucher.expiryDate,
+								createdAt: voucher.createdAt,
 							}
 						: null,
 					reporter: reporter
