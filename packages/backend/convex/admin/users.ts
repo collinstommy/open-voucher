@@ -292,7 +292,7 @@ export const getUserDetails = adminQuery({
 
 		const feedbackAndSupport = await ctx.db
 			.query("feedback")
-			.filter((q) => q.eq(q.field("userId"), userId))
+			.withIndex("by_user", (q) => q.eq("userId", userId))
 			.order("desc")
 			.collect();
 

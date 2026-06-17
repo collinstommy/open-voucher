@@ -218,6 +218,51 @@ export const submitAppFeedback = userMutation({
 	},
 });
 
+export const getFeedbackThread = userQuery({
+	args: {},
+	handler: async (ctx, { userId }) => {
+		const user = await ctx.db.get(userId);
+		if (!user) {
+			throw new Error("User not found");
+		}
+
+		const feedback = await ctx.db
+			.query("feedback")
+			.withIndex("by_user", (q) => q.eq("userId", userId))
+			.collect();
+
+		const userFeedback = feedback.filter(
+			(item) => (item.type ?? "feedback") === "feedback",
+		);
+
+		const adminMessages = await ctx.db
+			.query("messages")
+			.withIndex("by_admin_message", (q) =>
+				q.eq("isAdminMessage", true).eq("telegramChatId", user.telegramChatId),
+			)
+			.collect();
+
+		const items = [
+			...userFeedback.map((item) => ({
+				kind: "user" as const,
+				id: item._id,
+				text: item.text,
+				createdAt: item.createdAt,
+			})),
+			...adminMessages
+				.filter((message) => message.text)
+				.map((message) => ({
+					kind: "admin" as const,
+					id: message._id,
+					text: message.text!,
+					createdAt: message.createdAt,
+				})),
+		];
+
+		return items.sort((a, b) => a.createdAt - b.createdAt);
+	},
+});
+
 export const getTransactionHistory = userQuery({
 	args: {},
 	handler: async (ctx, { userId }) => {

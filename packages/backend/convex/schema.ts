@@ -143,7 +143,7 @@ export default defineSchema({
 		createdAt: v.number(),
 		status: v.string(), // "new", "read", "archived"
 		type: v.optional(v.string()), // "feedback", "support"
-	}),
+	}).index("by_user", ["userId"]),
 
 	analytics: defineTable({
 		action: v.string(),
