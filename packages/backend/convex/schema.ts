@@ -117,6 +117,7 @@ export default defineSchema({
 			v.literal("claim_reversed"),
 			v.literal("self_invalidated"),
 			v.literal("claim_returned"),
+			v.literal("replacement_received"),
 		),
 		amount: v.number(),
 		voucherId: v.optional(v.id("vouchers")),

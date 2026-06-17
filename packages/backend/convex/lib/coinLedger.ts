@@ -17,7 +17,8 @@ export type TransactionType =
 	| "admin_expiry_deduction"
 	| "claim_reversed"
 	| "self_invalidated"
-	| "claim_returned";
+	| "claim_returned"
+	| "replacement_received";
 
 export type ApplyCoinDeltaArgs = {
 	userId: Id<"users">;

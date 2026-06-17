@@ -401,9 +401,11 @@ function UserDetailPage() {
 																					? "bg-red-100 text-red-800"
 																					: tx.type === "admin_expiry_deduction"
 																						? "bg-rose-100 text-rose-800"
-																						: tx.type === "claim_reversed"
-																							? "bg-teal-100 text-teal-800"
-																							: "bg-amber-100 text-amber-800"
+																				: tx.type === "claim_reversed"
+																					? "bg-teal-100 text-teal-800"
+																					: tx.type === "replacement_received"
+																						? "bg-indigo-100 text-indigo-800"
+																						: "bg-amber-100 text-amber-800"
 															}`}
 														>
 															{tx.type.replace(/_/g, " ")}

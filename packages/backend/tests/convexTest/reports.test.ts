@@ -192,22 +192,19 @@ describe("Report Flow", () => {
 		expect(result.status).toBe("reported");
 	});
 
-	test("reporting voucher refunds coins when no replacement", async () => {
+	test("requestReplacement refunds coins or records replacement_received", async () => {
 		const t = convexTest(schema, modules);
 
-		// Create uploader
 		const uploaderId = await createUser(t, {
 			telegramChatId: "uploader123",
 			coins: 10,
 		});
 
-		// Create claimer
 		const claimerId = await createUser(t, {
 			telegramChatId: "claimer456",
 			coins: 10,
 		});
 
-		// Create claimed voucher
 		const voucherId = await createVoucher(t, {
 			type: "10",
 			uploaderId,
@@ -216,15 +213,12 @@ describe("Report Flow", () => {
 			claimedAt: Date.now(),
 		});
 
-		// Report the voucher — should return "reported" (replacement is opt-in now)
-		const result = await t.mutation(internal.vouchers.reportVoucher, {
+		await t.mutation(internal.vouchers.reportVoucher, {
 			userId: claimerId,
 			voucherId,
 		});
 
-		expect(result.status).toBe("reported");
-
-		const replacementResult = await t.mutation(
+		const noReplacementResult = await t.mutation(
 			internal.vouchers.requestReplacement,
 			{
 				userId: claimerId,
@@ -232,13 +226,76 @@ describe("Report Flow", () => {
 			},
 		);
 
-		expect(replacementResult.status).toBe("refunded");
+		expect(noReplacementResult.status).toBe("refunded");
 
-		// Check claimer got coins back
-		const claimer = await t.run(async (ctx) => {
-			return await ctx.db.get(claimerId);
+		const claimerAfterRefund = await t.run(async (ctx) => ctx.db.get(claimerId));
+		expect(claimerAfterRefund?.coins).toBe(20);
+
+		const txsAfterRefund = await t.run(async (ctx) =>
+			ctx.db
+				.query("transactions")
+				.withIndex("by_user", (q) => q.eq("userId", claimerId))
+				.collect(),
+		);
+		expect(
+			txsAfterRefund.some((tx) => tx.type === "replacement_received"),
+		).toBe(false);
+
+		const uploaderId2 = await createUser(t, {
+			telegramChatId: "uploader_replacement_tx",
+			coins: 10,
 		});
-		expect(claimer?.coins).toBe(20);
+		const claimerId2 = await createUser(t, {
+			telegramChatId: "claimer_replacement_tx",
+			coins: 10,
+		});
+
+		const originalVoucherId = await createVoucher(t, {
+			type: "10",
+			uploaderId: uploaderId2,
+			status: "claimed",
+			claimerId: claimerId2,
+			claimedAt: Date.now(),
+		});
+
+		const replacementVoucherId = await createVoucher(t, {
+			type: "10",
+			uploaderId: uploaderId2,
+			status: "available",
+		});
+
+		await t.mutation(internal.vouchers.reportVoucher, {
+			userId: claimerId2,
+			voucherId: originalVoucherId,
+		});
+
+		const replacementResult = await t.mutation(
+			internal.vouchers.requestReplacement,
+			{
+				userId: claimerId2,
+				originalVoucherId,
+			},
+		);
+
+		expect(replacementResult.status).toBe("replaced");
+
+		const txsAfterReplacement = await t.run(async (ctx) =>
+			ctx.db
+				.query("transactions")
+				.withIndex("by_user", (q) => q.eq("userId", claimerId2))
+				.collect(),
+		);
+		const replacementTx = txsAfterReplacement.find(
+			(tx) => tx.type === "replacement_received",
+		);
+		expect(replacementTx).toBeDefined();
+		expect(replacementTx?.amount).toBe(0);
+		expect(replacementTx?.voucherId).toBe(replacementVoucherId);
+
+		const claimerAfterReplacement = await t.run(async (ctx) =>
+			ctx.db.get(claimerId2),
+		);
+		expect(claimerAfterReplacement?.coins).toBe(10);
 	});
 
 	test("refundReportedVoucher refunds coins and records transaction", async () => {

@@ -556,6 +556,13 @@ export const requestReplacement = internalMutation({
 			});
 		}
 
+		await applyCoinDelta(ctx, {
+			userId: user._id,
+			delta: 0,
+			type: "replacement_received",
+			voucherId: replacement._id,
+		});
+
 		return {
 			status: "replaced",
 			voucher: {

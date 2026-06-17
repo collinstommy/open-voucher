@@ -21,6 +21,8 @@ function formatType(type: string): string {
 			return "Refund";
 		case "uploader_denied":
 			return "Upload Denied";
+		case "replacement_received":
+			return "Replacement Received";
 		default:
 			return type.replace(/_/g, " ");
 	}
@@ -48,8 +50,12 @@ function TransactionsPage() {
 							<ul className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
 								{transactions.map((t, i) => {
 									const isCredit = t.amount > 0;
-									const formattedAmount =
-										t.amount > 0 ? `+${t.amount}` : `${t.amount}`;
+									const isNeutral = t.amount === 0;
+									const formattedAmount = isNeutral
+										? "0"
+										: t.amount > 0
+											? `+${t.amount}`
+											: `${t.amount}`;
 									return (
 										<li
 											key={`${t._id}-${i}`}
@@ -65,9 +71,11 @@ function TransactionsPage() {
 											</div>
 											<span
 												className={`text-sm font-bold tabular-nums ${
-													isCredit
-														? "text-green-600"
-														: "text-red-500"
+													isNeutral
+														? "text-slate-500"
+														: isCredit
+															? "text-green-600"
+															: "text-red-500"
 												}`}
 											>
 												{formattedAmount}
