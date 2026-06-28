@@ -1,0 +1,102 @@
+---
+slug: request-voucher-ui
+title: "Request Voucher UI in Mini App"
+status: draft
+createdAt: "2025-01-15"
+---
+
+# Request Voucher UI in Mini App
+
+Add a "Request Voucher" screen to the Telegram Mini App so users can claim vouchers directly from the web interface instead of only through Telegram bot chat commands.
+
+## Objective
+
+Replace the text-only Telegram claim flow (user types "5", "10", or "20") with a proper UI in the mini app at `/app/request-voucher`. Users select a voucher denomination, see the coin cost and current availability, confirm the claim, and receive the voucher image + barcode inline.
+
+## Done Criteria
+
+- New route `/app/request-voucher` accessible from the main menu
+- Users can select €5, €10, or €20 voucher type
+- Coin cost and availability shown per type
+- Confirmation step before spending coins
+- Voucher image + barcode + expiry displayed after successful claim
+- Error handling for insufficient coins, no availability, daily limit, and bans
+- Loading states during claim processing
+- New "Request Voucher" menu item on home screen
+
+## Scope
+
+**In:**
+- New mini app route and UI components
+- User-facing Convex mutation wrapper for `requestVoucher`
+- Menu integration
+- Error and loading states
+
+**Out:**
+- Changes to the Telegram bot claim flow (remains as-is)
+- Voucher upload flow
+- Admin features
+
+## Approach
+
+### 1. Backend: User-facing claim mutation
+
+The existing `requestVoucher` in `packages/backend/convex/vouchers.ts` is an `internalMutation`. Create a thin `userMutation` wrapper that calls it, so the client can trigger claims directly.
+
+**File:** `packages/backend/convex/vouchers.ts` (add near existing user mutations)
+
+```ts
+export const claimVoucher = userMutation({
+  args: {
+    type: v.union(v.literal("5"), v.literal("10"), v.literal("20")),
+  },
+  handler: async (ctx, { type }) => {
+    const userId = ctx.user._id;
+    return await ctx.runMutation(internal.vouchers.requestVoucher, {
+      userId,
+      type,
+    });
+  },
+});
+```
+
+### 2. Frontend: New route `/app/request-voucher`
+
+**File:** `apps/web/src/routes/app/request-voucher.tsx`
+
+A single screen with three states:
+1. **Selection state** — three cards showing denomination, cost, and availability
+2. **Confirming state** — selected voucher details + "Claim for X coins" button
+3. **Result state** — voucher image, barcode number, expiry date, and remaining coins
+
+### 3. Menu integration
+
+**File:** `apps/web/src/components/mini-app/menuConfig.ts`
+
+Add a new menu item "Request Voucher" with icon `🎫`, description "Claim a voucher with coins", and `href: "/app/request-voucher"`.
+
+## Key Decisions
+
+### Why a userMutation wrapper instead of exposing requestVoucher directly?
+
+`requestVoucher` is `internalMutation` — it's called by Telegram bot handlers and the OCR pipeline. Changing its auth boundary would affect those callers. A thin `userMutation` wrapper keeps the existing internal API stable while adding client access.
+
+### Why a single screen with state transitions instead of multi-page flow?
+
+The claim flow is 3 steps (select → confirm → result). A single screen with conditional rendering keeps the UX tight in a mini app context where page transitions feel heavy. The availability page already follows this pattern.
+
+### Why not show the voucher image on the availability screen?
+
+Availability is read-only stock info. The request flow is a write operation with confirmation, cost, and result — a distinct user intent that deserves its own screen.
+
+## Risks
+
+- **Race condition on availability**: Between showing availability and claiming, a voucher might be taken. The backend handles this gracefully (returns "No vouchers currently available"), so the UI just needs to surface that error.
+- **Daily limit hits mid-flow**: If user hits `/app/request-voucher` having already claimed 5 today, show a clear message instead of a claim button.
+
+## Verification
+
+1. `bun run check-types` — no type errors
+2. `bun run test` — existing tests pass
+3. Manual smoke: navigate to `/app/request-voucher` → select €20 (cheapest at 5 coins) → confirm → see voucher image → check coin balance decreased
+4. Error smoke: attempt claim with 0 coins → see insufficient coins message

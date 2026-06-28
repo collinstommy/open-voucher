@@ -20,6 +20,7 @@ import type * as analytics from "../analytics.js";
 import type * as auth from "../auth.js";
 import type * as constants from "../constants.js";
 import type * as crons from "../crons.js";
+import type * as errors from "../errors.js";
 import type * as http from "../http.js";
 import type * as lib_coinLedger from "../lib/coinLedger.js";
 import type * as lib_jwt from "../lib/jwt.js";
@@ -63,6 +64,7 @@ declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   constants: typeof constants;
   crons: typeof crons;
+  errors: typeof errors;
   http: typeof http;
   "lib/coinLedger": typeof lib_coinLedger;
   "lib/jwt": typeof lib_jwt;

@@ -1,0 +1,113 @@
+<DesignBoard id="request-voucher-canvas" title="Request Voucher UI">
+
+<Section id="request-voucher-section" label="Request Voucher Flow">
+
+<Artboard id="select-state" x={0} y={0} label="Select Voucher" surface="mobile">
+  <Row>
+    <Btn label="← Back" />
+    <Title text="Request Voucher" />
+  </Row>
+  <Lines n={1} />
+  <Card>
+    <Row>
+      <Title text="€5" />
+      <Title text="Cost: 15 coins" />
+      <Pill label="12 available" />
+    </Row>
+  </Card>
+  <Card>
+    <Row>
+      <Title text="€10" />
+      <Title text="Cost: 10 coins" />
+      <Pill label="5 available" />
+    </Row>
+  </Card>
+  <Card>
+    <Row>
+      <Title text="€20" />
+      <Title text="Cost: 5 coins" />
+      <Pill label="3 available" />
+    </Row>
+  </Card>
+  <Lines n={1} />
+  <Pill label="Balance: 25 coins" />
+</Artboard>
+
+<Artboard id="confirm-state" x={400} y={0} label="Confirm Claim" surface="mobile">
+  <Row>
+    <Btn label="← Back" />
+    <Title text="Confirm Claim" />
+  </Row>
+  <Title text="€5 Voucher" />
+  <Lines n={1} />
+  <Card>
+    <Row>
+      <Title text="Cost" />
+      <Title text="15 coins" />
+    </Row>
+    <Row>
+      <Title text="Your balance" />
+      <Title text="25 coins" />
+    </Row>
+    <Row>
+      <Title text="After claim" />
+      <Title text="10 coins" />
+    </Row>
+  </Card>
+  <Btn label="Claim for 15 coins" />
+  <Lines n={1} />
+</Artboard>
+
+<Artboard id="result-state" x={800} y={0} label="Voucher Received" surface="mobile">
+  <Row>
+    <Btn label="← Back" />
+    <Title text="Your Voucher" />
+  </Row>
+  <Pill label="Claimed successfully" />
+  <Card>
+    <Lines n={4} />
+    <Row>
+      <Title text="Barcode" />
+      <Title text="1234 5678 9012" />
+    </Row>
+    <Row>
+      <Title text="Expires" />
+      <Title text="28 Jan 2025" />
+    </Row>
+  </Card>
+  <Card>
+    <Row>
+      <Title text="Remaining balance" />
+      <Title text="10 coins" />
+    </Row>
+  </Card>
+  <Lines n={1} />
+</Artboard>
+
+<Artboard id="error-state" x={1200} y={0} label="Insufficient Coins" surface="mobile">
+  <Row>
+    <Btn label="← Back" />
+    <Title text="Request Voucher" />
+  </Row>
+  <Card>
+    <Row>
+      <Title text="€5 Voucher" />
+      <Title text="Cost: 15 coins" />
+      <Pill label="Need 5 more" />
+    </Row>
+  </Card>
+  <Card>
+    <Title text="Insufficient coins" />
+    <Lines n={2} />
+  </Card>
+  <Card>
+    <Row>
+      <Title text="Your balance" />
+      <Title text="10 coins" />
+    </Row>
+  </Card>
+</Artboard>
+
+</Section>
+
+</DesignBoard>
