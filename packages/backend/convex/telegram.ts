@@ -444,8 +444,8 @@ export const sendMessageAction = internalAction({
 		chatId: v.string(),
 		text: v.string(),
 	},
-	handler: async (_ctx, { chatId, text }) => {
-		await sendTelegramMessage(chatId, text);
+	handler: async (ctx, { chatId, text }) => {
+		await sendTelegramMessage(chatId, text, undefined, ctx);
 	},
 });
 
@@ -543,10 +543,22 @@ export const sendUploaderReportMessage = internalAction({
 	},
 });
 
+async function logTelegramSendError(
+	ctx: ActionCtx,
+	chatId: string,
+	errorText: string,
+) {
+	await ctx.runMutation(internal.errors.logError, {
+		errorType: "telegram_send_message",
+		text: `chatId=${chatId}: ${errorText}`,
+	});
+}
+
 async function sendTelegramMessage(
 	chatId: string,
 	text: string,
 	replyMarkup?: Record<string, unknown>,
+	logCtx?: ActionCtx,
 ) {
 	const token = process.env.TELEGRAM_BOT_TOKEN;
 	if (!token) {
@@ -573,9 +585,16 @@ async function sendTelegramMessage(
 		if (!response.ok) {
 			const errorText = await response.text();
 			console.error("Failed to send Telegram message:", errorText);
+			if (logCtx) {
+				await logTelegramSendError(logCtx, chatId, errorText);
+			}
 		}
 	} catch (error) {
 		console.error("Network error sending Telegram message:", error);
+		if (logCtx) {
+			const errorText = error instanceof Error ? error.message : String(error);
+			await logTelegramSendError(logCtx, chatId, errorText);
+		}
 	}
 }
 

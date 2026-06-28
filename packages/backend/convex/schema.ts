@@ -163,4 +163,9 @@ export default defineSchema({
     createdAt: v.number(),
     expiresAt: v.number(),
   }).index("by_token", ["token"]),
+
+	errors: defineTable({
+		errorType: v.string(),
+		text: v.string(),
+	}),
 });
