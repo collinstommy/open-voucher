@@ -273,7 +273,8 @@ function HomeComponent() {
 				<h2 className="mb-4 font-medium">Expired Voucher Image Cleanup</h2>
 				<p className="mb-4 text-muted-foreground text-sm">
 					Deletes images from vouchers expired 90+ days (after 30-day grace
-					period). Dry run previews what would happen.
+					period). Processes up to 100 vouchers per run — repeat until counts
+					reach zero. Dry run previews what would happen.
 				</p>
 				<div className="mb-4 flex items-center gap-4">
 					<label className="flex items-center gap-2 text-sm">
