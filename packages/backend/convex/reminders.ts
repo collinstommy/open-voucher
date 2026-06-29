@@ -1,6 +1,6 @@
 import dayjs from "dayjs";
 import { internal } from "./_generated/api";
-import { Id } from "./_generated/dataModel";
+import type { Id } from "./_generated/dataModel";
 import { internalAction, internalQuery } from "./_generated/server";
 
 /**
@@ -24,8 +24,8 @@ export const sendDailyUploadReminders = internalAction({
 });
 
 /**
- * Query users who claimed at least one voucher yesterday.
- * Returns deduplicated list of telegram chat IDs.
+ * Query users who claimed at least one voucher yesterday and have not uploaded
+ * since the start of yesterday. Returns deduplicated telegram chat IDs.
  */
 export const getUsersWhoClaimedYesterday = internalQuery({
 	args: {},
@@ -34,12 +34,13 @@ export const getUsersWhoClaimedYesterday = internalQuery({
 			.subtract(1, "day")
 			.startOf("day")
 			.valueOf();
-		const endOfYesterday = dayjs().startOf("day").valueOf();
+		const startOfToday = dayjs().startOf("day").valueOf();
+		const startOfTomorrow = dayjs().add(1, "day").startOf("day").valueOf();
 
 		const vouchers = await ctx.db
 			.query("vouchers")
 			.withIndex("by_claimed_at", (q) =>
-				q.gte("claimedAt", startOfYesterday).lt("claimedAt", endOfYesterday),
+				q.gte("claimedAt", startOfYesterday).lt("claimedAt", startOfToday),
 			)
 			.collect();
 
@@ -51,7 +52,26 @@ export const getUsersWhoClaimedYesterday = internalQuery({
 			),
 		];
 
-		const chatIds = (await Promise.all(claimerIds.map((id) => ctx.db.get(id))))
+		const claimerIdsNeedingReminder: Id<"users">[] = [];
+		for (const claimerId of claimerIds) {
+			const recentUpload = await ctx.db
+				.query("vouchers")
+				.withIndex("by_uploader_created", (q) =>
+					q.eq("uploaderId", claimerId).gte("createdAt", startOfYesterday),
+				)
+				.first();
+
+			const uploadedYesterdayOrToday =
+				recentUpload !== null && recentUpload.createdAt < startOfTomorrow;
+
+			if (!uploadedYesterdayOrToday) {
+				claimerIdsNeedingReminder.push(claimerId);
+			}
+		}
+
+		const chatIds = (
+			await Promise.all(claimerIdsNeedingReminder.map((id) => ctx.db.get(id)))
+		)
 			.filter((user) => user !== null)
 			.map((user) => user.telegramChatId);
 
