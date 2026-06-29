@@ -483,6 +483,45 @@ describe("Voucher Image Cleanup", () => {
 			});
 			expect(url).toBeNull();
 		});
+
+		test("marks voucher deleted when storage file is already gone", async () => {
+			const t = convexTest(schema, modules);
+			const userId = await createUser(t, { telegramChatId: "997" });
+			const now = Date.now();
+
+			const imageStorageId = await t.run(async (ctx) => {
+				const id = await ctx.storage.store(new Blob(["already-gone"]));
+				await ctx.storage.delete(id);
+				return id;
+			});
+
+			const voucherId = await createVoucher(t, {
+				type: "10",
+				uploaderId: userId,
+				status: "expired",
+				expiryDate: now - 100 * MS_PER_DAY,
+				imageStorageId,
+			});
+
+			await t.run(async (ctx) => {
+				await ctx.db.patch(voucherId, {
+					imageMarkedForDeletionAt: now - 40 * MS_PER_DAY,
+				});
+			});
+
+			const deleteResult = await t.mutation(
+				internal.admin.imageCleanup.deleteVoucherImages,
+				{
+					vouchers: [{ voucherId, imageStorageId }],
+				},
+			);
+
+			expect(deleteResult.deleted).toBe(1);
+			expect(deleteResult.skipped).toBe(0);
+
+			const voucher = await t.run(async (ctx) => ctx.db.get(voucherId));
+			expect(voucher?.imageDeletedAt).toBeDefined();
+		});
 	});
 
 	describe("Marking mutation sets imageMarkedForDeletionAt", () => {

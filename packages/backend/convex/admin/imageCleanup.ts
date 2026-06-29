@@ -123,7 +123,14 @@ export const deleteVoucherImages = internalMutation({
 				continue;
 			}
 
-			await ctx.storage.delete(imageStorageId);
+			const imageUrl = await ctx.storage.getUrl(imageStorageId);
+			if (imageUrl !== null) {
+				await ctx.storage.delete(imageStorageId);
+			} else {
+				console.log(
+					`Image ${imageStorageId} already absent from storage; marking voucher ${voucherId} as deleted`,
+				);
+			}
 			await ctx.db.patch(voucherId, { imageDeletedAt: now });
 			deleted++;
 		}
