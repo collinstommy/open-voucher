@@ -144,4 +144,83 @@ describe("Reminder Flow", () => {
 
 		vi.useRealTimers();
 	});
+
+	test("skips users who already uploaded yesterday or today", async () => {
+		vi.useFakeTimers();
+
+		const now = Date.now();
+		const oneDayMs = 24 * 60 * 60 * 1000;
+		const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+		const yesterday = now - oneDayMs;
+		const twoDaysAgo = now - 2 * oneDayMs;
+		const futureExpiry = now + sevenDaysMs;
+
+		const t = convexTest(schema, modules);
+
+		const needsReminderId = await createUser(t, {
+			telegramChatId: "needs_reminder",
+			coins: 100,
+		});
+		const uploadedYesterdayId = await createUser(t, {
+			telegramChatId: "uploaded_yesterday",
+			coins: 100,
+		});
+		const uploadedTodayId = await createUser(t, {
+			telegramChatId: "uploaded_today",
+			coins: 100,
+		});
+		const otherUploaderId = await createUser(t, {
+			telegramChatId: "other_uploader",
+			coins: 50,
+		});
+
+		for (const claimerId of [
+			needsReminderId,
+			uploadedYesterdayId,
+			uploadedTodayId,
+		]) {
+			await createVoucher(t, {
+				type: "10",
+				uploaderId: otherUploaderId,
+				status: "claimed",
+				claimerId,
+				claimedAt: yesterday,
+				expiryDate: futureExpiry,
+				createdAt: yesterday,
+			});
+		}
+
+		await createVoucher(t, {
+			type: "5",
+			uploaderId: uploadedYesterdayId,
+			status: "available",
+			expiryDate: futureExpiry,
+			createdAt: yesterday,
+		});
+
+		await createVoucher(t, {
+			type: "5",
+			uploaderId: uploadedTodayId,
+			status: "available",
+			expiryDate: futureExpiry,
+			createdAt: now,
+		});
+
+		await createVoucher(t, {
+			type: "5",
+			uploaderId: needsReminderId,
+			status: "available",
+			expiryDate: futureExpiry,
+			createdAt: twoDaysAgo,
+		});
+
+		const chatIds = await t.query(
+			internal.reminders.getUsersWhoClaimedYesterday,
+			{},
+		);
+
+		expect(chatIds).toEqual(["needs_reminder"]);
+
+		vi.useRealTimers();
+	});
 });
