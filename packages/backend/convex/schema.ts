@@ -89,7 +89,8 @@ export default defineSchema({
 		.index("by_uploader", ["uploaderId"])
 		.index("by_uploader_created", ["uploaderId", "createdAt"])
 		.index("by_claimer_claimed_at", ["claimerId", "claimedAt"])
-		.index("by_barcode", ["barcodeNumber"]),
+		.index("by_barcode", ["barcodeNumber"])
+		.index("by_image_storage", ["imageStorageId"]),
 
 	reports: defineTable({
 		voucherId: v.id("vouchers"),
@@ -136,7 +137,9 @@ export default defineSchema({
 		extractedBarcode: v.optional(v.string()),
 		extractedExpiryDate: v.optional(v.string()),
 		extractedValidFrom: v.optional(v.string()),
-	}).index("by_userId", ["userId"]),
+	})
+		.index("by_userId", ["userId"])
+		.index("by_image_storage", ["imageStorageId"]),
   feedback: defineTable({
 		userId: v.id("users"),
 		text: v.string(),

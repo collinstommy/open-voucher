@@ -32,7 +32,7 @@ export const getExpiredVouchersForCleanup = internalQuery({
 						q.eq(q.field("imageDeletedAt"), undefined),
 					),
 				)
-				.collect();
+				.take(BATCH_SIZE);
 
 			return vouchers.map((v) => ({
 				_id: v._id,
@@ -94,12 +94,10 @@ export const deleteVoucherImages = internalMutation({
 		for (const { voucherId, imageStorageId } of vouchers) {
 			const otherVoucher = await ctx.db
 				.query("vouchers")
-				.filter((q) =>
-					q.and(
-						q.eq(q.field("imageStorageId"), imageStorageId),
-						q.neq(q.field("_id"), voucherId),
-					),
+				.withIndex("by_image_storage", (q) =>
+					q.eq("imageStorageId", imageStorageId),
 				)
+				.filter((q) => q.neq(q.field("_id"), voucherId))
 				.first();
 
 			if (otherVoucher) {
@@ -112,7 +110,9 @@ export const deleteVoucherImages = internalMutation({
 
 			const failedUpload = await ctx.db
 				.query("failedUploads")
-				.filter((q) => q.eq(q.field("imageStorageId"), imageStorageId))
+				.withIndex("by_image_storage", (q) =>
+					q.eq("imageStorageId", imageStorageId),
+				)
 				.first();
 
 			if (failedUpload) {
