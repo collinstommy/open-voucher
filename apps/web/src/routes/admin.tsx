@@ -9,7 +9,7 @@ export const Route = createFileRoute("/admin")({
 function AdminLayout() {
 	return (
 		<AdminApp>
-			<div className="px-4 py-2">
+			<div className="mx-auto max-w-7xl px-4 py-3 sm:px-6">
 				<NavigationLayout />
 				<Outlet />
 			</div>
