@@ -2,6 +2,23 @@ import dayjs from "dayjs";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { internalAction, internalQuery } from "./_generated/server";
+import {
+	TELEGRAM_SEND_BATCH_PAUSE_MS,
+	TELEGRAM_SEND_BATCH_SIZE,
+	TELEGRAM_SEND_MESSAGE_INTERVAL_MS,
+} from "./constants";
+
+const REMINDER_MESSAGE =
+	"🛒 You saved on your shopping yesterday!\n\nUpload your new vouchers today to ensure no vouchers go to waste.";
+
+function getStaggeredSendDelayMs(index: number): number {
+	const batch = Math.floor(index / TELEGRAM_SEND_BATCH_SIZE);
+	const withinBatch = index % TELEGRAM_SEND_BATCH_SIZE;
+	const batchDuration =
+		(TELEGRAM_SEND_BATCH_SIZE - 1) * TELEGRAM_SEND_MESSAGE_INTERVAL_MS;
+	const batchStart = batch * (batchDuration + TELEGRAM_SEND_BATCH_PAUSE_MS);
+	return batchStart + withinBatch * TELEGRAM_SEND_MESSAGE_INTERVAL_MS;
+}
 
 /**
  * Daily cron job that sends upload reminders to users who claimed vouchers yesterday.
@@ -14,11 +31,15 @@ export const sendDailyUploadReminders = internalAction({
 			internal.reminders.getUsersWhoClaimedYesterday,
 		);
 
-		for (const chatId of telegramChatIds) {
-			await ctx.scheduler.runAfter(0, internal.telegram.sendMessageAction, {
-				chatId,
-				text: `🛒 You saved on your shopping yesterday!\n\nUpload your new vouchers today to ensure no vouchers go to waste.`,
-			});
+		for (const [index, chatId] of telegramChatIds.entries()) {
+			await ctx.scheduler.runAfter(
+				getStaggeredSendDelayMs(index),
+				internal.telegram.sendMessageAction,
+				{
+					chatId,
+					text: REMINDER_MESSAGE,
+				},
+			);
 		}
 	},
 });
@@ -75,6 +96,6 @@ export const getUsersWhoClaimedYesterday = internalQuery({
 			.filter((user) => user !== null)
 			.map((user) => user.telegramChatId);
 
-		return chatIds;
+		return [...new Set(chatIds)];
 	},
 });
