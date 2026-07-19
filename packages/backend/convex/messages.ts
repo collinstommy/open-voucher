@@ -7,7 +7,17 @@ import {
 	loadInboundMessages,
 	resolveMessageIntent,
 } from "./lib/messageAnalytics";
+import { classifiedIntentValidator } from "./lib/messageIntent";
 import { internalMutation, internalQuery } from "./_generated/server";
+
+export const getMessageById = internalQuery({
+	args: {
+		messageId: v.id("messages"),
+	},
+	handler: async (ctx, { messageId }) => {
+		return await ctx.db.get(messageId);
+	},
+});
 
 export const getUnknownInboundMessages = internalQuery({
 	args: {
@@ -47,6 +57,30 @@ export const backfillMessageIntents = internalMutation({
 		).length;
 
 		return { updated, remaining: remaining - updated };
+	},
+});
+
+export const recordClassification = internalMutation({
+	args: {
+		messageId: v.id("messages"),
+		classifiedIntent: classifiedIntentValidator,
+		classifiedConfidence: v.number(),
+	},
+	handler: async (
+		ctx,
+		{ messageId, classifiedIntent, classifiedConfidence },
+	) => {
+		const message = await ctx.db.get(messageId);
+		if (!message) throw new Error("Message not found");
+		if (message.direction !== "inbound") {
+			throw new Error("Only inbound messages can be classified");
+		}
+
+		await ctx.db.patch(messageId, {
+			classifiedIntent,
+			classifiedConfidence,
+		});
+		return { success: true };
 	},
 });
 

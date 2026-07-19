@@ -62,4 +62,28 @@ describe("classifyInboundMessage", () => {
 			}),
 		).toBe("unknown");
 	});
+
+	test("does not classify known commands as unknown", () => {
+		const knownCommands = [
+			{ text: "help", expected: "help" },
+			{ text: "/help", expected: "help" },
+			{ text: "balance", expected: "balance" },
+			{ text: "/balance", expected: "balance" },
+			{ text: "start", expected: "start" },
+			{ text: "faq", expected: "faq" },
+			{ text: "donate", expected: "donate" },
+			{ text: "app", expected: "app" },
+			{ text: "share", expected: "share" },
+			{ text: "feedback", expected: "feedback" },
+			{ text: "5", expected: "claim_5" },
+			{ text: "10", expected: "claim_10" },
+			{ text: "20", expected: "claim_20" },
+		];
+
+		for (const { text, expected } of knownCommands) {
+			const result = classifyInboundMessage({ text, messageType: "text" });
+			expect(result).toBe(expected);
+			expect(result).not.toBe("unknown");
+		}
+	});
 });

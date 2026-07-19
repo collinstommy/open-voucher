@@ -164,3 +164,28 @@ export function emptyIntentCounts(): Record<MessageIntent, number> {
 		MESSAGE_INTENTS.map((intent) => [intent, 0]),
 	) as Record<MessageIntent, number>;
 }
+
+export const INBOUND_CLASSIFICATIONS = [
+	"return_voucher",
+	"revoke_upload",
+	"report_not_working",
+	"how_does_it_work",
+	"balance",
+	"limits_question",
+	"praise_or_noise",
+	"unknown",
+] as const;
+
+export const CLASSIFIED_LABELS = new Set<string>(INBOUND_CLASSIFICATIONS);
+
+export type InboundClassification = (typeof INBOUND_CLASSIFICATIONS)[number];
+
+export const classifiedIntentValidator = v.union(
+	...INBOUND_CLASSIFICATIONS.map((label) => v.literal(label)),
+);
+
+export function isClassifiedIntent(
+	value: string,
+): value is InboundClassification {
+	return CLASSIFIED_LABELS.has(value);
+}

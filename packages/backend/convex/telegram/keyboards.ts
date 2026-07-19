@@ -1,7 +1,7 @@
 import { helpData, faqData } from "./router";
 import type { InlineKeyboardButton } from "./botAdapter";
 
-function getMiniAppUrl(): string {
+export function getMiniAppUrl(): string {
 	return process.env.MINI_APP_URL ?? "https://openvouchers.org/app";
 }
 
@@ -9,7 +9,9 @@ function getFeedbackAppUrl(): string {
 	return `${getMiniAppUrl().replace(/\/$/, "")}/feedback`;
 }
 
-export function helpMenuKeyboard(): { inline_keyboard: InlineKeyboardButton[][] } {
+export function helpMenuKeyboard(): {
+	inline_keyboard: InlineKeyboardButton[][];
+} {
 	return {
 		inline_keyboard: [
 			[
@@ -29,7 +31,9 @@ export function helpMenuKeyboard(): { inline_keyboard: InlineKeyboardButton[][] 
 	};
 }
 
-export function faqMenuKeyboard(): { inline_keyboard: InlineKeyboardButton[][] } {
+export function faqMenuKeyboard(): {
+	inline_keyboard: InlineKeyboardButton[][];
+} {
 	return {
 		inline_keyboard: [
 			[
@@ -49,7 +53,9 @@ export function faqMenuKeyboard(): { inline_keyboard: InlineKeyboardButton[][] }
 	};
 }
 
-export function appWebAppKeyboard(): { inline_keyboard: InlineKeyboardButton[][] } {
+export function appWebAppKeyboard(): {
+	inline_keyboard: InlineKeyboardButton[][];
+} {
 	return {
 		inline_keyboard: [
 			[

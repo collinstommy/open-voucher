@@ -186,7 +186,10 @@ http.route({
 				return new Response("Unauthorized", { status: 403 });
 			}
 
-			const body = await request.json();
+			const body = (await request.json()) as {
+				message?: unknown;
+				callback_query?: unknown;
+			};
 
 			console.log("Webhook received:", JSON.stringify(body, null, 2));
 

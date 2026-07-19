@@ -241,11 +241,19 @@ function getMiniAppUrl(): string {
 }
 
 async function sendHelpMenu(chatId: string) {
-	await sendTelegramMessage(chatId, "Choose an option below", helpMenuKeyboard());
+	await sendTelegramMessage(
+		chatId,
+		"Choose an option below",
+		helpMenuKeyboard(),
+	);
 }
 
 async function sendFaqMenu(chatId: string) {
-	await sendTelegramMessage(chatId, "Choose a FAQ question below", faqMenuKeyboard());
+	await sendTelegramMessage(
+		chatId,
+		"Choose a FAQ question below",
+		faqMenuKeyboard(),
+	);
 }
 
 async function sendAppWebAppButton(chatId: string) {
@@ -337,7 +345,10 @@ async function handleVoucherRequest(
 					[
 						{
 							text: "⚠️ Its not working",
-							callback_data: reportData("report_init", String(result.voucherId)),
+							callback_data: reportData(
+								"report_init",
+								String(result.voucherId),
+							),
 						},
 					],
 				],
@@ -436,6 +447,16 @@ export const handleTelegramMessage = internalAction({
 		if (await handleCommand(ctx, chatId, lowerText, text, user)) return;
 
 		if (await handleVoucherRequest(ctx, chatId, lowerText, user)) return;
+
+		// Unknown free-text message: ask the LLM to classify it and reply with a
+		// deep-link into the mini app.
+		if (intent === "unknown") {
+			await ctx.scheduler.runAfter(
+				0,
+				internal.telegram.classifyUnknown.classifyUnknownMessage,
+				{ messageId: messageDbId },
+			);
+		}
 	},
 });
 
@@ -446,6 +467,32 @@ export const sendMessageAction = internalAction({
 	},
 	handler: async (ctx, { chatId, text }) => {
 		await sendTelegramMessage(chatId, text, undefined, ctx);
+	},
+});
+
+function webAppKeyboard(url: string): {
+	inline_keyboard: { text: string; web_app: { url: string } }[][];
+} {
+	return {
+		inline_keyboard: [
+			[
+				{
+					text: "📱 Open App",
+					web_app: { url },
+				},
+			],
+		],
+	};
+}
+
+export const sendWebAppMessageAction = internalAction({
+	args: {
+		chatId: v.string(),
+		text: v.string(),
+		webAppUrl: v.string(),
+	},
+	handler: async (ctx, { chatId, text, webAppUrl }) => {
+		await sendTelegramMessage(chatId, text, webAppKeyboard(webAppUrl), ctx);
 	},
 });
 
@@ -500,13 +547,7 @@ export const sendUploaderReportMessage = internalAction({
 	},
 	handler: async (
 		ctx,
-		{
-			uploaderChatId,
-			voucherId,
-			voucherType,
-			imageStorageId,
-			barcodeNumber,
-		},
+		{ uploaderChatId, voucherId, voucherType, imageStorageId, barcodeNumber },
 	) => {
 		const replyMarkup = {
 			inline_keyboard: [
@@ -741,8 +782,8 @@ export const handleTelegramCallback = internalAction({
 				Array.isArray(callbackQuery.message.photo) &&
 				callbackQuery.message.photo.length > 0,
 		};
-		await dispatch(c, callbackQuery.data, realBotAdapter());
-	},
+	await dispatch(c, callbackQuery.data, realBotAdapter());
+},
 });
 
 async function editTelegramMessageText(
@@ -799,9 +840,13 @@ async function getTelegramFileUrl(fileId: string): Promise<string> {
 	const res = await fetch(
 		`https://api.telegram.org/bot${token}/getFile?file_id=${fileId}`,
 	);
-	const data = await res.json();
+	const data = (await res.json()) as {
+		ok: boolean;
+		description?: string;
+		result?: { file_path?: string };
+	};
 	if (!data.ok) {
 		throw new Error(`Failed to get file path: ${data.description}`);
 	}
-	return `https://api.telegram.org/file/bot${token}/${data.result.file_path}`;
+	return `https://api.telegram.org/file/bot${token}/${data.result?.file_path}`;
 }
