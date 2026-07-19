@@ -10,6 +10,7 @@
 
 import type * as admin_analytics from "../admin/analytics.js";
 import type * as admin_auth from "../admin/auth.js";
+import type * as admin_broadcast from "../admin/broadcast.js";
 import type * as admin_dashboard from "../admin/dashboard.js";
 import type * as admin_feedback from "../admin/feedback.js";
 import type * as admin_healthChecks from "../admin/healthChecks.js";
@@ -22,6 +23,7 @@ import type * as constants from "../constants.js";
 import type * as crons from "../crons.js";
 import type * as errors from "../errors.js";
 import type * as http from "../http.js";
+import type * as lib_broadcastAudience from "../lib/broadcastAudience.js";
 import type * as lib_coinLedger from "../lib/coinLedger.js";
 import type * as lib_jwt from "../lib/jwt.js";
 import type * as lib_messageAnalytics from "../lib/messageAnalytics.js";
@@ -54,6 +56,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   "admin/analytics": typeof admin_analytics;
   "admin/auth": typeof admin_auth;
+  "admin/broadcast": typeof admin_broadcast;
   "admin/dashboard": typeof admin_dashboard;
   "admin/feedback": typeof admin_feedback;
   "admin/healthChecks": typeof admin_healthChecks;
@@ -66,6 +69,7 @@ declare const fullApi: ApiFromModules<{
   crons: typeof crons;
   errors: typeof errors;
   http: typeof http;
+  "lib/broadcastAudience": typeof lib_broadcastAudience;
   "lib/coinLedger": typeof lib_coinLedger;
   "lib/jwt": typeof lib_jwt;
   "lib/messageAnalytics": typeof lib_messageAnalytics;

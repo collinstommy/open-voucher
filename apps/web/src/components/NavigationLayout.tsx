@@ -17,6 +17,7 @@ const NAV_ITEMS = [
 	{ to: "/admin/failed-uploads", label: "Failed Uploads" },
 	{ to: "/admin/users", label: "Users" },
 	{ to: "/admin/feedback", label: "Feedback" },
+	{ to: "/admin/broadcast", label: "Broadcast" },
 	{ to: "/admin/analytics", label: "Analytics" },
 	{ to: "/admin/banned", label: "Banned" },
 	{ to: "/admin/settings", label: "Settings" },
