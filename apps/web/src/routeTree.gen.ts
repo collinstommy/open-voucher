@@ -27,6 +27,7 @@ import { Route as AdminHealthCheckRouteImport } from './routes/admin/health-chec
 import { Route as AdminFeedbackRouteImport } from './routes/admin/feedback'
 import { Route as AdminFailedUploadsRouteImport } from './routes/admin/failed-uploads'
 import { Route as AdminEvalsRouteImport } from './routes/admin/evals'
+import { Route as AdminBroadcastRouteImport } from './routes/admin/broadcast'
 import { Route as AdminBannedRouteImport } from './routes/admin/banned'
 import { Route as AdminAnalyticsRouteImport } from './routes/admin/analytics'
 import { Route as AdminUsersIndexRouteImport } from './routes/admin/users/index'
@@ -122,6 +123,11 @@ const AdminEvalsRoute = AdminEvalsRouteImport.update({
   path: '/evals',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminBroadcastRoute = AdminBroadcastRouteImport.update({
+  id: '/broadcast',
+  path: '/broadcast',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminBannedRoute = AdminBannedRouteImport.update({
   id: '/banned',
   path: '/banned',
@@ -150,6 +156,7 @@ export interface FileRoutesByFullPath {
   '/telegram': typeof TelegramRoute
   '/admin/analytics': typeof AdminAnalyticsRoute
   '/admin/banned': typeof AdminBannedRoute
+  '/admin/broadcast': typeof AdminBroadcastRoute
   '/admin/evals': typeof AdminEvalsRoute
   '/admin/failed-uploads': typeof AdminFailedUploadsRoute
   '/admin/feedback': typeof AdminFeedbackRoute
@@ -172,6 +179,7 @@ export interface FileRoutesByTo {
   '/telegram': typeof TelegramRoute
   '/admin/analytics': typeof AdminAnalyticsRoute
   '/admin/banned': typeof AdminBannedRoute
+  '/admin/broadcast': typeof AdminBroadcastRoute
   '/admin/evals': typeof AdminEvalsRoute
   '/admin/failed-uploads': typeof AdminFailedUploadsRoute
   '/admin/feedback': typeof AdminFeedbackRoute
@@ -197,6 +205,7 @@ export interface FileRoutesById {
   '/telegram': typeof TelegramRoute
   '/admin/analytics': typeof AdminAnalyticsRoute
   '/admin/banned': typeof AdminBannedRoute
+  '/admin/broadcast': typeof AdminBroadcastRoute
   '/admin/evals': typeof AdminEvalsRoute
   '/admin/failed-uploads': typeof AdminFailedUploadsRoute
   '/admin/feedback': typeof AdminFeedbackRoute
@@ -223,6 +232,7 @@ export interface FileRouteTypes {
     | '/telegram'
     | '/admin/analytics'
     | '/admin/banned'
+    | '/admin/broadcast'
     | '/admin/evals'
     | '/admin/failed-uploads'
     | '/admin/feedback'
@@ -245,6 +255,7 @@ export interface FileRouteTypes {
     | '/telegram'
     | '/admin/analytics'
     | '/admin/banned'
+    | '/admin/broadcast'
     | '/admin/evals'
     | '/admin/failed-uploads'
     | '/admin/feedback'
@@ -269,6 +280,7 @@ export interface FileRouteTypes {
     | '/telegram'
     | '/admin/analytics'
     | '/admin/banned'
+    | '/admin/broadcast'
     | '/admin/evals'
     | '/admin/failed-uploads'
     | '/admin/feedback'
@@ -422,6 +434,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminEvalsRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/broadcast': {
+      id: '/admin/broadcast'
+      path: '/broadcast'
+      fullPath: '/admin/broadcast'
+      preLoaderRoute: typeof AdminBroadcastRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/banned': {
       id: '/admin/banned'
       path: '/banned'
@@ -456,6 +475,7 @@ declare module '@tanstack/react-router' {
 interface AdminRouteChildren {
   AdminAnalyticsRoute: typeof AdminAnalyticsRoute
   AdminBannedRoute: typeof AdminBannedRoute
+  AdminBroadcastRoute: typeof AdminBroadcastRoute
   AdminEvalsRoute: typeof AdminEvalsRoute
   AdminFailedUploadsRoute: typeof AdminFailedUploadsRoute
   AdminFeedbackRoute: typeof AdminFeedbackRoute
@@ -470,6 +490,7 @@ interface AdminRouteChildren {
 const AdminRouteChildren: AdminRouteChildren = {
   AdminAnalyticsRoute: AdminAnalyticsRoute,
   AdminBannedRoute: AdminBannedRoute,
+  AdminBroadcastRoute: AdminBroadcastRoute,
   AdminEvalsRoute: AdminEvalsRoute,
   AdminFailedUploadsRoute: AdminFailedUploadsRoute,
   AdminFeedbackRoute: AdminFeedbackRoute,
