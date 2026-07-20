@@ -1,6 +1,5 @@
 import { v } from "convex/values";
 import { adminAction } from "./auth";
-import { internalAction } from "../_generated/server";
 import { classifyMessageText } from "../lib/intentClassifier";
 import { INTENT_EVAL_SET, type IntentEvalCase } from "../lib/intentEvalSet";
 import type { InboundClassification } from "../lib/messageIntent";
@@ -81,12 +80,6 @@ async function runIntentEvalLogic(): Promise<EvalRunResult> {
 export const runIntentEvals = adminAction({
 	args: { token: v.string() },
 	handler: async (_ctx, { token: _token }): Promise<EvalRunResult> => {
-		return runIntentEvalLogic();
-	},
-});
-
-export const runIntentEvalsInternal = internalAction({
-	handler: async (): Promise<EvalRunResult> => {
 		return runIntentEvalLogic();
 	},
 });

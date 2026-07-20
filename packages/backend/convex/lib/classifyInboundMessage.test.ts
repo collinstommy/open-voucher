@@ -13,9 +13,9 @@ describe("classifyInboundMessage", () => {
 			classifyInboundMessage({
 				text: "anything here",
 				messageType: "text",
-				userState: "waiting_for_feedback_message",
+				userState: "waiting_for_ban_appeal",
 			}),
-		).toBe("state_feedback");
+		).toBe("state_ban_appeal");
 	});
 
 	test("classifies standard commands", () => {

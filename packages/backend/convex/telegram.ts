@@ -9,7 +9,7 @@ import { UPLOAD_REWARDS } from "./constants";
 import { classifyInboundMessage } from "./lib/messageIntent";
 import { realBotAdapter } from "./telegram/botAdapter";
 import { reportData, uploaderData } from "./telegram/router";
-import { helpMenuKeyboard, faqMenuKeyboard, appWebAppKeyboard, feedbackWebAppKeyboard } from "./telegram/keyboards";
+import { helpMenuKeyboard, faqMenuKeyboard, appWebAppKeyboard, feedbackWebAppKeyboard, getMiniAppUrl, webAppKeyboard } from "./telegram/keyboards";
 import "./telegram/handlers/report";
 import "./telegram/handlers/help";
 import "./telegram/handlers/faq";
@@ -236,10 +236,6 @@ async function handleImageUpload(
 	}
 }
 
-function getMiniAppUrl(): string {
-	return process.env.MINI_APP_URL ?? "https://openvouchers.org/app";
-}
-
 async function sendHelpMenu(chatId: string) {
 	await sendTelegramMessage(
 		chatId,
@@ -448,8 +444,6 @@ export const handleTelegramMessage = internalAction({
 
 		if (await handleVoucherRequest(ctx, chatId, lowerText, user)) return;
 
-		// Unknown free-text message: ask the LLM to classify it and reply with a
-		// deep-link into the mini app.
 		if (intent === "unknown") {
 			await ctx.scheduler.runAfter(
 				0,
@@ -470,29 +464,20 @@ export const sendMessageAction = internalAction({
 	},
 });
 
-function webAppKeyboard(url: string): {
-	inline_keyboard: { text: string; web_app: { url: string } }[][];
-} {
-	return {
-		inline_keyboard: [
-			[
-				{
-					text: "📱 Open App",
-					web_app: { url },
-				},
-			],
-		],
-	};
-}
-
 export const sendWebAppMessageAction = internalAction({
 	args: {
 		chatId: v.string(),
 		text: v.string(),
 		webAppUrl: v.string(),
+		buttonText: v.optional(v.string()),
 	},
-	handler: async (ctx, { chatId, text, webAppUrl }) => {
-		await sendTelegramMessage(chatId, text, webAppKeyboard(webAppUrl), ctx);
+	handler: async (ctx, { chatId, text, webAppUrl, buttonText }) => {
+		await sendTelegramMessage(
+			chatId,
+			text,
+			webAppKeyboard(webAppUrl, buttonText),
+			ctx,
+		);
 	},
 });
 

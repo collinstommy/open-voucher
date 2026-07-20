@@ -82,3 +82,21 @@ export function feedbackWebAppKeyboard(): {
 		],
 	};
 }
+
+export function webAppKeyboard(
+	url: string,
+	buttonText = "📱 Open App",
+): {
+	inline_keyboard: InlineKeyboardButton[][];
+} {
+	return {
+		inline_keyboard: [
+			[
+				{
+					text: buttonText,
+					web_app: { url },
+				},
+			],
+		],
+	};
+}

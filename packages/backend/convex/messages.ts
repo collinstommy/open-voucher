@@ -76,11 +76,15 @@ export const recordClassification = internalMutation({
 			throw new Error("Only inbound messages can be classified");
 		}
 
+		if (message.classifiedIntent) {
+			return { success: true, alreadyRecorded: true };
+		}
+
 		await ctx.db.patch(messageId, {
 			classifiedIntent,
 			classifiedConfidence,
 		});
-		return { success: true };
+		return { success: true, alreadyRecorded: false };
 	},
 });
 

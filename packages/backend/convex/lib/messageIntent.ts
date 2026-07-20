@@ -2,7 +2,6 @@ import { v } from "convex/values";
 
 export type TelegramUserState =
 	| "waiting_for_support_message"
-	| "waiting_for_feedback_message"
 	| "waiting_for_ban_appeal"
 	| "onboarding_tutorial";
 
@@ -21,7 +20,6 @@ export const MESSAGE_INTENTS = [
 	"feedback",
 	"feedback_with_text",
 	"state_support",
-	"state_feedback",
 	"state_ban_appeal",
 	"state_onboarding",
 	"unknown",
@@ -54,7 +52,6 @@ export const INTENT_LABELS: Record<MessageIntent, string> = {
 	feedback: "Feedback",
 	feedback_with_text: "Feedback (with text)",
 	state_support: "Support flow",
-	state_feedback: "Feedback flow",
 	state_ban_appeal: "Ban appeal",
 	state_onboarding: "Onboarding",
 	unknown: "Unknown / free text",
@@ -94,9 +91,6 @@ export function classifyInboundMessage(args: {
 
 	if (userState === "waiting_for_support_message") {
 		return "state_support";
-	}
-	if (userState === "waiting_for_feedback_message") {
-		return "state_feedback";
 	}
 	if (userState === "waiting_for_ban_appeal") {
 		return "state_ban_appeal";
@@ -189,3 +183,14 @@ export function isClassifiedIntent(
 ): value is InboundClassification {
 	return CLASSIFIED_LABELS.has(value);
 }
+
+export const CLASSIFIED_INTENT_LABELS: Record<InboundClassification, string> = {
+	return_voucher: "Return voucher",
+	revoke_upload: "Revoke upload",
+	report_not_working: "Report not working",
+	how_does_it_work: "How does it work?",
+	balance: "Balance",
+	limits_question: "Limits question",
+	praise_or_noise: "Praise / noise",
+	unknown: "Unknown",
+};

@@ -1,9 +1,62 @@
 import { v } from "convex/values";
 import { internal } from "../_generated/api";
+import type { Id } from "../_generated/dataModel";
+import type { ActionCtx } from "../_generated/server";
 import { internalAction } from "../_generated/server";
 import { isClassifiedIntent, type InboundClassification } from "../lib/messageIntent";
 import { classifyMessageText } from "../lib/intentClassifier";
 import { replyForClassification } from "./inboundReplies";
+
+async function sendClassifiedReplyForMessage(
+	ctx: ActionCtx,
+	messageId: Id<"messages">,
+): Promise<void> {
+	const message = await ctx.runQuery(internal.messages.getMessageById, {
+		messageId,
+	});
+	if (!message || message.direction !== "inbound") return;
+
+	const classifiedIntent = message.classifiedIntent;
+	if (!classifiedIntent || !isClassifiedIntent(classifiedIntent)) return;
+
+	const user = await ctx.runQuery(internal.users.getUserByTelegramChatId, {
+		telegramChatId: message.telegramChatId,
+	});
+
+	if (classifiedIntent === "balance" && user) {
+		await ctx.runAction(internal.telegram.sendMessageAction, {
+			chatId: message.telegramChatId,
+			text: `💰 You have ${user.coins} coins.`,
+		});
+		await ctx.runMutation(internal.analytics.recordServerEvent, {
+			action: `classified_reply:${classifiedIntent}`,
+			userId: user._id,
+		});
+		return;
+	}
+
+	const reply = replyForClassification(classifiedIntent);
+	if (!reply) return;
+
+	if (reply.kind === "text") {
+		await ctx.runAction(internal.telegram.sendMessageAction, {
+			chatId: message.telegramChatId,
+			text: reply.text,
+		});
+	} else {
+		await ctx.runAction(internal.telegram.sendWebAppMessageAction, {
+			chatId: message.telegramChatId,
+			text: reply.text,
+			webAppUrl: reply.webAppUrl,
+			buttonText: reply.buttonText,
+		});
+	}
+
+	await ctx.runMutation(internal.analytics.recordServerEvent, {
+		action: `classified_reply:${classifiedIntent}`,
+		userId: user?._id,
+	});
+}
 
 export const classifyUnknownMessage = internalAction({
 	args: {
@@ -13,33 +66,26 @@ export const classifyUnknownMessage = internalAction({
 		const message = await ctx.runQuery(internal.messages.getMessageById, {
 			messageId,
 		});
+		if (!message || message.direction !== "inbound") return;
 
-		// Already classified (e.g. retry) — reply only if the label is actionable.
-		const existingIntent = message?.classifiedIntent;
+		const existingIntent = message.classifiedIntent;
 		if (existingIntent && isClassifiedIntent(existingIntent)) {
-			if (replyForClassification(existingIntent)) {
-				await ctx.scheduler.runAfter(
-					0,
-					internal.telegram.classifyUnknown.sendClassifiedReply,
-					{
-						messageId,
-					},
-				);
+			if (
+				existingIntent === "balance" ||
+				replyForClassification(existingIntent)
+			) {
+				await sendClassifiedReplyForMessage(ctx, messageId);
 			}
 			return;
 		}
 
-		const userText = message?.text ?? "";
+		const userText = message.text ?? "";
 		if (!userText.trim()) {
-			await ctx.scheduler.runAfter(
-				0,
-				internal.messages.recordClassification,
-				{
-					messageId,
-					classifiedIntent: "unknown",
-					classifiedConfidence: 0,
-				},
-			);
+			await ctx.runMutation(internal.messages.recordClassification, {
+				messageId,
+				classifiedIntent: "unknown",
+				classifiedConfidence: 0,
+			});
 			return;
 		}
 
@@ -63,8 +109,7 @@ export const classifyUnknownMessage = internalAction({
 			}
 		}
 
-		await ctx.scheduler.runAfter(
-			0,
+		const recordResult = await ctx.runMutation(
 			internal.messages.recordClassification,
 			{
 				messageId,
@@ -73,14 +118,12 @@ export const classifyUnknownMessage = internalAction({
 			},
 		);
 
-		if (replyForClassification(intent)) {
-			await ctx.scheduler.runAfter(
-				0,
-				internal.telegram.classifyUnknown.sendClassifiedReply,
-				{
-					messageId,
-				},
-			);
+		if (recordResult.alreadyRecorded) {
+			return;
+		}
+
+		if (replyForClassification(intent) || intent === "balance") {
+			await sendClassifiedReplyForMessage(ctx, messageId);
 		}
 	},
 });
@@ -90,49 +133,6 @@ export const sendClassifiedReply = internalAction({
 		messageId: v.id("messages"),
 	},
 	handler: async (ctx, { messageId }) => {
-		const message = await ctx.runQuery(internal.messages.getMessageById, {
-			messageId,
-		});
-		if (!message || message.direction !== "inbound") return;
-
-		const classifiedIntent = message.classifiedIntent;
-		if (!classifiedIntent || !isClassifiedIntent(classifiedIntent)) return;
-
-		let reply = replyForClassification(classifiedIntent);
-		if (!reply) return;
-
-		const user = await ctx.runQuery(internal.users.getUserByTelegramChatId, {
-			telegramChatId: message.telegramChatId,
-		});
-
-		if (classifiedIntent === "balance" && user) {
-			await ctx.scheduler.runAfter(
-				0,
-				internal.telegram.sendMessageAction,
-				{
-					chatId: message.telegramChatId,
-					text: `💰 You have ${user.coins} coins.`,
-				},
-			);
-		} else {
-			await ctx.scheduler.runAfter(
-				0,
-				internal.telegram.sendWebAppMessageAction,
-				{
-					chatId: message.telegramChatId,
-					text: reply.text,
-					webAppUrl: reply.webAppUrl,
-				},
-			);
-		}
-
-		await ctx.scheduler.runAfter(
-			0,
-			internal.analytics.recordServerEvent,
-			{
-				action: `classified_reply:${classifiedIntent}`,
-				userId: user?._id,
-			},
-		);
+		await sendClassifiedReplyForMessage(ctx, messageId);
 	},
 });

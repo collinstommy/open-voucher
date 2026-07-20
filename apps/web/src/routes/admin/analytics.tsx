@@ -57,6 +57,7 @@ const CLASSIFIED_INTENT_LABELS: Record<string, string> = {
 	revoke_upload: "Revoke upload",
 	report_not_working: "Report not working",
 	how_does_it_work: "How does it work?",
+	balance: "Balance",
 	limits_question: "Limits question",
 	praise_or_noise: "Praise / noise",
 	unknown: "Unknown",

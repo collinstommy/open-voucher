@@ -17,7 +17,7 @@ export async function callGeminiApi(
 		maxOutputTokens: generationConfig?.maxOutputTokens ?? 8192,
 	};
 	if (generationConfig?.responseMimeType) {
-		config.response_mime_type = generationConfig.responseMimeType;
+		config.responseMimeType = generationConfig.responseMimeType;
 	}
 
 	const body: Record<string, unknown> = {
