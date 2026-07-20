@@ -1,3 +1,7 @@
+import {
+	RETURN_VOUCHER_REPLY_TEXT,
+	returnVoucherReplyKeyboard,
+} from "../inboundReplies";
 import { helpMenuKeyboard } from "../keyboards";
 import { on } from "../router";
 
@@ -16,7 +20,8 @@ on("faq", async (c, event, bot) => {
 		case "return_cancel": {
 			await bot.sendMessage(
 				c.chatId,
-				"Voucher return/cancel is currently <b>not supported</b>.",
+				RETURN_VOUCHER_REPLY_TEXT,
+				returnVoucherReplyKeyboard(),
 			);
 			break;
 		}

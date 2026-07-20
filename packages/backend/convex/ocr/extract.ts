@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import dayjs from "dayjs";
 import { internalAction } from "../_generated/server";
+import { callGeminiApi } from "../lib/gemini";
 
 type ExtractedData = {
 	type: number;
@@ -181,7 +182,15 @@ async function callApiForExtraction(
 	}
 
 	try {
-		return await callGeminiApi(imageBase64, prompt, geminiApiKey, geminiModel);
+		return await callGeminiApi(
+			[
+				{ text: prompt },
+				{ inlineData: { mimeType: "image/jpeg", data: imageBase64 } },
+			],
+			geminiApiKey,
+			geminiModel,
+			{ temperature: 0, maxOutputTokens: 8192 },
+		);
 	} catch (geminiError) {
 		console.warn("Gemini extraction failed, trying OpenRouter:", geminiError);
 		const openRouterApiKey = process.env.OPENROUTER_API_KEY;
@@ -214,7 +223,12 @@ async function extractVoucherData(
 				result = await callApiForExtraction(imageBase64, prompt, useOpenRouter);
 			} else {
 				// Retry with Gemini 3.1 Flash (more capable model) for a second attempt
-				result = await callApiForExtraction(imageBase64, prompt, false, "gemini-3.1-flash");
+				result = await callApiForExtraction(
+					imageBase64,
+					prompt,
+					false,
+					"gemini-3.1-flash",
+				);
 			}
 		} catch (apiError) {
 			if (attempt < 1) {
@@ -265,10 +279,7 @@ async function extractVoucherData(
 				rawResponse: result.raw,
 			};
 		} catch (parseError) {
-			console.error(
-				`JSON parse failed (attempt ${attempt + 1}):`,
-				parseError,
-			);
+			console.error(`JSON parse failed (attempt ${attempt + 1}):`, parseError);
 			console.error("Raw AI text:", result.text);
 			if (attempt < 1) {
 				console.warn("Retrying with Gemini 2.5 Flash...");
@@ -339,55 +350,6 @@ If any date field is unknown: null.
 If the voucher only has "valid until" with no start date: set validFromDay and validFromMonth to null.`;
 }
 
-async function callGeminiApi(
-	imageBase64: string,
-	prompt: string,
-	apiKey: string,
-	modelName = "gemini-3.1-flash-lite",
-): Promise<{ text: string; raw: string }> {
-	const response = await fetch(
-		`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
-		{
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({
-				contents: [
-					{
-						parts: [
-							{ text: prompt },
-							{
-								inlineData: {
-									mimeType: "image/jpeg",
-									data: imageBase64,
-								},
-							},
-						],
-					},
-				],
-				generationConfig: {
-					temperature: 0.0,
-					maxOutputTokens: 8192,
-				},
-			}),
-		},
-	);
-
-	if (!response.ok) {
-		const error = await response.text();
-		throw new Error(`Gemini API error: ${error}`);
-	}
-
-	const result = await response.json();
-	const rawResponse = JSON.stringify(result);
-
-	const textContent = result.candidates?.[0]?.content?.parts?.[0]?.text;
-	if (!textContent) {
-		throw new Error("No text in Gemini response");
-	}
-
-	return { text: textContent, raw: rawResponse };
-}
-
 async function callOpenRouterApi(
 	imageBase64: string,
 	prompt: string,
@@ -430,7 +392,9 @@ async function callOpenRouterApi(
 		throw new Error(`OpenRouter API error: ${error}`);
 	}
 
-	const result = await response.json();
+	const result = (await response.json()) as {
+		choices?: Array<{ message?: { content?: string } }>;
+	};
 	const rawResponse = JSON.stringify(result);
 	console.log("OpenRouter response:", rawResponse);
 

@@ -10,9 +10,7 @@ import {
 export type InboundMessage = Doc<"messages">;
 
 export function isInboundUserMessage(message: InboundMessage): boolean {
-	return (
-		message.direction === "inbound" && message.isAdminMessage !== true
-	);
+	return message.direction === "inbound" && message.isAdminMessage !== true;
 }
 
 export function filterBySince<T extends { createdAt: number }>(
@@ -66,6 +64,8 @@ export async function enrichUnknownMessages(
 				text: message.text ?? "",
 				telegramChatId: message.telegramChatId,
 				createdAt: message.createdAt,
+				classifiedIntent: message.classifiedIntent,
+				classifiedConfidence: message.classifiedConfidence,
 				user: user
 					? {
 							id: user._id,

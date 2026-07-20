@@ -52,6 +52,17 @@ const TRANSACTION_LABELS: Record<string, string> = {
 	claim_returned: "Admin claim returned",
 };
 
+const CLASSIFIED_INTENT_LABELS: Record<string, string> = {
+	return_voucher: "Return voucher",
+	revoke_upload: "Revoke upload",
+	report_not_working: "Report not working",
+	how_does_it_work: "How does it work?",
+	balance: "Balance",
+	limits_question: "Limits question",
+	praise_or_noise: "Praise / noise",
+	unknown: "Unknown",
+};
+
 export const Route = createFileRoute("/admin/analytics")({
 	component: AnalyticsPage,
 });
@@ -60,8 +71,7 @@ function AnalyticsPage() {
 	const { token } = useAdminAuth();
 	const [sinceDays, setSinceDays] = useState<"all" | "30">("30");
 	const since = useMemo(
-		() =>
-			sinceDays === "30" ? Date.now() - 30 * MS_PER_DAY : undefined,
+		() => (sinceDays === "30" ? Date.now() - 30 * MS_PER_DAY : undefined),
 		[sinceDays],
 	);
 
@@ -79,20 +89,15 @@ function AnalyticsPage() {
 		),
 	);
 
-	const { data: transactionData, isLoading: transactionLoading } =
-		useQuery(
-			convexQuery(
-				api.admin.analytics.getTransactionTotalsByType,
-				token ? { token, since } : "skip",
-			),
-		);
+	const { data: transactionData, isLoading: transactionLoading } = useQuery(
+		convexQuery(
+			api.admin.analytics.getTransactionTotalsByType,
+			token ? { token, since } : "skip",
+		),
+	);
 
 	if (isLoading) {
-		return (
-			<div className="text-muted-foreground">
-				Loading analytics...
-			</div>
-		);
+		return <div className="text-muted-foreground">Loading analytics...</div>;
 	}
 
 	if (error) {
@@ -104,10 +109,7 @@ function AnalyticsPage() {
 		);
 	}
 
-	const dashboardCounts = (data?.dashboardCounts ?? {}) as Record<
-		string,
-		number
-	>;
+	const dashboardCounts: Record<string, number> = data?.dashboardCounts ?? {};
 	const unknownMessages = data?.unknownMessages ?? [];
 
 	return (
@@ -122,9 +124,7 @@ function AnalyticsPage() {
 				</div>
 				<select
 					value={sinceDays}
-					onChange={(e) =>
-						setSinceDays(e.target.value as "all" | "30")
-					}
+					onChange={(e) => setSinceDays(e.target.value as "all" | "30")}
 					className="rounded-md border border-input bg-background px-3 py-1.5 text-foreground text-sm"
 				>
 					<option value="30">Last 30 days</option>
@@ -135,27 +135,20 @@ function AnalyticsPage() {
 			<section className="mb-8 rounded-lg border p-4">
 				<h2 className="mb-4 font-medium">Transaction totals by type</h2>
 				{transactionLoading ? (
-					<div className="text-muted-foreground text-sm">
-						Loading...
-					</div>
+					<div className="text-muted-foreground text-sm">Loading...</div>
 				) : (
 					<>
 						<div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-							{Object.entries(
-								transactionData?.totals ?? {},
-							).map(([type, count]) => (
-								<div
-									key={type}
-									className="rounded-md border p-3"
-								>
+						{Object.entries(transactionData?.totals ?? {}).map(
+							([type, count]: [string, number]) => (
+								<div key={type} className="rounded-md border p-3">
 									<div className="mb-1 text-muted-foreground text-xs">
 										{TRANSACTION_LABELS[type] ?? type}
 									</div>
-									<div className="font-semibold text-2xl">
-										{count}
-									</div>
+									<div className="font-semibold text-2xl">{count}</div>
 								</div>
-							))}
+							),
+						)}
 						</div>
 						{transactionData && (
 							<div className="mt-3 text-muted-foreground text-xs">
@@ -169,14 +162,14 @@ function AnalyticsPage() {
 			<section className="mb-8 rounded-lg border p-4">
 				<h2 className="mb-4 font-medium">Known commands</h2>
 				<div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-					{Object.entries(dashboardCounts).map(([intent, count]) => (
-						<div key={intent} className="rounded-md border p-3">
-							<div className="mb-1 text-muted-foreground text-xs">
-								{INTENT_LABELS[intent] ?? intent}
-							</div>
-							<div className="font-semibold text-2xl">{count}</div>
+				{Object.entries(dashboardCounts).map(([intent, count]: [string, number]) => (
+					<div key={intent} className="rounded-md border p-3">
+						<div className="mb-1 text-muted-foreground text-xs">
+							{INTENT_LABELS[intent] ?? intent}
 						</div>
-					))}
+						<div className="font-semibold text-2xl">{count}</div>
+					</div>
+				))}
 				</div>
 				<div className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-3 dark:border-amber-900 dark:bg-amber-950/30">
 					<div className="text-muted-foreground text-xs">
@@ -191,26 +184,19 @@ function AnalyticsPage() {
 			<section className="mb-8 rounded-lg border p-4">
 				<h2 className="mb-4 font-medium">App events</h2>
 				{analyticsLoading ? (
-					<div className="text-muted-foreground text-sm">
-						Loading...
-					</div>
+					<div className="text-muted-foreground text-sm">Loading...</div>
 				) : (
 					<div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-						{Object.entries(
-							analyticsData?.counts ?? {},
-						).map(([action, count]) => (
-							<div
-								key={action}
-								className="rounded-md border p-3"
-							>
+					{Object.entries(analyticsData?.counts ?? {}).map(
+						([action, count]: [string, number]) => (
+							<div key={action} className="rounded-md border p-3">
 								<div className="mb-1 text-muted-foreground text-xs">
 									{ANALYTICS_LABELS[action] ?? action}
 								</div>
-								<div className="font-semibold text-2xl">
-									{count as number}
-								</div>
+								<div className="font-semibold text-2xl">{count}</div>
 							</div>
-						))}
+						),
+					)}
 					</div>
 				)}
 				{analyticsData && (
@@ -231,10 +217,7 @@ function AnalyticsPage() {
 				) : (
 					<div className="space-y-4">
 						{unknownMessages.map((item) => (
-							<div
-								key={item._id}
-								className="rounded-lg border p-4"
-							>
+							<div key={item._id} className="rounded-lg border p-4">
 								<div className="mb-2 flex items-start justify-between gap-4">
 									<div>
 										{item.user?.id ? (
@@ -250,19 +233,28 @@ function AnalyticsPage() {
 													"Unknown user"}
 											</Link>
 										) : (
-											<span className="font-medium">
-												Unknown user
-											</span>
+											<span className="font-medium">Unknown user</span>
 										)}
 										<div className="text-muted-foreground text-xs">
-											{item.telegramChatId} •{" "}
-											{formatDateTime(item.createdAt)}
+											{item.telegramChatId} • {formatDateTime(item.createdAt)}
 										</div>
+										{item.classifiedIntent && (
+											<div className="mt-1 text-xs">
+												<span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-slate-700">
+													{CLASSIFIED_INTENT_LABELS[item.classifiedIntent] ??
+														item.classifiedIntent}
+													{item.classifiedConfidence !== undefined &&
+														item.classifiedConfidence !== null && (
+															<span className="ml-1 text-slate-500">
+																{Math.round(item.classifiedConfidence * 100)}%
+															</span>
+														)}
+												</span>
+											</div>
+										)}
 									</div>
 								</div>
-								<p className="whitespace-pre-wrap">
-									{item.text || "(empty)"}
-								</p>
+								<p className="whitespace-pre-wrap">{item.text || "(empty)"}</p>
 							</div>
 						))}
 					</div>

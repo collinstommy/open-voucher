@@ -1,4 +1,7 @@
-# Message Intent Analysis
+---
+name: message-intent-analysis
+description: Pull unknown inbound Telegram messages from production, clean out junk/noise, and analyze the remaining messages to identify feature requests, bugs, and UX issues.
+---
 
 ## Purpose
 Pull unknown inbound Telegram messages from production, clean out junk/noise, and analyze the remaining messages to identify feature requests, bugs, and UX issues.
@@ -23,7 +26,7 @@ The output is a JSON object with a `messages` array. Each message has `_id`, `cr
 Run the cleaning script with filter rules:
 
 ```bash
-python3 .agents/skills/scripts/clean_messages.py .note/unknown_messages_raw.json .note/unknown_messages_cleaned.json
+python3 .agents/skills/message-intent-analysis/scripts/clean_messages.py .note/unknown_messages_raw.json .note/unknown_messages_cleaned.json
 ```
 
 The cleaning script removes:
@@ -38,12 +41,12 @@ The cleaning script removes:
 ### 3. Print Summary Stats
 
 ```bash
-python3 .agents/skills/scripts/summarize_messages.py .note/unknown_messages_cleaned.json
+python3 .agents/skills/message-intent-analysis/scripts/summarize_messages.py .note/unknown_messages_cleaned.json
 ```
 
 To print all message texts for LLM analysis:
 ```bash
-python3 .agents/skills/scripts/summarize_messages.py .note/unknown_messages_cleaned.json --all
+python3 .agents/skills/message-intent-analysis/scripts/summarize_messages.py .note/unknown_messages_cleaned.json --all
 ```
 
 ### 4. Analyze with LLM
@@ -63,7 +66,7 @@ The LLM can also create its own analysis scripts if it finds patterns it wants t
 
 ## Adding New Clean Patterns
 
-Edit `scripts/clean_messages.py` and add to the appropriate set:
+Edit `scripts/clean_messages.py` (in this skill's directory) and add to the appropriate set:
 - `INVITE_CODE_PATTERNS` — regex patterns (case-insensitive)
 - `SHORT_NOISE` — exact lowercase matches for short junk messages
 - `EXTRA_JUNK` — exact lowercase matches for longer junk messages

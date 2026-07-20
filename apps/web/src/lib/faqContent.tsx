@@ -1,16 +1,19 @@
 import type { ReactNode } from "react";
 
 export type FaqItem = {
+	id: string;
 	q: string;
 	a: ReactNode;
 };
 
 const UPLOAD_CLAIM_FAQ: FaqItem[] = [
 	{
+		id: "how-to-upload",
 		q: "How do I upload a voucher?",
 		a: "Send a screenshot of your voucher to the bot in Telegram. Make sure the barcode is clearly visible. Paper vouchers and app screenshots are accepted.",
 	},
 	{
+		id: "how-to-claim",
 		q: "How do I claim a voucher?",
 		a: "In the bot chat, send 5, 10, or 20 depending on the voucher value you want (€5, €10, or €20 off). The bot will send you a voucher from the pool if you have enough coins.",
 	},
@@ -18,6 +21,7 @@ const UPLOAD_CLAIM_FAQ: FaqItem[] = [
 
 export const LANDING_FAQ_ITEMS: FaqItem[] = [
 	{
+		id: "why-smaller-vouchers-worth-more",
 		q: "Why are smaller vouchers worth more?",
 		a: (
 			<>
@@ -42,34 +46,58 @@ export const LANDING_FAQ_ITEMS: FaqItem[] = [
 		),
 	},
 	{
+		id: "is-this-really-free",
 		q: "Is this really free?",
 		a: "Yes. The project is open-source and community-run. We have no intention of charging fees.",
 	},
 	{
+		id: "can-i-use-online-or-app-vouchers",
 		q: "Can I use online or app vouchers?",
 		a: "Yes! You can upload screenshots of vouchers from the Dunnes Stores app or from your email. They work exactly the same as paper vouchers.",
 	},
 	{
+		id: "what-if-voucher-already-used",
 		q: "What if the voucher I receive has already been used?",
 		a: 'You can mark it as "already used" in the bot. Users who upload multiple used vouchers will be banned from the system. When you report a voucher as used, you will get a replacement voucher when available.',
 	},
 	{
+		id: "how-do-i-know-pool-availability",
 		q: "How do I know if there are enough vouchers in the pool?",
 		a: "Check voucher availability in the Mini App before claiming. The pool typically has plenty of €5 and €10 vouchers available.",
 	},
 	{
+		id: "can-i-upload-vouchers-expiring-today",
 		q: "Can I upload vouchers that expire today?",
 		a: "Yes, but uploads after 9pm for same-day expiring vouchers won't earn coins. This ensures vouchers have enough time to be used before shops close.",
 	},
 	{
-		q: "Is there a limit on how many vouchers I can swap?",
-		a: "No limits! You can swap as many vouchers as you need, completely free.",
+		id: "are-there-any-limits",
+		q: "Are there any limits?",
+		a: (
+			<>
+				<p className="mb-2">
+					The app is completely free and there&apos;s no monthly cap. You can swap as
+					many vouchers as you need. A few short daily limits exist only to
+					prevent abuse and keep the pool fair for everyone:
+				</p>
+				<ul className="list-disc list-inside space-y-1">
+					<li>10 voucher uploads per 24 hours</li>
+					<li>5 voucher claims per 24 hours</li>
+					<li>2 reports per day</li>
+					<li>
+						Vouchers expiring today can&apos;t be returned after 9 PM Irish time
+					</li>
+				</ul>
+			</>
+		),
 	},
 	{
+		id: "what-if-accidentally-use-uploaded-voucher",
 		q: "What happens if I upload a voucher and accidentally use it?",
-		a: 'The claimer can mark the voucher as "already used" in the bot. You will get a message to confirm it\'s already been used.',
+		a: 'The claimer can mark the voucher as "already used" in the bot. You will get a message to confirm it&apos;s already been used.',
 	},
 	{
+		id: "is-this-a-cryptocurrency",
 		q: "Is this a cryptocurrency? Can I buy coins?",
 		a: 'No. "Coins" are simply community points used to ensure the system is fair. They have no monetary value and cannot be bought or sold. The only way to earn coins is by helping others (uploading vouchers).',
 	},

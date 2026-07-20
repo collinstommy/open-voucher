@@ -13,9 +13,9 @@ describe("classifyInboundMessage", () => {
 			classifyInboundMessage({
 				text: "anything here",
 				messageType: "text",
-				userState: "waiting_for_feedback_message",
+				userState: "waiting_for_ban_appeal",
 			}),
-		).toBe("state_feedback");
+		).toBe("state_ban_appeal");
 	});
 
 	test("classifies standard commands", () => {
@@ -61,5 +61,29 @@ describe("classifyInboundMessage", () => {
 				messageType: "text",
 			}),
 		).toBe("unknown");
+	});
+
+	test("does not classify known commands as unknown", () => {
+		const knownCommands = [
+			{ text: "help", expected: "help" },
+			{ text: "/help", expected: "help" },
+			{ text: "balance", expected: "balance" },
+			{ text: "/balance", expected: "balance" },
+			{ text: "start", expected: "start" },
+			{ text: "faq", expected: "faq" },
+			{ text: "donate", expected: "donate" },
+			{ text: "app", expected: "app" },
+			{ text: "share", expected: "share" },
+			{ text: "feedback", expected: "feedback" },
+			{ text: "5", expected: "claim_5" },
+			{ text: "10", expected: "claim_10" },
+			{ text: "20", expected: "claim_20" },
+		];
+
+		for (const { text, expected } of knownCommands) {
+			const result = classifyInboundMessage({ text, messageType: "text" });
+			expect(result).toBe(expected);
+			expect(result).not.toBe("unknown");
+		}
 	});
 });

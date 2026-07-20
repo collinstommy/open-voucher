@@ -1,4 +1,7 @@
-# Voucher Failure Rate Analysis
+---
+name: voucher-failure-analysis
+description: Analyze failedUploads production data from Convex to measure the impact of OCR/pipeline changes on upload failure rates.
+---
 
 ## Purpose
 Analyze `failedUploads` production data from Convex to measure the impact of OCR/pipeline changes on upload failure rates.

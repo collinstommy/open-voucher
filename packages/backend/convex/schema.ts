@@ -49,10 +49,13 @@ export default defineSchema({
 		isAdminMessage: v.optional(v.boolean()),
 		// Stored as string; validated on write via messageIntentValidator in mutations.
 		intent: v.optional(v.string()),
+		classifiedIntent: v.optional(v.string()),
+		classifiedConfidence: v.optional(v.number()),
 		createdAt: v.number(),
 	})
 		.index("by_admin_message", ["isAdminMessage", "telegramChatId"])
-		.index("by_direction", ["direction"]),
+		.index("by_direction", ["direction"])
+		.index("by_classified_intent", ["classifiedIntent"]),
 
 	vouchers: defineTable({
 		type: v.union(
@@ -140,7 +143,7 @@ export default defineSchema({
 	})
 		.index("by_userId", ["userId"])
 		.index("by_image_storage", ["imageStorageId"]),
-  feedback: defineTable({
+	feedback: defineTable({
 		userId: v.id("users"),
 		text: v.string(),
 		createdAt: v.number(),
@@ -161,11 +164,11 @@ export default defineSchema({
 		value: v.string(),
 	}).index("by_key", ["key"]),
 
-  adminSessions: defineTable({
-    token: v.string(),
-    createdAt: v.number(),
-    expiresAt: v.number(),
-  }).index("by_token", ["token"]),
+	adminSessions: defineTable({
+		token: v.string(),
+		createdAt: v.number(),
+		expiresAt: v.number(),
+	}).index("by_token", ["token"]),
 
 	errors: defineTable({
 		errorType: v.string(),
