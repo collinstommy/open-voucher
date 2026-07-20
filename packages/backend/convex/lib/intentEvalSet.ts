@@ -1,4 +1,4 @@
-import type { InboundClassification } from "./messageIntent";
+import type { InboundClassification } from "./intentClassifier";
 
 export type IntentEvalCase = {
 	text: string;

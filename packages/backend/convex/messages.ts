@@ -7,7 +7,7 @@ import {
 	loadInboundMessages,
 	resolveMessageIntent,
 } from "./lib/messageAnalytics";
-import { classifiedIntentValidator } from "./lib/messageIntent";
+import { classifiedIntentValidator } from "./lib/intentClassifier";
 import { internalMutation, internalQuery } from "./_generated/server";
 
 export const getMessageById = internalQuery({

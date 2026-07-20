@@ -1,11 +1,11 @@
 import { getMiniAppUrl, webAppKeyboard } from "./keyboards";
-import type { InboundClassification } from "../lib/messageIntent";
+import type { InboundClassification } from "../lib/intentClassifier";
 
 export const RETURN_VOUCHER_REPLY_TEXT =
 	"To return a voucher you didn't use, open <b>My Claims</b>.";
 
 export const REPORT_NOT_WORKING_REPLY_TEXT =
-	"Find the voucher in your chat history and tap <b>Report</b> for a replacement.";
+	"Find the voucher in your chat history and tap <b>Its not working</b> for a replacement.";
 
 export type WebAppReply = {
 	kind: "web_app";

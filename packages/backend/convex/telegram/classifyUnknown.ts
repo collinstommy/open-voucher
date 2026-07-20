@@ -3,7 +3,10 @@ import { internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import type { ActionCtx } from "../_generated/server";
 import { internalAction } from "../_generated/server";
-import { isClassifiedIntent, type InboundClassification } from "../lib/messageIntent";
+import {
+	isInboundClassification,
+	type InboundClassification,
+} from "../lib/intentClassifier";
 import { classifyMessageText } from "../lib/intentClassifier";
 import { replyForClassification } from "./inboundReplies";
 
@@ -17,7 +20,7 @@ async function sendClassifiedReplyForMessage(
 	if (!message || message.direction !== "inbound") return;
 
 	const classifiedIntent = message.classifiedIntent;
-	if (!classifiedIntent || !isClassifiedIntent(classifiedIntent)) return;
+	if (!classifiedIntent || !isInboundClassification(classifiedIntent)) return;
 
 	const user = await ctx.runQuery(internal.users.getUserByTelegramChatId, {
 		telegramChatId: message.telegramChatId,
@@ -69,7 +72,7 @@ export const classifyUnknownMessage = internalAction({
 		if (!message || message.direction !== "inbound") return;
 
 		const existingIntent = message.classifiedIntent;
-		if (existingIntent && isClassifiedIntent(existingIntent)) {
+		if (existingIntent && isInboundClassification(existingIntent)) {
 			if (
 				existingIntent === "balance" ||
 				replyForClassification(existingIntent)

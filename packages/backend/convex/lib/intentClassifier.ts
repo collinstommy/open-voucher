@@ -1,8 +1,45 @@
+import { v } from "convex/values";
 import { callGeminiApi } from "./gemini";
-import {
-	isClassifiedIntent,
-	type InboundClassification,
-} from "./messageIntent";
+
+/** LLM classification labels for unknown free-text inbound messages. */
+export const INBOUND_CLASSIFICATIONS = [
+	"return_voucher",
+	"revoke_upload",
+	"report_not_working",
+	"how_does_it_work",
+	"balance",
+	"limits_question",
+	"praise_or_noise",
+	"unknown",
+] as const;
+
+export type InboundClassification = (typeof INBOUND_CLASSIFICATIONS)[number];
+
+const INBOUND_CLASSIFICATION_SET = new Set<string>(INBOUND_CLASSIFICATIONS);
+
+export const classifiedIntentValidator = v.union(
+	...INBOUND_CLASSIFICATIONS.map((label) => v.literal(label)),
+);
+
+export function isInboundClassification(
+	value: string,
+): value is InboundClassification {
+	return INBOUND_CLASSIFICATION_SET.has(value);
+}
+
+export const INBOUND_CLASSIFICATION_LABELS: Record<
+	InboundClassification,
+	string
+> = {
+	return_voucher: "Return voucher",
+	revoke_upload: "Revoke upload",
+	report_not_working: "Report not working",
+	how_does_it_work: "How does it work?",
+	balance: "Balance",
+	limits_question: "Limits question",
+	praise_or_noise: "Praise / noise",
+	unknown: "Unknown",
+};
 
 export const CLASSIFICATION_MODEL = "gemini-3.1-flash-lite";
 export const CLASSIFICATION_CONFIDENCE_THRESHOLD = 0.6;
@@ -48,7 +85,7 @@ export function normalizeClassification(raw: ClassificationResult): {
 		return { intent: "unknown", confidence };
 	}
 
-	if (isClassifiedIntent(raw.label)) {
+	if (isInboundClassification(raw.label)) {
 		return { intent: raw.label, confidence };
 	}
 

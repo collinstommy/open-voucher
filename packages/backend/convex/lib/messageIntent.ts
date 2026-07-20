@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 
+/** Rule-based routing for inbound Telegram messages (commands, uploads, state flows). */
 export type TelegramUserState =
 	| "waiting_for_support_message"
 	| "waiting_for_ban_appeal"
@@ -158,39 +159,3 @@ export function emptyIntentCounts(): Record<MessageIntent, number> {
 		MESSAGE_INTENTS.map((intent) => [intent, 0]),
 	) as Record<MessageIntent, number>;
 }
-
-export const INBOUND_CLASSIFICATIONS = [
-	"return_voucher",
-	"revoke_upload",
-	"report_not_working",
-	"how_does_it_work",
-	"balance",
-	"limits_question",
-	"praise_or_noise",
-	"unknown",
-] as const;
-
-export const CLASSIFIED_LABELS = new Set<string>(INBOUND_CLASSIFICATIONS);
-
-export type InboundClassification = (typeof INBOUND_CLASSIFICATIONS)[number];
-
-export const classifiedIntentValidator = v.union(
-	...INBOUND_CLASSIFICATIONS.map((label) => v.literal(label)),
-);
-
-export function isClassifiedIntent(
-	value: string,
-): value is InboundClassification {
-	return CLASSIFIED_LABELS.has(value);
-}
-
-export const CLASSIFIED_INTENT_LABELS: Record<InboundClassification, string> = {
-	return_voucher: "Return voucher",
-	revoke_upload: "Revoke upload",
-	report_not_working: "Report not working",
-	how_does_it_work: "How does it work?",
-	balance: "Balance",
-	limits_question: "Limits question",
-	praise_or_noise: "Praise / noise",
-	unknown: "Unknown",
-};
