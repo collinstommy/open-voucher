@@ -1,4 +1,5 @@
 import { v } from "convex/values";
+import { lookupSessionByToken } from "../src/lib/adminAuth";
 import { mutation, query } from "./_generated/server";
 
 const SESSION_DURATION_MS = 24 * 60 * 60 * 1000;
@@ -41,10 +42,7 @@ export const logout = mutation({
 		token: v.string(),
 	},
 	handler: async (ctx, { token }) => {
-		const session = await ctx.db
-			.query("adminSessions")
-			.withIndex("by_token", (q) => q.eq("token", token))
-			.first();
+		const session = await lookupSessionByToken(ctx, token);
 
 		if (!session) {
 			return { success: true };
@@ -61,17 +59,13 @@ export const checkSession = query({
 		token: v.string(),
 	},
 	handler: async (ctx, { token }) => {
-		const session = await ctx.db
-			.query("adminSessions")
-			.withIndex("by_token", (q) => q.eq("token", token))
-			.first();
+		const session = await lookupSessionByToken(ctx, token);
 
 		if (!session) {
 			return null;
 		}
 
-		const now = Date.now();
-		if (session.expiresAt < now) {
+		if (session.expiresAt < Date.now()) {
 			return null;
 		}
 
