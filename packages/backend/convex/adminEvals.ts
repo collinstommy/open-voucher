@@ -1,8 +1,10 @@
 import { v } from "convex/values";
-import { adminAction } from "./auth";
-import { classifyMessageText } from "../lib/intentClassifier";
-import { INTENT_EVAL_SET, type IntentEvalCase } from "../lib/intentEvalSet";
-import type { InboundClassification } from "../lib/intentClassifier";
+import {
+	classifyMessageText,
+	type InboundClassification,
+} from "../src/lib/intentClassifier";
+import { INTENT_EVAL_SET, type IntentEvalCase } from "../src/lib/intentEvalSet";
+import { adminAction } from "./adminGuards";
 
 const CONCURRENCY = 10;
 

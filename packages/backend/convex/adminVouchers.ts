@@ -1,8 +1,7 @@
 import { v } from "convex/values";
-import { internal } from "../_generated/api";
-import { CLAIM_COSTS, UPLOAD_REWARDS } from "../constants";
-import { applyCoinDelta } from "../lib/coinLedger";
-import { adminMutation, adminQuery } from "./auth";
+import { CLAIM_COSTS, UPLOAD_REWARDS } from "../src/lib/constants";
+import { applyCoinDelta } from "../src/lib/coinLedger";
+import { adminMutation, adminQuery } from "./adminGuards";
 
 export const getTodaysVouchers = adminQuery({
 	args: {},
@@ -189,35 +188,5 @@ export const clearReportAndUpdateVoucher = adminMutation({
 			voucherId: report.voucherId,
 			newStatus: newVoucherStatus,
 		};
-	},
-});
-
-export const sendMessageToUser = adminMutation({
-	args: {
-		userId: v.id("users"),
-		messageText: v.string(),
-	},
-	handler: async (ctx, { userId, messageText }) => {
-		const user = await ctx.db.get(userId);
-		if (!user) {
-			throw new Error("User not found");
-		}
-
-		await ctx.db.insert("messages", {
-			telegramMessageId: 0,
-			telegramChatId: user.telegramChatId,
-			direction: "outbound",
-			messageType: "text",
-			text: messageText,
-			isAdminMessage: true,
-			createdAt: Date.now(),
-		});
-
-		await ctx.scheduler.runAfter(0, internal.telegram.sendAdminMessageAction, {
-			chatId: user.telegramChatId,
-			text: messageText,
-		});
-
-		return { success: true };
 	},
 });

@@ -4,18 +4,19 @@ import advancedFormat from "dayjs/plugin/advancedFormat";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import type { ActionCtx } from "./_generated/server";
-import { internalAction } from "./_generated/server";
-import { UPLOAD_REWARDS } from "./constants";
-import { classifyInboundMessage } from "./lib/messageIntent";
-import { realBotAdapter } from "./telegram/botAdapter";
-import { reportData, uploaderData } from "./telegram/router";
-import { helpMenuKeyboard, faqMenuKeyboard, appWebAppKeyboard, feedbackWebAppKeyboard, getMiniAppUrl, webAppKeyboard } from "./telegram/keyboards";
-import "./telegram/handlers/report";
-import "./telegram/handlers/help";
-import "./telegram/handlers/faq";
-import "./telegram/handlers/uploader";
-import { dispatch } from "./telegram/router";
-import type { CallbackContext } from "./telegram/router";
+import { action, internalAction } from "./_generated/server";
+import { assertValidSession } from "../src/lib/adminAuth";
+import { UPLOAD_REWARDS } from "../src/lib/constants";
+import { classifyInboundMessage } from "../src/lib/messageIntent";
+import { realBotAdapter } from "../src/telegram/botAdapter";
+import { reportData, uploaderData } from "../src/telegram/router";
+import { helpMenuKeyboard, faqMenuKeyboard, appWebAppKeyboard, feedbackWebAppKeyboard, getMiniAppUrl, webAppKeyboard } from "../src/telegram/keyboards";
+import "../src/telegram/handlers/report";
+import "../src/telegram/handlers/help";
+import "../src/telegram/handlers/faq";
+import "../src/telegram/handlers/uploader";
+import { dispatch } from "../src/telegram/router";
+import type { CallbackContext } from "../src/telegram/router";
 
 dayjs.extend(advancedFormat);
 
@@ -835,3 +836,172 @@ async function getTelegramFileUrl(fileId: string): Promise<string> {
 	}
 	return `https://api.telegram.org/file/bot${token}/${data.result?.file_path}`;
 }
+
+type HealthCheckResult = {
+	ocrTest: { success: boolean; message: string };
+	voucherCount: { success: boolean; count: number; message: string };
+	telegramToken: { success: boolean; message: string };
+};
+
+async function performHealthCheck(ctx: ActionCtx): Promise<HealthCheckResult> {
+	const currentYear = new Date().getFullYear();
+	const expectedExpiry = `${currentYear}-01-29`;
+
+	const { voucherCount, testImageSetting } = await ctx.runQuery(
+		internal.adminSession.getHealthCheckMetrics,
+		{},
+	);
+
+	let ocrTest: { success: boolean; message: string };
+	if (!testImageSetting) {
+		ocrTest = {
+			success: false,
+			message: "No test voucher image configured",
+		};
+	} else {
+		const ocrResult = await ctx.runAction(
+			internal.ocr.extractFromImage,
+			{ imageStorageId: testImageSetting as Id<"_storage"> },
+		);
+
+		if (ocrResult.expiryDate === expectedExpiry) {
+			ocrTest = {
+				success: true,
+				message: `Expiry date ${ocrResult.expiryDate} matches expected ${expectedExpiry}`,
+			};
+		} else {
+			ocrTest = {
+				success: false,
+				message: `Expected expiry ${expectedExpiry}, got ${ocrResult.expiryDate ?? "null"}`,
+			};
+		}
+	}
+
+	const telegramToken = process.env.TELEGRAM_BOT_TOKEN;
+	let telegramTest: { success: boolean; message: string };
+	if (!telegramToken) {
+		telegramTest = {
+			success: false,
+			message: "TELEGRAM_BOT_TOKEN not configured",
+		};
+	} else {
+		const response = await fetch(
+			`https://api.telegram.org/bot${telegramToken}/getMe`,
+		);
+		if (response.ok) {
+			telegramTest = {
+				success: true,
+				message: "Telegram token is valid",
+			};
+		} else {
+			telegramTest = {
+				success: false,
+				message: `Telegram token invalid: ${response.status} ${response.statusText}`,
+			};
+		}
+	}
+
+	return {
+		ocrTest,
+		voucherCount: {
+			success: voucherCount > 20,
+			count: voucherCount,
+			message:
+				voucherCount > 20
+					? `${voucherCount} available vouchers (threshold: 20)`
+					: `${voucherCount} available vouchers, need > 20`,
+		},
+		telegramToken: telegramTest,
+	};
+}
+
+export const runHealthCheck = action({
+	args: { token: v.string() },
+	handler: async (ctx, { token }) => {
+		const session = await ctx.runQuery(internal.adminSession.getSessionByToken, {
+			token,
+		});
+		assertValidSession(session);
+		return performHealthCheck(ctx);
+	},
+});
+
+export const runHealthCheckInternal = internalAction({
+	args: {},
+	handler: async (ctx) => performHealthCheck(ctx),
+});
+
+export const runOcrEvals = action({
+	args: {
+		token: v.string(),
+		images: v.array(
+			v.object({
+				filename: v.string(),
+				imageBase64: v.string(),
+			}),
+		),
+		useOpenRouter: v.optional(v.boolean()),
+	},
+	handler: async (
+		ctx,
+		{ token, images, useOpenRouter },
+	): Promise<{
+		overallSuccess: boolean;
+		passed: number;
+		total: number;
+		results: Array<{
+			filename: string;
+			testDate: string;
+			success: boolean;
+			expectedValidFrom: string | undefined;
+			expectedExpiry: string;
+			actualValidFrom?: string;
+			actualExpiry?: string;
+			error?: string;
+		}>;
+	}> => {
+		const session = await ctx.runQuery(internal.adminSession.getSessionByToken, {
+			token,
+		});
+		assertValidSession(session);
+		return ctx.runAction(internal.ocr.runOcrEvalsInternal, {
+			images,
+			useOpenRouter,
+		});
+	},
+});
+
+export const runSingleOcrEval = action({
+	args: {
+		token: v.string(),
+		filename: v.string(),
+		imageBase64: v.string(),
+		useOpenRouter: v.optional(v.boolean()),
+	},
+	handler: async (
+		ctx,
+		{ token, filename, imageBase64, useOpenRouter },
+	): Promise<{
+		filename: string;
+		results: Array<{
+			filename: string;
+			testDate: string;
+			success: boolean;
+			expectedValidFrom: string | undefined;
+			expectedExpiry: string;
+			actualValidFrom?: string;
+			actualExpiry?: string;
+			error?: string;
+		}>;
+	}> => {
+		const session = await ctx.runQuery(internal.adminSession.getSessionByToken, {
+			token,
+		});
+		assertValidSession(session);
+		return ctx.runAction(internal.ocr.runImageOcrEval, {
+			filename,
+			imageBase64,
+			useOpenRouter,
+		});
+	},
+});

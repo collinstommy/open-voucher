@@ -26,3 +26,33 @@ export const setSetting = internalMutation({
 		}
 	},
 });
+
+export const getHealthCheckData = internalQuery({
+	args: { token: v.string() },
+	handler: async (ctx, { token }) => {
+		const session = await ctx.db
+			.query("adminSessions")
+			.withIndex("by_token", (q) => q.eq("token", token))
+			.first();
+
+		if (!session) {
+			return { valid: false, error: "Invalid session" };
+		}
+
+		if (session.expiresAt < Date.now()) {
+			return { valid: false, error: "Session expired" };
+		}
+
+		const now = Date.now();
+		const vouchers = await ctx.db
+			.query("vouchers")
+			.withIndex("by_status_created", (q) => q.eq("status", "available"))
+			.collect();
+
+		const voucherCount = vouchers.filter(
+			(v) => (v.expiryDate as number) > now,
+		).length;
+
+		return { valid: true, voucherCount };
+	},
+});

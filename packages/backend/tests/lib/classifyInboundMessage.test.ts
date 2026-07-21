@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { classifyInboundMessage } from "./messageIntent";
+import { classifyInboundMessage } from "../../src/lib/messageIntent";
 
 describe("classifyInboundMessage", () => {
 	test("classifies image uploads", () => {

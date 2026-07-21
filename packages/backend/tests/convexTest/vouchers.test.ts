@@ -608,7 +608,7 @@ describe("OCR Flow with Mocked Gemini", () => {
 		});
 
 		// Simulate OCR completing with valid result
-		await t.mutation(internal.ocr.store.storeVoucherFromOcr, {
+		await t.mutation(internal.ocr.storeVoucherFromOcr, {
 			userId,
 			imageStorageId,
 			type: "10",
@@ -665,7 +665,7 @@ describe("OCR Flow with Mocked Gemini", () => {
 		const pastDate = new Date(
 			Date.now() - 7 * 24 * 60 * 60 * 1000,
 		).toISOString();
-		await t.mutation(internal.ocr.store.storeVoucherFromOcr, {
+		await t.mutation(internal.ocr.storeVoucherFromOcr, {
 			userId,
 			imageStorageId,
 			type: "10",

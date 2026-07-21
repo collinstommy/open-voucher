@@ -8,9 +8,10 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { api, internal } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import schema from "../../convex/schema";
-import { reportData, uploaderData } from "../../convex/telegram/router";
+import { reportData, uploaderData } from "../../src/telegram/router";
 import { modules } from "../test.setup";
 import {
+	adminLogin,
 	createUser,
 	createVoucher,
 	mockTelegramResponse,
@@ -1095,11 +1096,9 @@ describe("Review System", () => {
 			telegramChatId: "normal1",
 		});
 
-		const loginResult = await t.mutation(api.admin.auth.login, {
-			password: "test-admin-password",
-		});
+		const loginResult = await adminLogin(t);
 
-		const flagged = await t.query(api.admin.users.getFlaggedUsers, {
+		const flagged = await t.query(api.adminUsers.getFlaggedUsers, {
 			token: loginResult.token,
 		});
 
@@ -1116,11 +1115,9 @@ describe("Review System", () => {
 			flaggedForReviewAt: Date.now(),
 		});
 
-		const loginResult = await t.mutation(api.admin.auth.login, {
-			password: "test-admin-password",
-		});
+		const loginResult = await adminLogin(t);
 
-		await t.mutation(api.admin.users.banUser, {
+		await t.mutation(api.adminUsers.banUser, {
 			token: loginResult.token,
 			userId,
 		});
@@ -1144,11 +1141,9 @@ describe("Review System", () => {
 			flaggedForReviewAt: Date.now(),
 		});
 
-		const loginResult = await t.mutation(api.admin.auth.login, {
-			password: "test-admin-password",
-		});
+		const loginResult = await adminLogin(t);
 
-		await t.mutation(api.admin.users.unbanUser, {
+		await t.mutation(api.adminUsers.unbanUser, {
 			token: loginResult.token,
 			userId,
 		});
@@ -1170,11 +1165,9 @@ describe("Review System", () => {
 			flaggedForReviewAt: Date.now(),
 		});
 
-		const loginResult = await t.mutation(api.admin.auth.login, {
-			password: "test-admin-password",
-		});
+		const loginResult = await adminLogin(t);
 
-		await t.mutation(api.admin.users.dismissFlag, {
+		await t.mutation(api.adminUsers.dismissFlag, {
 			token: loginResult.token,
 			userId,
 		});

@@ -1,6 +1,6 @@
 import { v } from "convex/values";
-import type { Id } from "../_generated/dataModel";
-import { adminMutation, adminQuery } from "./auth";
+import type { Id } from "./_generated/dataModel";
+import { adminMutation, adminQuery } from "./adminGuards";
 
 export const getAllFeedback = adminQuery({
 	args: {},

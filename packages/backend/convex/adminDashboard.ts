@@ -1,5 +1,7 @@
-import { internalQuery } from "../_generated/server";
-import { adminQuery } from "./auth";
+import { v } from "convex/values";
+import { runCleanup } from "../src/lib/voucherImageCleanup";
+import { adminMutation, adminQuery } from "./adminGuards";
+import { internalQuery } from "./_generated/server";
 
 export const getStats = adminQuery({
 	args: {},
@@ -208,5 +210,15 @@ export const getWeeklyVouchers = adminQuery({
 		return Object.values(dailyData).sort(
 			(a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
 		);
+	},
+});
+
+export const cleanupExpiredVoucherImages = adminMutation({
+	args: {
+		token: v.string(),
+		dryRun: v.optional(v.boolean()),
+	},
+	handler: async (ctx, { dryRun }) => {
+		return runCleanup(ctx, dryRun !== false);
 	},
 });

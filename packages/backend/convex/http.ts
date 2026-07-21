@@ -1,8 +1,8 @@
 import { httpRouter } from "convex/server";
 import { httpAction, type ActionCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
-import { verifyTelegramInitData } from "./lib/telegramAuth";
-import { issueJwt } from "./lib/jwt";
+import { verifyTelegramInitData } from "../src/lib/telegramAuth";
+import { issueJwt } from "../src/lib/jwt";
 
 const http = httpRouter();
 

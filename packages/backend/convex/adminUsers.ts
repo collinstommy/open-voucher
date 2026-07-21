@@ -1,6 +1,6 @@
 import { v } from "convex/values";
-import { internalMutation, internalQuery } from "../_generated/server";
-import { adminMutation, adminQuery } from "./auth";
+import { adminMutation, adminQuery } from "./adminGuards";
+import { internalMutation, internalQuery } from "./_generated/server";
 
 export const getAllUsers = adminQuery({
 	args: {},

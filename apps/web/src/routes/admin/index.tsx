@@ -33,24 +33,24 @@ function HomeComponent() {
 	const [dryRun, setDryRun] = useState(true);
 	const [cleanupResult, setCleanupResult] = useState<any>(null);
 	const stats = useQuery(
-		convexQuery(api.admin.dashboard.getStats, token ? { token } : "skip"),
+		convexQuery(api.adminDashboard.getStats, token ? { token } : "skip"),
 	);
 	const userGrowth = useQuery(
-		convexQuery(api.admin.analytics.getUserGrowth, token ? { token, range } : "skip"),
+		convexQuery(api.adminAnalytics.getUserGrowth, token ? { token, range } : "skip"),
 	);
 	const weeklyVouchers = useQuery(
-		convexQuery(api.admin.dashboard.getWeeklyVouchers, token ? { token } : "skip"),
+		convexQuery(api.adminDashboard.getWeeklyVouchers, token ? { token } : "skip"),
 	);
 	const weeklyFailures = useQuery(
 		convexQuery(
-			api.admin.dashboard.getWeeklyFailureStats,
+			api.adminDashboard.getWeeklyFailureStats,
 			token ? { token } : "skip",
 		),
 	);
 
 	const cleanupMutation = useMutation({
 		mutationFn: () =>
-			convex.action(api.admin.imageCleanup.cleanupExpiredVoucherImages, {
+			convex.mutation(api.adminDashboard.cleanupExpiredVoucherImages, {
 				token: token!,
 				dryRun,
 			}),

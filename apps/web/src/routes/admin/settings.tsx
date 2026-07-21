@@ -11,7 +11,7 @@ export const Route = createFileRoute("/admin/settings")({
 function SettingsComponent() {
 	const { token } = useAdminAuth();
 	const { data: imageUrl } = useQuery(
-		convexQuery(api.admin.feedback.getSampleVoucherImageUrl, token ? { token } : "skip"),
+		convexQuery(api.adminFeedback.getSampleVoucherImageUrl, token ? { token } : "skip"),
 	);
 
 	return (

@@ -6,8 +6,10 @@ import {
 	isInboundUserMessage,
 	loadInboundMessages,
 	resolveMessageIntent,
-} from "./lib/messageAnalytics";
-import { classifiedIntentValidator } from "./lib/intentClassifier";
+} from "../src/lib/messageAnalytics";
+import { classifiedIntentValidator } from "../src/lib/intentClassifier";
+import { internal } from "./_generated/api";
+import { adminMutation } from "./adminGuards";
 import { internalMutation, internalQuery } from "./_generated/server";
 
 export const getMessageById = internalQuery({
@@ -94,5 +96,36 @@ export const getAnalyticsEventCounts = internalQuery({
 	},
 	handler: async (ctx, { since }) => {
 		return await buildAnalyticsEventCounts(ctx, since);
+	},
+});
+
+export const sendMessageToUser = adminMutation({
+	args: {
+		token: v.string(),
+		userId: v.id("users"),
+		messageText: v.string(),
+	},
+	handler: async (ctx, { userId, messageText }) => {
+		const user = await ctx.db.get(userId);
+		if (!user) {
+			throw new Error("User not found");
+		}
+
+		await ctx.db.insert("messages", {
+			telegramMessageId: 0,
+			telegramChatId: user.telegramChatId,
+			direction: "outbound",
+			messageType: "text",
+			text: messageText,
+			isAdminMessage: true,
+			createdAt: Date.now(),
+		});
+
+		await ctx.scheduler.runAfter(0, internal.telegram.sendAdminMessageAction, {
+			chatId: user.telegramChatId,
+			text: messageText,
+		});
+
+		return { success: true };
 	},
 });

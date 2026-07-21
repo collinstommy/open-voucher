@@ -1,6 +1,6 @@
-import { internal } from "../../_generated/api";
-import type { Id } from "../../_generated/dataModel";
-import { UPLOAD_REWARDS } from "../../constants";
+import { internal } from "../../../convex/_generated/api";
+import type { Id } from "../../../convex/_generated/dataModel";
+import { UPLOAD_REWARDS } from "../../lib/constants";
 import { on } from "../router";
 
 on("uploader_admitted", async (c, event, bot) => {

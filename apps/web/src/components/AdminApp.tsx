@@ -1,7 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
-import { useConvex } from "convex/react";
 import { useState } from "react";
 
 interface AdminAppProps {

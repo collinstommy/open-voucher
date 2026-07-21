@@ -1,6 +1,6 @@
 import { convexTest } from "convex-test";
 import { describe, expect, test } from "vitest";
-import { api } from "../../convex/_generated/api";
+import { buildMessageAnalytics } from "../../src/lib/messageAnalytics";
 import schema from "../../convex/schema";
 import { modules } from "../test.setup";
 
@@ -38,9 +38,9 @@ describe("getMessageAnalytics", () => {
 			});
 		});
 
-		const result = await t.query(api.admin.analytics.getMessageAnalytics, {
-			token,
-		});
+		const result = await t.run(async (ctx) =>
+			buildMessageAnalytics(ctx, undefined),
+		);
 
 		expect(result.totalInbound).toBe(2);
 		expect(result.dashboardCounts.help).toBe(1);

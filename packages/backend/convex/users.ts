@@ -1,9 +1,9 @@
 import { v } from "convex/values";
 import { internalMutation, internalQuery } from "./_generated/server";
-import { SIGNUP_BONUS } from "./constants";
+import { SIGNUP_BONUS } from "../src/lib/constants";
 import { userMutation, userQuery } from "./auth";
-import { applyCoinDelta } from "./lib/coinLedger";
-import { messageIntentValidator } from "./lib/messageIntent";
+import { applyCoinDelta } from "../src/lib/coinLedger";
+import { messageIntentValidator } from "../src/lib/messageIntent";
 
 /**
  * Create a new user.

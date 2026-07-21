@@ -1,5 +1,5 @@
 import * as jose from "jose";
-import type { Id } from "../_generated/dataModel";
+import type { Id } from "../../convex/_generated/dataModel";
 
 const ISSUER = "https://www.openvouchers.org";
 const AUDIENCE = "open-voucher";

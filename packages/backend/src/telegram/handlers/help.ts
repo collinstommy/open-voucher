@@ -1,4 +1,4 @@
-import { internal } from "../../_generated/api";
+import { internal } from "../../../convex/_generated/api";
 import type { BotAdapter } from "../botAdapter";
 import { faqMenuKeyboard, appWebAppKeyboard } from "../keyboards";
 import { on } from "../router";

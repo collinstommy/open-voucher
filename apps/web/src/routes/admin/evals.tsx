@@ -231,7 +231,7 @@ function EvalsPage() {
 
 			const results = await Promise.all(
 				TEST_IMAGE_FILES.map((filename) =>
-					convex.action(api.admin.healthChecks.runSingleOcrEval, {
+					convex.action(api.telegram.runSingleOcrEval, {
 						token,
 						filename,
 						imageBase64: imagesMap.get(filename)!,
@@ -271,7 +271,7 @@ function EvalsPage() {
 		if (!token) return;
 		setIntentLoading(true);
 		try {
-			const result = await convex.action(api.admin.evals.runIntentEvals, {
+			const result = await convex.action(api.adminEvals.runIntentEvals, {
 				token,
 			});
 			setIntentResults(result);

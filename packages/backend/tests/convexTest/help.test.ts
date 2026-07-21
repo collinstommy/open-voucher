@@ -5,7 +5,7 @@ import { convexTest } from "convex-test";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { internal } from "../../convex/_generated/api";
 import schema from "../../convex/schema";
-import { helpData } from "../../convex/telegram/router";
+import { helpData } from "../../src/telegram/router";
 import { modules } from "../test.setup";
 import {
 	createTelegramCallback,

@@ -8,8 +8,8 @@ import {
 	type QueryCtx,
 } from "./_generated/server";
 import { userMutation, userQuery } from "./auth";
-import { CLAIM_COSTS, UPLOAD_REWARDS } from "./constants";
-import { applyCoinDelta } from "./lib/coinLedger";
+import { CLAIM_COSTS, UPLOAD_REWARDS } from "../src/lib/constants";
+import { applyCoinDelta } from "../src/lib/coinLedger";
 
 function getVoucherExpiryCalendarDay(expiryDate: number): string {
 	const date = new Date(expiryDate);
@@ -77,7 +77,7 @@ export const uploadVoucher = internalMutation({
 			return null;
 		}
 
-		await ctx.scheduler.runAfter(0, internal.ocr.process.processVoucherImage, {
+		await ctx.scheduler.runAfter(0, internal.ocr.processVoucherImage, {
 			userId,
 			imageStorageId,
 		});

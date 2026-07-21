@@ -7,8 +7,12 @@
 
 import { convexTest } from "convex-test";
 import { describe, expect, test } from "vitest";
-import { internal } from "../../convex/_generated/api";
 import schema from "../../convex/schema";
+import {
+	deleteVoucherImages,
+	getExpiredVouchersForCleanup,
+	markVoucherImagesForDeletion,
+} from "../../src/lib/voucherImageCleanup";
 import { modules } from "../test.setup";
 import { createUser, createVoucher } from "./fixtures/testHelpers";
 
@@ -28,9 +32,8 @@ describe("Voucher Image Cleanup", () => {
 				expiryDate: now - 91 * MS_PER_DAY,
 			});
 
-			const result = await t.query(
-				internal.admin.imageCleanup.getExpiredVouchersForCleanup,
-				{ mode: "mark" },
+			const result = await t.run(async (ctx) =>
+				getExpiredVouchersForCleanup(ctx, "mark"),
 			);
 
 			expect(result).toHaveLength(1);
@@ -49,9 +52,8 @@ describe("Voucher Image Cleanup", () => {
 				expiryDate: now - 89 * MS_PER_DAY,
 			});
 
-			const result = await t.query(
-				internal.admin.imageCleanup.getExpiredVouchersForCleanup,
-				{ mode: "mark" },
+			const result = await t.run(async (ctx) =>
+				getExpiredVouchersForCleanup(ctx, "mark"),
 			);
 
 			expect(result).toHaveLength(0);
@@ -69,9 +71,8 @@ describe("Voucher Image Cleanup", () => {
 				expiryDate: now - 90 * MS_PER_DAY + 60_000, // 1 min buffer for timing
 			});
 
-			const result = await t.query(
-				internal.admin.imageCleanup.getExpiredVouchersForCleanup,
-				{ mode: "mark" },
+			const result = await t.run(async (ctx) =>
+				getExpiredVouchersForCleanup(ctx, "mark"),
 			);
 
 			expect(result).toHaveLength(0);
@@ -89,9 +90,8 @@ describe("Voucher Image Cleanup", () => {
 				expiryDate: now - 100 * MS_PER_DAY,
 			});
 
-			const result = await t.query(
-				internal.admin.imageCleanup.getExpiredVouchersForCleanup,
-				{ mode: "mark" },
+			const result = await t.run(async (ctx) =>
+				getExpiredVouchersForCleanup(ctx, "mark"),
 			);
 
 			expect(result).toHaveLength(0);
@@ -109,9 +109,8 @@ describe("Voucher Image Cleanup", () => {
 				expiryDate: now - 100 * MS_PER_DAY,
 			});
 
-			const result = await t.query(
-				internal.admin.imageCleanup.getExpiredVouchersForCleanup,
-				{ mode: "mark" },
+			const result = await t.run(async (ctx) =>
+				getExpiredVouchersForCleanup(ctx, "mark"),
 			);
 
 			expect(result).toHaveLength(1);
@@ -130,9 +129,8 @@ describe("Voucher Image Cleanup", () => {
 				expiryDate: now - 100 * MS_PER_DAY,
 			});
 
-			const result = await t.query(
-				internal.admin.imageCleanup.getExpiredVouchersForCleanup,
-				{ mode: "mark" },
+			const result = await t.run(async (ctx) =>
+				getExpiredVouchersForCleanup(ctx, "mark"),
 			);
 
 			expect(result).toHaveLength(1);
@@ -157,9 +155,8 @@ describe("Voucher Image Cleanup", () => {
 				});
 			});
 
-			const result = await t.query(
-				internal.admin.imageCleanup.getExpiredVouchersForCleanup,
-				{ mode: "mark" },
+			const result = await t.run(async (ctx) =>
+				getExpiredVouchersForCleanup(ctx, "mark"),
 			);
 
 			expect(result).toHaveLength(0);
@@ -183,9 +180,8 @@ describe("Voucher Image Cleanup", () => {
 				});
 			});
 
-			const result = await t.query(
-				internal.admin.imageCleanup.getExpiredVouchersForCleanup,
-				{ mode: "mark" },
+			const result = await t.run(async (ctx) =>
+				getExpiredVouchersForCleanup(ctx, "mark"),
 			);
 
 			expect(result).toHaveLength(0);
@@ -205,9 +201,8 @@ describe("Voucher Image Cleanup", () => {
 				});
 			}
 
-			const result = await t.query(
-				internal.admin.imageCleanup.getExpiredVouchersForCleanup,
-				{ mode: "mark" },
+			const result = await t.run(async (ctx) =>
+				getExpiredVouchersForCleanup(ctx, "mark"),
 			);
 
 			expect(result).toHaveLength(100);
@@ -238,9 +233,8 @@ describe("Voucher Image Cleanup", () => {
 				});
 			});
 
-			const result = await t.query(
-				internal.admin.imageCleanup.getExpiredVouchersForCleanup,
-				{ mode: "delete" },
+			const result = await t.run(async (ctx) =>
+				getExpiredVouchersForCleanup(ctx, "delete"),
 			);
 
 			expect(result).toHaveLength(1);
@@ -265,9 +259,8 @@ describe("Voucher Image Cleanup", () => {
 				});
 			});
 
-			const result = await t.query(
-				internal.admin.imageCleanup.getExpiredVouchersForCleanup,
-				{ mode: "delete" },
+			const result = await t.run(async (ctx) =>
+				getExpiredVouchersForCleanup(ctx, "delete"),
 			);
 
 			expect(result).toHaveLength(0);
@@ -291,9 +284,8 @@ describe("Voucher Image Cleanup", () => {
 				});
 			});
 
-			const result = await t.query(
-				internal.admin.imageCleanup.getExpiredVouchersForCleanup,
-				{ mode: "delete" },
+			const result = await t.run(async (ctx) =>
+				getExpiredVouchersForCleanup(ctx, "delete"),
 			);
 
 			expect(result).toHaveLength(0);
@@ -318,9 +310,8 @@ describe("Voucher Image Cleanup", () => {
 				});
 			});
 
-			const result = await t.query(
-				internal.admin.imageCleanup.getExpiredVouchersForCleanup,
-				{ mode: "delete" },
+			const result = await t.run(async (ctx) =>
+				getExpiredVouchersForCleanup(ctx, "delete"),
 			);
 
 			expect(result).toHaveLength(0);
@@ -338,9 +329,8 @@ describe("Voucher Image Cleanup", () => {
 				expiryDate: now - 100 * MS_PER_DAY,
 			});
 
-			const result = await t.query(
-				internal.admin.imageCleanup.getExpiredVouchersForCleanup,
-				{ mode: "delete" },
+			const result = await t.run(async (ctx) =>
+				getExpiredVouchersForCleanup(ctx, "delete"),
 			);
 
 			expect(result).toHaveLength(0);
@@ -379,11 +369,8 @@ describe("Voucher Image Cleanup", () => {
 				});
 			});
 
-			const deleteResult = await t.mutation(
-				internal.admin.imageCleanup.deleteVoucherImages,
-				{
-					vouchers: [{ voucherId: voucherId1, imageStorageId }],
-				},
+			const deleteResult = await t.run(async (ctx) =>
+				deleteVoucherImages(ctx, [{ voucherId: voucherId1, imageStorageId }]),
 			);
 
 			expect(deleteResult.deleted).toBe(0);
@@ -427,11 +414,8 @@ describe("Voucher Image Cleanup", () => {
 				});
 			});
 
-			const deleteResult = await t.mutation(
-				internal.admin.imageCleanup.deleteVoucherImages,
-				{
-					vouchers: [{ voucherId, imageStorageId }],
-				},
+			const deleteResult = await t.run(async (ctx) =>
+				deleteVoucherImages(ctx, [{ voucherId, imageStorageId }]),
 			);
 
 			expect(deleteResult.deleted).toBe(0);
@@ -463,11 +447,8 @@ describe("Voucher Image Cleanup", () => {
 				});
 			});
 
-			const deleteResult = await t.mutation(
-				internal.admin.imageCleanup.deleteVoucherImages,
-				{
-					vouchers: [{ voucherId, imageStorageId }],
-				},
+			const deleteResult = await t.run(async (ctx) =>
+				deleteVoucherImages(ctx, [{ voucherId, imageStorageId }]),
 			);
 
 			expect(deleteResult.deleted).toBe(1);
@@ -509,11 +490,8 @@ describe("Voucher Image Cleanup", () => {
 				});
 			});
 
-			const deleteResult = await t.mutation(
-				internal.admin.imageCleanup.deleteVoucherImages,
-				{
-					vouchers: [{ voucherId, imageStorageId }],
-				},
+			const deleteResult = await t.run(async (ctx) =>
+				deleteVoucherImages(ctx, [{ voucherId, imageStorageId }]),
 			);
 
 			expect(deleteResult.deleted).toBe(1);
@@ -543,9 +521,9 @@ describe("Voucher Image Cleanup", () => {
 				expiryDate: now - 100 * MS_PER_DAY,
 			});
 
-			await t.mutation(internal.admin.imageCleanup.markVoucherImagesForDeletion, {
-				voucherIds: [id1, id2],
-			});
+			await t.run(async (ctx) =>
+				markVoucherImagesForDeletion(ctx, [id1, id2]),
+			);
 
 			const v1 = await t.run(async (ctx) => ctx.db.get(id1));
 			const v2 = await t.run(async (ctx) => ctx.db.get(id2));

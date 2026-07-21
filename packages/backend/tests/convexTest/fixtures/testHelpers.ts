@@ -228,6 +228,30 @@ export async function createVoucher(
 	});
 }
 
+export async function adminLogin(
+	t: any,
+	password = "test-admin-password",
+): Promise<{ token: string; expiresAt: number }> {
+	return t.run(async (ctx: any) => {
+		const adminPassword = process.env.ADMIN_PASSWORD;
+		if (!adminPassword || password !== adminPassword) {
+			throw new Error("Invalid password");
+		}
+
+		const token = crypto.randomUUID();
+		const now = Date.now();
+		const expiresAt = now + 24 * 60 * 60 * 1000;
+
+		await ctx.db.insert("adminSessions", {
+			token,
+			createdAt: now,
+			expiresAt,
+		});
+
+		return { token, expiresAt };
+	});
+}
+
 export type OCRScenario =
 	| "valid_10"
 	| "valid_5"

@@ -6,9 +6,9 @@ import { internalAction } from "../_generated/server";
 import {
 	isInboundClassification,
 	type InboundClassification,
-} from "../lib/intentClassifier";
-import { classifyMessageText } from "../lib/intentClassifier";
-import { replyForClassification } from "./inboundReplies";
+} from "../../src/lib/intentClassifier";
+import { classifyMessageText } from "../../src/lib/intentClassifier";
+import { replyForClassification } from "../../src/telegram/inboundReplies";
 
 async function sendClassifiedReplyForMessage(
 	ctx: ActionCtx,

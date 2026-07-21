@@ -2,8 +2,8 @@ import { v } from "convex/values";
 import {
 	buildAnalyticsEventCounts,
 	buildMessageAnalytics,
-} from "../lib/messageAnalytics";
-import { adminQuery } from "./auth";
+} from "../src/lib/messageAnalytics";
+import { adminQuery } from "./adminGuards";
 
 export const getMessageAnalytics = adminQuery({
 	args: {

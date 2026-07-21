@@ -1,6 +1,6 @@
-import type { MutationCtx } from "../_generated/server";
-import type { Id } from "../_generated/dataModel";
-import { MIN_COINS } from "../constants";
+import type { MutationCtx } from "../../convex/_generated/server";
+import type { Id } from "../../convex/_generated/dataModel";
+import { MIN_COINS } from "./constants";
 
 /**
  * Transaction types recorded in the `transactions` table.

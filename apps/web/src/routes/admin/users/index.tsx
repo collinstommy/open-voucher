@@ -31,18 +31,18 @@ function UsersPage() {
 	const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
 
 	const { data, isLoading, error } = useQuery(
-		convexQuery(api.admin.users.getUsersWithStats, token ? { token } : "skip"),
+		convexQuery(api.adminUsers.getUsersWithStats, token ? { token } : "skip"),
 	);
 
 	const banMutation = useMutation({
 		mutationFn: (userId: Id<"users">) =>
-			convex.mutation(api.admin.users.banUser, { token: token!, userId }),
+			convex.mutation(api.adminUsers.banUser, { token: token!, userId }),
 		onSuccess: () => queryClient.invalidateQueries(),
 	});
 
 	const unbanMutation = useMutation({
 		mutationFn: (userId: Id<"users">) =>
-			convex.mutation(api.admin.users.unbanUser, { token: token!, userId }),
+			convex.mutation(api.adminUsers.unbanUser, { token: token!, userId }),
 		onSuccess: () => queryClient.invalidateQueries(),
 	});
 

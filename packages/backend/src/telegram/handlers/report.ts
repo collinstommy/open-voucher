@@ -1,7 +1,7 @@
 import dayjs from "dayjs";
 import advancedFormat from "dayjs/plugin/advancedFormat";
-import { internal } from "../../_generated/api";
-import type { Id } from "../../_generated/dataModel";
+import { internal } from "../../../convex/_generated/api";
+import type { Id } from "../../../convex/_generated/dataModel";
 import type { BotAdapter } from "../botAdapter";
 import { on, reportData } from "../router";
 

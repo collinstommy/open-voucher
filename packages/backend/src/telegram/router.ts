@@ -1,4 +1,4 @@
-import type { ActionCtx } from "../_generated/server";
+import type { ActionCtx } from "../../convex/_generated/server";
 import type { BotAdapter } from "./botAdapter";
 
 export const CALLBACK_KINDS = {

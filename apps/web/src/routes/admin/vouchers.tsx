@@ -14,7 +14,7 @@ function VouchersPage() {
 	const { token } = useAdminAuth();
 
 	const { results, status, loadMore } = usePaginatedQuery(
-		api.admin.vouchers.getAllVouchers,
+		api.adminVouchers.getAllVouchers,
 		token ? { token } : "skip",
 		{ initialNumItems: 50 },
 	);
