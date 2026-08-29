@@ -48,6 +48,9 @@ const DEDUCTION_TYPE_LABELS: Record<DeductionType, string> = {
 	admin_report_deduction: "Reports",
 };
 
+const UPLOAD_WARNING_MESSAGE =
+	"Warning: Vouchers you uploaded have been reported as not working by several other community members. Please only upload unused, valid vouchers. Continued reports may result in a coin deduction or a permanent ban.";
+
 type ReportActivity = {
 	_id: string;
 	createdAt: number;
@@ -225,6 +228,17 @@ function UserDetailPage() {
 		},
 	});
 
+	const handleSendWarning = () => {
+		if (!user || !token) return;
+
+		const confirmed = window.confirm(
+			`Send this warning to ${user.username || user.firstName || user.telegramChatId}?\n\n${UPLOAD_WARNING_MESSAGE}`,
+		);
+		if (confirmed) {
+			sendMessageMutation.mutate(UPLOAD_WARNING_MESSAGE);
+		}
+	};
+
 	const clearReportMutation = useMutation({
 		mutationFn: ({
 			reportId,
@@ -336,6 +350,15 @@ function UserDetailPage() {
 						</p>
 					</div>
 					<div className="flex gap-2">
+						{!user.isBanned && (
+							<Button
+								variant="outline"
+								onClick={handleSendWarning}
+								disabled={sendMessageMutation.isPending}
+							>
+								{sendMessageMutation.isPending ? "Sending..." : "Send warning"}
+							</Button>
+						)}
 						{user.flaggedForReviewAt && !user.isBanned && (
 							<Button
 								variant="outline"
