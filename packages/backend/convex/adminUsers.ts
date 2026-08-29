@@ -65,19 +65,33 @@ export const getFlaggedUsers = adminQuery({
 			)
 			.collect();
 
-		return users
-			.sort((a, b) => (b.flaggedForReviewAt || 0) - (a.flaggedForReviewAt || 0))
-			.map((user) => ({
-				_id: user._id,
-				telegramChatId: user.telegramChatId,
-				username: user.username,
-				firstName: user.firstName,
-				flaggedForReviewAt: user.flaggedForReviewAt,
-				uploadCount: user.uploadCount || 0,
-				claimCount: user.claimCount || 0,
-				uploadReportCount: user.uploadReportCount || 0,
-				claimReportCount: user.claimReportCount || 0,
-			}));
+		return await Promise.all(
+			users
+				.sort(
+					(a, b) => (b.flaggedForReviewAt || 0) - (a.flaggedForReviewAt || 0),
+				)
+				.map(async (user) => ({
+					_id: user._id,
+					telegramChatId: user.telegramChatId,
+					username: user.username,
+					firstName: user.firstName,
+					flaggedForReviewAt: user.flaggedForReviewAt,
+					uploadCount: user.uploadCount || 0,
+					claimCount: user.claimCount || 0,
+					uploadReportCount: user.uploadReportCount || 0,
+					claimReportCount: user.claimReportCount || 0,
+					adminMessageCount: (
+						await ctx.db
+							.query("messages")
+							.withIndex("by_admin_message", (q) =>
+								q
+									.eq("isAdminMessage", true)
+									.eq("telegramChatId", user.telegramChatId),
+							)
+							.collect()
+					).length,
+				})),
+		);
 	},
 });
 
@@ -130,15 +144,27 @@ export const getBannedUsers = adminQuery({
 			.filter((q) => q.eq(q.field("isBanned"), true))
 			.collect();
 
-		return bannedUsers
-			.sort((a, b) => (b.bannedAt || 0) - (a.bannedAt || 0))
-			.map((user) => ({
-				_id: user._id,
-				telegramChatId: user.telegramChatId,
-				username: user.username,
-				firstName: user.firstName,
-				bannedAt: user.bannedAt,
-			}));
+		return await Promise.all(
+			bannedUsers
+				.sort((a, b) => (b.bannedAt || 0) - (a.bannedAt || 0))
+				.map(async (user) => ({
+					_id: user._id,
+					telegramChatId: user.telegramChatId,
+					username: user.username,
+					firstName: user.firstName,
+					bannedAt: user.bannedAt,
+					adminMessageCount: (
+						await ctx.db
+							.query("messages")
+							.withIndex("by_admin_message", (q) =>
+								q
+									.eq("isAdminMessage", true)
+									.eq("telegramChatId", user.telegramChatId),
+							)
+							.collect()
+					).length,
+				})),
+		);
 	},
 });
 
