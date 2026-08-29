@@ -1253,3 +1253,278 @@ describe("Review System", () => {
 		expect(uploader?.isBanned).toBe(false);
 	});
 });
+
+describe("Report count recalculation", () => {
+	beforeEach(() => {
+		setupFetchMock();
+	});
+
+	afterEach(() => {
+		vi.unstubAllGlobals();
+	});
+
+	test("reportVoucher recalculates both uploader and reporter counts", async () => {
+		const t = convexTest(schema, modules);
+		const now = Date.now();
+		const uploaderId = await createUser(t, {
+			telegramChatId: "recalc_uploader_1",
+		});
+		const reporterId = await createUser(t, {
+			telegramChatId: "recalc_reporter_1",
+			coins: 50,
+		});
+
+		const voucherId = await createVoucher(t, {
+			type: "10",
+			uploaderId,
+			status: "claimed",
+			claimerId: reporterId,
+			expiryDate: now + 7 * 24 * 60 * 60 * 1000,
+			claimedAt: now,
+			createdAt: now,
+		});
+
+		await t.mutation(internal.vouchers.reportVoucher, {
+			userId: reporterId,
+			voucherId,
+		});
+
+		const [uploader, reporter] = await t.run(async (ctx) => {
+			return [await ctx.db.get(uploaderId), await ctx.db.get(reporterId)];
+		});
+
+		expect(uploader?.uploadReportCount).toBe(1);
+		expect(reporter?.claimReportCount).toBe(1);
+	});
+
+	test("type 0 vouchers now count toward uploadReportCount", async () => {
+		const t = convexTest(schema, modules);
+		const now = Date.now();
+		const uploaderId = await createUser(t, {
+			telegramChatId: "recalc_uploader_type0",
+		});
+		const reporterId = await createUser(t, {
+			telegramChatId: "recalc_reporter_type0",
+			coins: 50,
+		});
+
+		const voucherId = await createVoucher(t, {
+			type: "0",
+			uploaderId,
+			status: "claimed",
+			claimerId: reporterId,
+			expiryDate: now + 7 * 24 * 60 * 60 * 1000,
+			claimedAt: now,
+		});
+
+		await t.mutation(internal.vouchers.reportVoucher, {
+			userId: reporterId,
+			voucherId,
+		});
+
+		const uploader = await t.run(async (ctx) => {
+			return await ctx.db.get(uploaderId);
+		});
+
+		expect(uploader?.uploadReportCount).toBe(1);
+	});
+
+	test("confirmUploaderUsedVoucher recalculates counts after deleting report", async () => {
+		const t = convexTest(schema, modules);
+		const now = Date.now();
+		const uploaderId = await createUser(t, {
+			telegramChatId: "recalc_admit_uploader",
+			coins: 100,
+		});
+		const reporterId = await createUser(t, {
+			telegramChatId: "recalc_admit_reporter",
+			coins: 100,
+		});
+
+		const v1 = await createVoucher(t, {
+			type: "10",
+			uploaderId,
+			status: "claimed",
+			claimerId: reporterId,
+			expiryDate: now + 7 * 24 * 60 * 60 * 1000,
+			claimedAt: now - 2000,
+			createdAt: now - 2000,
+		});
+		const v2 = await createVoucher(t, {
+			type: "10",
+			uploaderId,
+			status: "claimed",
+			claimerId: reporterId,
+			expiryDate: now + 7 * 24 * 60 * 60 * 1000,
+			claimedAt: now - 1000,
+			createdAt: now - 1000,
+		});
+
+		await t.mutation(internal.vouchers.reportVoucher, {
+			userId: reporterId,
+			voucherId: v1,
+		});
+		await t.mutation(internal.vouchers.reportVoucher, {
+			userId: reporterId,
+			voucherId: v2,
+		});
+
+		let [uploader, reporter] = await t.run(async (ctx) => {
+			return [await ctx.db.get(uploaderId), await ctx.db.get(reporterId)];
+		});
+		expect(uploader?.uploadReportCount).toBe(2);
+		expect(reporter?.claimReportCount).toBe(2);
+
+		await t.mutation(internal.vouchers.confirmUploaderUsedVoucher, {
+			uploaderId,
+			voucherId: v1,
+			amount: 10,
+		});
+
+		[uploader, reporter] = await t.run(async (ctx) => {
+			return [await ctx.db.get(uploaderId), await ctx.db.get(reporterId)];
+		});
+		expect(uploader?.uploadReportCount).toBe(1);
+		expect(reporter?.claimReportCount).toBe(1);
+	});
+
+	test("clearReportAndUpdateVoucher recalculates counts after deleting report", async () => {
+		const t = convexTest(schema, modules);
+		const now = Date.now();
+		vi.stubEnv("ADMIN_PASSWORD", "test-admin-password");
+
+		const uploaderId = await createUser(t, {
+			telegramChatId: "recalc_clear_uploader",
+		});
+		const reporterId = await createUser(t, {
+			telegramChatId: "recalc_clear_reporter",
+			coins: 50,
+		});
+
+		const voucherId = await createVoucher(t, {
+			type: "10",
+			uploaderId,
+			status: "claimed",
+			claimerId: reporterId,
+			expiryDate: now + 7 * 24 * 60 * 60 * 1000,
+			claimedAt: now,
+		});
+
+		await t.mutation(internal.vouchers.reportVoucher, {
+			userId: reporterId,
+			voucherId,
+		});
+
+		const reportId = await t.run(async (ctx) => {
+			const report = await ctx.db
+				.query("reports")
+				.withIndex("by_voucher", (q) => q.eq("voucherId", voucherId))
+				.first();
+			return report?._id as Id<"reports">;
+		});
+
+		const loginResult = await adminLogin(t);
+
+		await t.mutation(api.adminVouchers.clearReportAndUpdateVoucher, {
+			token: loginResult.token,
+			reportId,
+			newVoucherStatus: "expired",
+		});
+
+		const [uploader, reporter] = await t.run(async (ctx) => {
+			return [await ctx.db.get(uploaderId), await ctx.db.get(reporterId)];
+		});
+		expect(uploader?.uploadReportCount).toBe(0);
+		expect(reporter?.claimReportCount).toBe(0);
+		vi.unstubAllEnvs();
+	});
+
+	test("multiple reports accumulate and recount correctly", async () => {
+		const t = convexTest(schema, modules);
+		const now = Date.now();
+		const uploaderId = await createUser(t, {
+			telegramChatId: "recalc_multi_uploader",
+		});
+		const r1 = await createUser(t, {
+			telegramChatId: "recalc_multi_r1",
+			coins: 50,
+		});
+		const r2 = await createUser(t, {
+			telegramChatId: "recalc_multi_r2",
+			coins: 50,
+		});
+
+		const v1 = await createVoucher(t, {
+			type: "10",
+			uploaderId,
+			status: "claimed",
+			claimerId: r1,
+			expiryDate: now + 7 * 24 * 60 * 60 * 1000,
+			claimedAt: now - 3000,
+			createdAt: now - 3000,
+		});
+		const v2 = await createVoucher(t, {
+			type: "10",
+			uploaderId,
+			status: "claimed",
+			claimerId: r2,
+			expiryDate: now + 7 * 24 * 60 * 60 * 1000,
+			claimedAt: now - 2000,
+			createdAt: now - 2000,
+		});
+		const v3 = await createVoucher(t, {
+			type: "10",
+			uploaderId,
+			status: "claimed",
+			claimerId: r1,
+			expiryDate: now + 7 * 24 * 60 * 60 * 1000,
+			claimedAt: now - 1000,
+			createdAt: now - 1000,
+		});
+
+		await t.mutation(internal.vouchers.reportVoucher, {
+			userId: r1,
+			voucherId: v1,
+		});
+		await t.mutation(internal.vouchers.reportVoucher, {
+			userId: r2,
+			voucherId: v2,
+		});
+		await t.mutation(internal.vouchers.reportVoucher, {
+			userId: r1,
+			voucherId: v3,
+		});
+
+		const uploader = await t.run(async (ctx) => {
+			return await ctx.db.get(uploaderId);
+		});
+		const reporter1 = await t.run(async (ctx) => {
+			return await ctx.db.get(r1);
+		});
+		expect(uploader?.uploadReportCount).toBe(3);
+		expect(reporter1?.claimReportCount).toBe(2);
+
+		// Delete one report via admin clear
+		vi.stubEnv("ADMIN_PASSWORD", "test-admin-password");
+		const reportId = await t.run(async (ctx) => {
+			const report = await ctx.db
+				.query("reports")
+				.withIndex("by_voucher", (q) => q.eq("voucherId", v1))
+				.first();
+			return report?._id as Id<"reports">;
+		});
+		const loginResult = await adminLogin(t);
+		await t.mutation(api.adminVouchers.clearReportAndUpdateVoucher, {
+			token: loginResult.token,
+			reportId,
+			newVoucherStatus: "available",
+		});
+		vi.unstubAllEnvs();
+
+		const [uploaderAfter, r1After] = await t.run(async (ctx) => {
+			return [await ctx.db.get(uploaderId), await ctx.db.get(r1)];
+		});
+		expect(uploaderAfter?.uploadReportCount).toBe(2);
+		expect(r1After?.claimReportCount).toBe(1);
+	});
+});
