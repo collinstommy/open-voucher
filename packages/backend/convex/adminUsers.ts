@@ -32,8 +32,25 @@ export const banUser = adminMutation({
 		await ctx.db.patch(userId, {
 			isBanned: true,
 			bannedAt: Date.now(),
-			flaggedForReviewAt: undefined,
 		});
+		return { success: true };
+	},
+});
+
+export const flagForReview = adminMutation({
+	args: {
+		userId: v.id("users"),
+	},
+	handler: async (ctx, { userId }) => {
+		const user = await ctx.db.get(userId);
+		if (!user) {
+			throw new Error("User not found");
+		}
+
+		if (!user.flaggedForReviewAt) {
+			await ctx.db.patch(userId, { flaggedForReviewAt: Date.now() });
+		}
+
 		return { success: true };
 	},
 });
@@ -46,7 +63,6 @@ export const unbanUser = adminMutation({
 		await ctx.db.patch(userId, {
 			isBanned: false,
 			bannedAt: undefined,
-			flaggedForReviewAt: undefined,
 		});
 		return { success: true };
 	},
@@ -153,6 +169,7 @@ export const getBannedUsers = adminQuery({
 					username: user.username,
 					firstName: user.firstName,
 					bannedAt: user.bannedAt,
+					flaggedForReviewAt: user.flaggedForReviewAt,
 					adminMessageCount: (
 						await ctx.db
 							.query("messages")

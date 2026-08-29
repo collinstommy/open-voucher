@@ -81,9 +81,24 @@ type UserTransaction = {
 };
 
 type ActivityItem =
-	| { kind: "transaction"; id: string; createdAt: number; transaction: UserTransaction }
-	| { kind: "report_filed"; id: string; createdAt: number; report: ReportActivity }
-	| { kind: "report_against"; id: string; createdAt: number; report: ReportActivity };
+	| {
+			kind: "transaction";
+			id: string;
+			createdAt: number;
+			transaction: UserTransaction;
+	  }
+	| {
+			kind: "report_filed";
+			id: string;
+			createdAt: number;
+			report: ReportActivity;
+	  }
+	| {
+			kind: "report_against";
+			id: string;
+			createdAt: number;
+			report: ReportActivity;
+	  };
 
 function buildActivityItems(
 	transactions: UserTransaction[],
@@ -156,6 +171,15 @@ function UserDetailPage() {
 	const banMutation = useMutation({
 		mutationFn: () =>
 			convex.mutation(api.adminUsers.banUser, {
+				token: token!,
+				userId: userId as Id<"users">,
+			}),
+		onSuccess: () => queryClient.invalidateQueries(),
+	});
+
+	const flagForReviewMutation = useMutation({
+		mutationFn: () =>
+			convex.mutation(api.adminUsers.flagForReview, {
 				token: token!,
 				userId: userId as Id<"users">,
 			}),
@@ -287,14 +311,30 @@ function UserDetailPage() {
 		deductAmount.trim() !== "" &&
 		Number(deductAmount) > (user?.coins ?? Infinity);
 	const stats = data?.stats;
-	const uploadedVouchers = [...(data?.uploadedVouchers ?? [])].sort((a, b) => b.createdAt - a.createdAt);
-	const claimedVouchers = [...(data?.claimedVouchers ?? [])].sort((a, b) => (b.claimedAt ?? 0) - (a.claimedAt ?? 0));
-	const failedUploads = [...(data?.failedUploads ?? [])].sort((a, b) => b._creationTime - a._creationTime);
-	const reportsFiledByUser = [...(data?.reportsFiledByUser ?? [])].sort((a, b) => b.createdAt - a.createdAt);
-	const reportsAgainstUploads = [...(data?.reportsAgainstUploads ?? [])].sort((a, b) => b.createdAt - a.createdAt);
-	const feedbackAndSupport = [...(data?.feedbackAndSupport ?? [])].sort((a, b) => b.createdAt - a.createdAt);
-	const adminMessages = [...(data?.adminMessages ?? [])].sort((a, b) => b.createdAt - a.createdAt);
-	const transactions = [...(data?.transactions ?? [])].sort((a, b) => b.createdAt - a.createdAt);
+	const uploadedVouchers = [...(data?.uploadedVouchers ?? [])].sort(
+		(a, b) => b.createdAt - a.createdAt,
+	);
+	const claimedVouchers = [...(data?.claimedVouchers ?? [])].sort(
+		(a, b) => (b.claimedAt ?? 0) - (a.claimedAt ?? 0),
+	);
+	const failedUploads = [...(data?.failedUploads ?? [])].sort(
+		(a, b) => b._creationTime - a._creationTime,
+	);
+	const reportsFiledByUser = [...(data?.reportsFiledByUser ?? [])].sort(
+		(a, b) => b.createdAt - a.createdAt,
+	);
+	const reportsAgainstUploads = [...(data?.reportsAgainstUploads ?? [])].sort(
+		(a, b) => b.createdAt - a.createdAt,
+	);
+	const feedbackAndSupport = [...(data?.feedbackAndSupport ?? [])].sort(
+		(a, b) => b.createdAt - a.createdAt,
+	);
+	const adminMessages = [...(data?.adminMessages ?? [])].sort(
+		(a, b) => b.createdAt - a.createdAt,
+	);
+	const transactions = [...(data?.transactions ?? [])].sort(
+		(a, b) => b.createdAt - a.createdAt,
+	);
 	const activityItems = buildActivityItems(
 		transactions,
 		reportsFiledByUser,
@@ -350,6 +390,17 @@ function UserDetailPage() {
 						</p>
 					</div>
 					<div className="flex gap-2">
+						{!user.flaggedForReviewAt && (
+							<Button
+								variant="outline"
+								onClick={() => flagForReviewMutation.mutate()}
+								disabled={flagForReviewMutation.isPending}
+							>
+								{flagForReviewMutation.isPending
+									? "Flagging..."
+									: "Flag for Review"}
+							</Button>
+						)}
 						{!user.isBanned && (
 							<Button
 								variant="outline"
@@ -400,9 +451,7 @@ function UserDetailPage() {
 					>
 						{TAB_LABELS[tab]}
 						{tabCounts[tab] > 0 && (
-							<span className="ml-1.5 opacity-70">
-								({tabCounts[tab]})
-							</span>
+							<span className="ml-1.5 opacity-70">({tabCounts[tab]})</span>
 						)}
 					</Button>
 				))}
@@ -419,7 +468,9 @@ function UserDetailPage() {
 						</div>
 						<div className="rounded-md border p-3">
 							<div className="mb-1 text-muted-foreground text-xs">Uploaded</div>
-							<div className="font-semibold text-xl">{stats?.uploadedCount}</div>
+							<div className="font-semibold text-xl">
+								{stats?.uploadedCount}
+							</div>
 						</div>
 						<div className="rounded-md border p-3">
 							<div className="mb-1 text-muted-foreground text-xs">Claimed</div>
@@ -498,7 +549,9 @@ function UserDetailPage() {
 									amountExceedsBalance
 								}
 							>
-								{deductCoinsMutation.isPending ? "Deducting..." : "Deduct coins"}
+								{deductCoinsMutation.isPending
+									? "Deducting..."
+									: "Deduct coins"}
 							</Button>
 						</div>
 						{deductError && (
@@ -555,11 +608,12 @@ function UserDetailPage() {
 																					? "bg-red-100 text-red-800"
 																					: tx.type === "admin_expiry_deduction"
 																						? "bg-rose-100 text-rose-800"
-																				: tx.type === "claim_reversed"
-																					? "bg-teal-100 text-teal-800"
-																					: tx.type === "replacement_received"
-																						? "bg-indigo-100 text-indigo-800"
-																						: "bg-amber-100 text-amber-800"
+																						: tx.type === "claim_reversed"
+																							? "bg-teal-100 text-teal-800"
+																							: tx.type ===
+																									"replacement_received"
+																								? "bg-indigo-100 text-indigo-800"
+																								: "bg-amber-100 text-amber-800"
 															}`}
 														>
 															{tx.type.replace(/_/g, " ")}
@@ -568,7 +622,9 @@ function UserDetailPage() {
 													<td className="p-3">
 														<span
 															className={
-																tx.amount > 0 ? "text-green-600" : "text-red-600"
+																tx.amount > 0
+																	? "text-green-600"
+																	: "text-red-600"
 															}
 														>
 															{tx.amount > 0 ? "+" : ""}
@@ -705,13 +761,17 @@ function UserDetailPage() {
 										</div>
 										{voucher.claimer && (
 											<div className="mt-2 text-sm">
-												<span className="text-muted-foreground">Claimed by: </span>
+												<span className="text-muted-foreground">
+													Claimed by:{" "}
+												</span>
 												<Link
 													to="/admin/users/$userId"
 													params={{ userId: voucher.claimer._id }}
 													className="text-blue-600 hover:underline"
 												>
-													{voucher.claimer.username || voucher.claimer.firstName || voucher.claimer.telegramChatId}
+													{voucher.claimer.username ||
+														voucher.claimer.firstName ||
+														voucher.claimer.telegramChatId}
 												</Link>
 											</div>
 										)}
@@ -721,7 +781,9 @@ function UserDetailPage() {
 													size="sm"
 													variant="destructive"
 													onClick={() =>
-														expireVoucherMutation.mutate(voucher._id as Id<"vouchers">)
+														expireVoucherMutation.mutate(
+															voucher._id as Id<"vouchers">,
+														)
 													}
 													disabled={expireVoucherMutation.isPending}
 												>
@@ -784,8 +846,7 @@ function UserDetailPage() {
 										</div>
 										{voucher.expiryDate && (
 											<div className="mb-1 text-muted-foreground text-sm">
-												Expires{" "}
-												{formatDate(voucher.expiryDate)}
+												Expires {formatDate(voucher.expiryDate)}
 											</div>
 										)}
 										<div className="mb-1 text-muted-foreground text-sm">
@@ -798,13 +859,17 @@ function UserDetailPage() {
 										)}
 										{voucher.uploader && (
 											<div className="mt-2 text-sm">
-												<span className="text-muted-foreground">Uploaded by: </span>
+												<span className="text-muted-foreground">
+													Uploaded by:{" "}
+												</span>
 												<Link
 													to="/admin/users/$userId"
 													params={{ userId: voucher.uploader._id }}
 													className="text-blue-600 hover:underline"
 												>
-													{voucher.uploader.username || voucher.uploader.firstName || voucher.uploader.telegramChatId}
+													{voucher.uploader.username ||
+														voucher.uploader.firstName ||
+														voucher.uploader.telegramChatId}
 												</Link>
 											</div>
 										)}
@@ -813,7 +878,9 @@ function UserDetailPage() {
 												size="sm"
 												variant="outline"
 												onClick={() =>
-													reverseClaimMutation.mutate(voucher._id as Id<"vouchers">)
+													reverseClaimMutation.mutate(
+														voucher._id as Id<"vouchers">,
+													)
 												}
 												disabled={reverseClaimMutation.isPending}
 											>
@@ -869,7 +936,9 @@ function UserDetailPage() {
 										</div>
 										<div className="mb-1 text-sm">
 											<span className="font-medium">Reason: </span>
-											<span className="text-red-600">{upload.failureReason}</span>
+											<span className="text-red-600">
+												{upload.failureReason}
+											</span>
 										</div>
 										{upload.errorMessage && (
 											<div className="mb-1 text-sm">
@@ -964,9 +1033,13 @@ function UserDetailPage() {
 													params={{ userId: report.uploader._id }}
 													className="text-blue-600 hover:underline"
 												>
-													{report.uploader.username || report.uploader.firstName || report.uploader.telegramChatId}
+													{report.uploader.username ||
+														report.uploader.firstName ||
+														report.uploader.telegramChatId}
 												</Link>
-											) : "Unknown"}
+											) : (
+												"Unknown"
+											)}
 										</div>
 									</div>
 									<div className="rounded bg-muted p-3">
@@ -1062,9 +1135,13 @@ function UserDetailPage() {
 													params={{ userId: report.reporter._id }}
 													className="text-blue-600 hover:underline"
 												>
-													{report.reporter.username || report.reporter.firstName || report.reporter.telegramChatId}
+													{report.reporter.username ||
+														report.reporter.firstName ||
+														report.reporter.telegramChatId}
 												</Link>
-											) : "Unknown"}
+											) : (
+												"Unknown"
+											)}
 										</div>
 									</div>
 									<div className="rounded bg-muted p-3">
@@ -1180,7 +1257,9 @@ function UserDetailPage() {
 								adminMessages.map((message: any) => (
 									<div key={message._id} className="mb-3 flex justify-end">
 										<div className="max-w-xs rounded-lg bg-blue-500 p-3 text-white shadow-sm">
-											<p className="whitespace-pre-wrap text-sm">{message.text}</p>
+											<p className="whitespace-pre-wrap text-sm">
+												{message.text}
+											</p>
 											<p className="mt-1 text-xs opacity-75">
 												{formatDateTime(message.createdAt)}
 											</p>

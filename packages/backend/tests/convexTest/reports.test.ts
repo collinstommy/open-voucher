@@ -229,7 +229,9 @@ describe("Report Flow", () => {
 
 		expect(noReplacementResult.status).toBe("refunded");
 
-		const claimerAfterRefund = await t.run(async (ctx) => ctx.db.get(claimerId));
+		const claimerAfterRefund = await t.run(async (ctx) =>
+			ctx.db.get(claimerId),
+		);
 		expect(claimerAfterRefund?.coins).toBe(20);
 
 		const txsAfterRefund = await t.run(async (ctx) =>
@@ -1107,7 +1109,7 @@ describe("Review System", () => {
 		expect(flagged[0].telegramChatId).toBe("flagged1");
 	});
 
-	test("banUser bans user and clears flag", async () => {
+	test("banUser bans user and preserves flag", async () => {
 		const t = convexTest(schema, modules);
 
 		const userId = await createUser(t, {
@@ -1128,10 +1130,31 @@ describe("Review System", () => {
 
 		expect(user?.isBanned).toBe(true);
 		expect(user?.bannedAt).toBeDefined();
-		expect(user?.flaggedForReviewAt).toBeUndefined();
+		expect(user?.flaggedForReviewAt).toBeDefined();
 	});
 
-	test("unbanUser unbans user and clears flag", async () => {
+	test("flagForReview flags an unflagged user", async () => {
+		const t = convexTest(schema, modules);
+
+		const userId = await createUser(t, {
+			telegramChatId: "toflag",
+		});
+		const loginResult = await adminLogin(t);
+
+		await t.mutation(api.adminUsers.flagForReview, {
+			token: loginResult.token,
+			userId,
+		});
+
+		const user = await t.run(async (ctx) => {
+			return await ctx.db.get(userId);
+		});
+
+		expect(user?.isBanned).toBe(false);
+		expect(user?.flaggedForReviewAt).toBeDefined();
+	});
+
+	test("unbanUser unbans user and preserves flag", async () => {
 		const t = convexTest(schema, modules);
 
 		const userId = await createUser(t, {
@@ -1154,7 +1177,7 @@ describe("Review System", () => {
 
 		expect(user?.isBanned).toBe(false);
 		expect(user?.bannedAt).toBeUndefined();
-		expect(user?.flaggedForReviewAt).toBeUndefined();
+		expect(user?.flaggedForReviewAt).toBeDefined();
 	});
 
 	test("dismissFlag clears flag without banning", async () => {
