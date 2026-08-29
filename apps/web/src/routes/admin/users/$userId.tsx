@@ -36,6 +36,18 @@ const TAB_LABELS: Record<Tab, string> = {
 	messages: "Messages",
 };
 
+const DEDUCTION_TYPES = [
+	"admin_report_deduction",
+	"admin_manual_deduction",
+] as const;
+
+type DeductionType = (typeof DEDUCTION_TYPES)[number];
+
+const DEDUCTION_TYPE_LABELS: Record<DeductionType, string> = {
+	admin_manual_deduction: "Manual",
+	admin_report_deduction: "Reports",
+};
+
 type ReportActivity = {
 	_id: string;
 	createdAt: number;
@@ -124,6 +136,11 @@ function UserDetailPage() {
 	const convex = useConvex();
 	const queryClient = useQueryClient();
 	const [messageText, setMessageText] = useState("");
+	const [deductAmount, setDeductAmount] = useState("");
+	const [deductType, setDeductType] = useState<DeductionType>(
+		"admin_report_deduction",
+	);
+	const [deductError, setDeductError] = useState<string | null>(null);
 	const [activeTab, setActiveTab] = useState<Tab>("transactions");
 
 	const { data, isLoading, error } = useQuery(
@@ -159,6 +176,48 @@ function UserDetailPage() {
 			}),
 		onSuccess: () => queryClient.invalidateQueries(),
 	});
+
+	const deductCoinsMutation = useMutation({
+		mutationFn: ({
+			amount,
+			deductionType,
+		}: {
+			amount: number;
+			deductionType: DeductionType;
+		}) =>
+			convex.mutation(api.adminUsers.deductUserCoins, {
+				token: token!,
+				userId: userId as Id<"users">,
+				amount,
+				deductionType,
+			}),
+		onSuccess: () => {
+			setDeductAmount("");
+			setDeductError(null);
+			queryClient.invalidateQueries();
+		},
+	});
+
+	const handleDeductCoins = () => {
+		const amount = Number(deductAmount);
+		if (!Number.isInteger(amount) || amount <= 0) {
+			setDeductError("Amount must be a whole number greater than 0");
+			return;
+		}
+		const balance = user?.coins ?? 0;
+		if (amount > balance) {
+			setDeductError(
+				`Amount cannot exceed the user's balance of ${balance} coin${balance === 1 ? "" : "s"}`,
+			);
+			return;
+		}
+		const confirmed = window.confirm(
+			`Deduct ${amount} coin${amount === 1 ? "" : "s"} from ${user?.username || user?.firstName || user?.telegramChatId || "this user"}?\n\nDeduction type: ${DEDUCTION_TYPE_LABELS[deductType]}\nTheir current balance is ${user?.coins ?? "?"} coins.`,
+		);
+		if (confirmed) {
+			deductCoinsMutation.mutate({ amount, deductionType: deductType });
+		}
+	};
 
 	const sendMessageMutation = useMutation({
 		mutationFn: (text: string) =>
@@ -362,6 +421,75 @@ function UserDetailPage() {
 								{stats?.reportsFiledCount}
 							</div>
 						</div>
+					</div>
+
+					{/* Deduct Coins */}
+					<div className="rounded-lg border p-4">
+						<div className="mb-3">
+							<h3 className="font-semibold">Deduct coins</h3>
+							<p className="text-muted-foreground text-sm">
+								Remove coins from this user's balance. A ledger transaction is
+								recorded automatically.
+							</p>
+						</div>
+						<div className="mb-3 flex flex-wrap gap-2">
+							{DEDUCTION_TYPES.map((type) => (
+								<Button
+									key={type}
+									variant={deductType === type ? "default" : "outline"}
+									size="sm"
+									onClick={() => setDeductType(type)}
+									disabled={deductCoinsMutation.isPending}
+								>
+									{DEDUCTION_TYPE_LABELS[type]}
+								</Button>
+							))}
+						</div>
+						<div className="flex flex-wrap items-end gap-2">
+							<div className="flex flex-col gap-1">
+								<label
+									htmlFor="deduct-amount"
+									className="text-muted-foreground text-xs"
+								>
+									Amount
+								</label>
+								<input
+									id="deduct-amount"
+									type="number"
+									min={1}
+									step={1}
+									value={deductAmount}
+									onChange={(e) => {
+										setDeductAmount(e.target.value);
+										setDeductError(null);
+									}}
+									placeholder="e.g. 10"
+									className="w-32 rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+									disabled={deductCoinsMutation.isPending}
+								/>
+							</div>
+							<Button
+								variant="destructive"
+								onClick={handleDeductCoins}
+								disabled={
+									deductCoinsMutation.isPending ||
+									!deductAmount.trim() ||
+									Number(deductAmount) <= 0 ||
+									Number(deductAmount) > (user?.coins ?? Infinity)
+								}
+							>
+								{deductCoinsMutation.isPending ? "Deducting..." : "Deduct coins"}
+							</Button>
+						</div>
+						{deductError && (
+							<p className="mt-2 text-sm text-red-500">{deductError}</p>
+						)}
+						{deductCoinsMutation.isError && (
+							<p className="mt-2 text-sm text-red-500">
+								{deductCoinsMutation.error?.message ||
+									"Failed to deduct coins. Please try again."}
+							</p>
+						)}
 					</div>
 
 					{/* Activity Table */}
