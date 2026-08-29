@@ -204,13 +204,6 @@ function UserDetailPage() {
 			setDeductError("Amount must be a whole number greater than 0");
 			return;
 		}
-		const balance = user?.coins ?? 0;
-		if (amount > balance) {
-			setDeductError(
-				`Amount cannot exceed the user's balance of ${balance} coin${balance === 1 ? "" : "s"}`,
-			);
-			return;
-		}
 		const confirmed = window.confirm(
 			`Deduct ${amount} coin${amount === 1 ? "" : "s"} from ${user?.username || user?.firstName || user?.telegramChatId || "this user"}?\n\nDeduction type: ${DEDUCTION_TYPE_LABELS[deductType]}\nTheir current balance is ${user?.coins ?? "?"} coins.`,
 		);
@@ -275,6 +268,10 @@ function UserDetailPage() {
 	}
 
 	const user = data?.user;
+
+	const amountExceedsBalance =
+		deductAmount.trim() !== "" &&
+		Number(deductAmount) > (user?.coins ?? Infinity);
 	const stats = data?.stats;
 	const uploadedVouchers = [...(data?.uploadedVouchers ?? [])].sort((a, b) => b.createdAt - a.createdAt);
 	const claimedVouchers = [...(data?.claimedVouchers ?? [])].sort((a, b) => (b.claimedAt ?? 0) - (a.claimedAt ?? 0));
@@ -475,7 +472,7 @@ function UserDetailPage() {
 									deductCoinsMutation.isPending ||
 									!deductAmount.trim() ||
 									Number(deductAmount) <= 0 ||
-									Number(deductAmount) > (user?.coins ?? Infinity)
+									amountExceedsBalance
 								}
 							>
 								{deductCoinsMutation.isPending ? "Deducting..." : "Deduct coins"}
@@ -483,6 +480,12 @@ function UserDetailPage() {
 						</div>
 						{deductError && (
 							<p className="mt-2 text-sm text-red-500">{deductError}</p>
+						)}
+						{!deductError && amountExceedsBalance && (
+							<p className="mt-2 text-sm text-red-500">
+								Amount exceeds the user's balance of {user?.coins ?? 0} coin
+								{(user?.coins ?? 0) === 1 ? "" : "s"}
+							</p>
 						)}
 						{deductCoinsMutation.isError && (
 							<p className="mt-2 text-sm text-red-500">
