@@ -52,6 +52,7 @@ const TRANSACTION_LABELS: Record<string, string> = {
 	claim_reversed: "User returned",
 	self_invalidated: "Self invalidated",
 	claim_returned: "Admin claim returned",
+	replacement_received: "Replacement received",
 };
 
 const CLASSIFIED_INTENT_LABELS: Record<string, string> = {
@@ -155,6 +156,16 @@ function AnalyticsPage() {
 						{transactionData && (
 							<div className="mt-3 text-muted-foreground text-xs">
 								{transactionData.totalCount} total transactions
+							</div>
+						)}
+						{transactionData && (
+							<div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 dark:border-amber-900 dark:bg-amber-950/30">
+								<div className="mb-1 text-muted-foreground text-xs">
+									Vouchers reported as not working
+								</div>
+								<div className="font-semibold text-2xl">
+									{transactionData.reportedNotWorkingCount}
+								</div>
 							</div>
 						)}
 					</>

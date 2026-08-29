@@ -36,13 +36,23 @@ export const getTransactionTotalsByType = adminQuery({
 					)
 					.collect()
 			: await ctx.db.query("transactions").collect();
+		const reports = await ctx.db.query("reports").collect();
+		const reportedNotWorkingCount = reports.filter(
+			(report) =>
+				report.reason === "not_working" &&
+				(since === undefined || report.createdAt >= since),
+		).length;
 
 		const totals: Record<string, number> = {};
 		for (const t of filtered) {
 			totals[t.type] = (totals[t.type] ?? 0) + 1;
 		}
 
-		return { totals, totalCount: filtered.length };
+		return {
+			totals,
+			totalCount: filtered.length,
+			reportedNotWorkingCount,
+		};
 	},
 });
 
