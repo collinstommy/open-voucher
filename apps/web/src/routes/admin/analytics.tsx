@@ -47,6 +47,8 @@ const TRANSACTION_LABELS: Record<string, string> = {
 	uploader_refund: "Uploader refund",
 	uploader_denied: "Uploader denied",
 	admin_expiry_deduction: "Admin expiry deduction",
+	admin_manual_deduction: "Admin manual deduction",
+	admin_report_deduction: "Admin reports deduction",
 	claim_reversed: "User returned",
 	self_invalidated: "Self invalidated",
 	claim_returned: "Admin claim returned",

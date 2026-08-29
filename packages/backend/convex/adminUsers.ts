@@ -1,4 +1,5 @@
 import { v } from "convex/values";
+import { applyCoinDelta } from "../src/lib/coinLedger";
 import { adminMutation, adminQuery } from "./adminGuards";
 import { internalMutation, internalQuery } from "./_generated/server";
 
@@ -87,6 +88,37 @@ export const dismissFlag = adminMutation({
 	handler: async (ctx, { userId }) => {
 		await ctx.db.patch(userId, { flaggedForReviewAt: undefined });
 		return { success: true };
+	},
+});
+
+export const deductUserCoins = adminMutation({
+	args: {
+		userId: v.id("users"),
+		amount: v.number(),
+		deductionType: v.union(
+			v.literal("admin_manual_deduction"),
+			v.literal("admin_report_deduction"),
+		),
+	},
+	handler: async (ctx, { userId, amount, deductionType }) => {
+		if (!Number.isInteger(amount) || amount <= 0) {
+			throw new Error("Amount must be a positive integer");
+		}
+
+		// Patches the user balance and inserts the ledger transaction in a
+		// single atomic mutation, so the deduction and its record cannot
+		// diverge. Throws if the user does not exist.
+		const { newBalance } = await applyCoinDelta(ctx, {
+			userId,
+			delta: -amount,
+			type: deductionType,
+		});
+
+		return {
+			success: true,
+			deductedAmount: amount,
+			newBalance,
+		};
 	},
 });
 
