@@ -93,9 +93,11 @@ function BannedUsers() {
 											<span>Claims: {user.claimCount}</span>
 											<span>Upload Reports: {user.uploadReportCount}</span>
 											<span>Claim Reports: {user.claimReportCount}</span>
+										{user.adminMessageCount > 0 && (
 											<span title="Admin messages sent">
 												✉️ {user.adminMessageCount}
 											</span>
+										)}
 										</div>
 									</div>
 									<div className="text-sm text-muted-foreground">
@@ -164,12 +166,14 @@ function BannedUsers() {
 										<p className="text-sm text-muted-foreground">
 											Chat ID: {user.telegramChatId}
 										</p>
-										<div
-											className="mt-2 text-sm text-muted-foreground"
-											title="Admin messages sent"
-										>
-											✉️ {user.adminMessageCount}
-										</div>
+						{user.adminMessageCount > 0 && (
+							<div
+								className="mt-2 text-sm text-muted-foreground"
+								title="Admin messages sent"
+							>
+								✉️ {user.adminMessageCount}
+							</div>
+						)}
 									</div>
 									{user.bannedAt && (
 										<div className="text-sm text-muted-foreground">
