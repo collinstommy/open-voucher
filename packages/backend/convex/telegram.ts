@@ -6,11 +6,14 @@ import type { Id } from "./_generated/dataModel";
 import type { ActionCtx } from "./_generated/server";
 import { action, internalAction } from "./_generated/server";
 import { assertValidSession } from "../src/lib/adminAuth";
-import { UPLOAD_REWARDS } from "../src/lib/constants";
 import { classifyInboundMessage } from "../src/lib/messageIntent";
-import { realBotAdapter } from "../src/telegram/botAdapter";
+import {
+	createBotAdapter,
+	realBotAdapter,
+	registerTelegramBotCommands,
+} from "../src/telegram/botAdapter";
 import { reportData, uploaderData } from "../src/telegram/router";
-import { helpMenuKeyboard, faqMenuKeyboard, appWebAppKeyboard, feedbackWebAppKeyboard, getMiniAppUrl, webAppKeyboard } from "../src/telegram/keyboards";
+import { helpMenuKeyboard, faqMenuKeyboard, appWebAppKeyboard, feedbackWebAppKeyboard, webAppKeyboard } from "../src/telegram/keyboards";
 import "../src/telegram/handlers/report";
 import "../src/telegram/handlers/help";
 import "../src/telegram/handlers/faq";
@@ -19,6 +22,26 @@ import { dispatch } from "../src/telegram/router";
 import type { CallbackContext } from "../src/telegram/router";
 
 dayjs.extend(advancedFormat);
+
+const outboundBot = realBotAdapter();
+
+async function logTelegramSendError(
+	ctx: ActionCtx,
+	chatId: string,
+	errorText: string,
+) {
+	await ctx.runMutation(internal.errors.logError, {
+		errorType: "telegram_send_message",
+		text: `chatId=${chatId}: ${errorText}`,
+	});
+}
+
+function botWithSendErrorLogging(ctx: ActionCtx) {
+	return createBotAdapter({
+		onSendMessageError: (chatId, errorText) =>
+			logTelegramSendError(ctx, chatId, errorText),
+	});
+}
 
 type TelegramUserState =
 	| "waiting_for_support_message"
@@ -99,12 +122,12 @@ async function handleNewUser(
 		username,
 		firstName,
 	});
-	await sendTelegramMessage(chatId, getWelcomeMessage());
+	await outboundBot.sendMessage(chatId, getWelcomeMessage());
 	await ctx.runMutation(internal.users.setUserOnboardingStep, {
 		userId: newUser._id,
 		step: 1,
 	});
-	await sendTelegramMessage(chatId, TUTORIAL_STEP_1_MESSAGE);
+	await outboundBot.sendMessage(chatId, TUTORIAL_STEP_1_MESSAGE);
 }
 
 async function handleUserState(
@@ -123,7 +146,7 @@ async function handleUserState(
 			await ctx.runMutation(internal.users.clearUserTelegramState, {
 				userId: user._id,
 			});
-			await sendTelegramMessage(
+			await outboundBot.sendMessage(
 				chatId,
 				"✅ Your support request has been received. We'll review your case and get back to you.",
 			);
@@ -138,7 +161,7 @@ async function handleUserState(
 			await ctx.runMutation(internal.users.clearUserTelegramState, {
 				userId: user._id,
 			});
-			await sendTelegramMessage(
+			await outboundBot.sendMessage(
 				chatId,
 				"✅ Your appeal has been received. We'll review your case and get back to you.",
 			);
@@ -170,20 +193,20 @@ async function handleOnboardingTutorial(
 		});
 		const imageUrl = await getSampleVoucherImageUrl(ctx);
 		if (imageUrl) {
-			await sendTelegramPhoto(chatId, imageUrl, "Here is your sample voucher!");
+			await outboundBot.sendPhoto(chatId, imageUrl, "Here is your sample voucher!");
 		} else {
 			console.error("Sample image not found");
-			await sendTelegramMessage(chatId, "Here is your sample voucher!");
+			await outboundBot.sendMessage(chatId, "Here is your sample voucher!");
 		}
 		await ctx.runMutation(internal.users.clearOnboardingTutorial, {
 			userId: user._id,
 		});
-		await sendTelegramMessage(chatId, TUTORIAL_COMPLETE_MESSAGE(user.coins));
+		await outboundBot.sendMessage(chatId, TUTORIAL_COMPLETE_MESSAGE(user.coins));
 		return true;
 	}
 
 	if (step === 1) {
-		await sendTelegramMessage(chatId, TUTORIAL_STEP_1_RETRY_MESSAGE);
+		await outboundBot.sendMessage(chatId, TUTORIAL_STEP_1_RETRY_MESSAGE);
 		return true;
 	}
 
@@ -205,10 +228,10 @@ async function handleImageUpload(
 	messageDbId: Id<"messages"> | undefined,
 	user: User,
 ) {
-	await sendTelegramMessage(chatId, "📸 Processing your voucher...");
+	await outboundBot.sendMessage(chatId, "📸 Processing your voucher...");
 
 	if (!message.photo) {
-		await sendTelegramMessage(chatId, "❌ No photo found in message.");
+		await outboundBot.sendMessage(chatId, "❌ No photo found in message.");
 		return;
 	}
 
@@ -233,12 +256,12 @@ async function handleImageUpload(
 		});
 	} catch (e) {
 		console.error(e);
-		await sendTelegramMessage(chatId, "❌ Failed to process image.");
+		await outboundBot.sendMessage(chatId, "❌ Failed to process image.");
 	}
 }
 
 async function sendHelpMenu(chatId: string) {
-	await sendTelegramMessage(
+	await outboundBot.sendMessage(
 		chatId,
 		"Choose an option below",
 		helpMenuKeyboard(),
@@ -246,7 +269,7 @@ async function sendHelpMenu(chatId: string) {
 }
 
 async function sendFaqMenu(chatId: string) {
-	await sendTelegramMessage(
+	await outboundBot.sendMessage(
 		chatId,
 		"Choose a FAQ question below",
 		faqMenuKeyboard(),
@@ -254,7 +277,7 @@ async function sendFaqMenu(chatId: string) {
 }
 
 async function sendAppWebAppButton(chatId: string) {
-	await sendTelegramMessage(
+	await outboundBot.sendMessage(
 		chatId,
 		"📱 <b>My Account</b>\n\nView your balance, transactions, and voucher availability.",
 		appWebAppKeyboard(),
@@ -274,7 +297,7 @@ async function handleCommand(
 	}
 
 	if (lowerText === "balance") {
-		await sendTelegramMessage(chatId, `💰 You have ${user.coins} coins.`);
+		await outboundBot.sendMessage(chatId, `💰 You have ${user.coins} coins.`);
 		return true;
 	}
 
@@ -289,7 +312,7 @@ async function handleCommand(
 	}
 
 	if (lowerText === "donate") {
-		await sendTelegramMessage(
+		await outboundBot.sendMessage(
 			chatId,
 			"☕ <b>Support Open Vouchers</b>\n\nThe service is free, but servers and AI-powered OCR aren't. Your support helps keep the lights on!\n\nhttps://buymeacoffee.com/openvouchers",
 		);
@@ -302,7 +325,7 @@ async function handleCommand(
 	}
 
 	if (lowerText === "share") {
-		await sendTelegramMessage(
+		await outboundBot.sendMessage(
 			chatId,
 			"🔗 Swap and share Dunnes Stores vouchers:\nhttps://openvouchers.org/telegram\n\nNew users get a <b>10-coin welcome bonus</b>!",
 		);
@@ -331,9 +354,9 @@ async function handleVoucherRequest(
 	});
 
 	if (!result.success) {
-		await sendTelegramMessage(chatId, `❌ ${result.error}`);
+		await outboundBot.sendMessage(chatId, `❌ ${result.error}`);
 	} else {
-		const sent = await sendTelegramPhoto(
+		const sent = await outboundBot.sendPhoto(
 			chatId,
 			result.imageUrl!,
 			`✅ <b>Here is your €${type} voucher!</b>\n\nExpires: ${dayjs(result.expiryDate!).format("MMM Do")}\nRemaining coins: ${result.remainingCoins}`,
@@ -363,7 +386,7 @@ async function handleVoucherRequest(
 			);
 
 			if (refundResult.refunded) {
-				await sendTelegramMessage(
+				await outboundBot.sendMessage(
 					chatId,
 					`⚠️ We couldn't deliver your voucher image right now. Your ${refundResult.refundAmount} coins were refunded automatically. Please try requesting again.`,
 				);
@@ -427,7 +450,7 @@ export const handleTelegramMessage = internalAction({
 				userId: user._id,
 				state: "waiting_for_ban_appeal",
 			});
-			await sendTelegramMessage(
+			await outboundBot.sendMessage(
 				chatId,
 				"🚫 Your account has been banned for misuse.\n\nPlease reply with a message describing if you think this is an error.",
 			);
@@ -461,7 +484,7 @@ export const sendMessageAction = internalAction({
 		text: v.string(),
 	},
 	handler: async (ctx, { chatId, text }) => {
-		await sendTelegramMessage(chatId, text, undefined, ctx);
+		await botWithSendErrorLogging(ctx).sendMessage(chatId, text);
 	},
 });
 
@@ -473,11 +496,10 @@ export const sendWebAppMessageAction = internalAction({
 		buttonText: v.optional(v.string()),
 	},
 	handler: async (ctx, { chatId, text, webAppUrl, buttonText }) => {
-		await sendTelegramMessage(
+		await botWithSendErrorLogging(ctx).sendMessage(
 			chatId,
 			text,
 			webAppKeyboard(webAppUrl, buttonText),
-			ctx,
 		);
 	},
 });
@@ -496,7 +518,7 @@ export const sendAdminMessageAction = internalAction({
 		text: v.string(),
 	},
 	handler: async (_ctx, { chatId, text }) => {
-		await sendTelegramMessage(
+		await outboundBot.sendMessage(
 			chatId,
 			formatAdminTelegramMessage(text),
 			feedbackWebAppKeyboard(),
@@ -555,7 +577,7 @@ export const sendUploaderReportMessage = internalAction({
 		const imageUrl = await ctx.storage.getUrl(imageStorageId);
 
 		if (imageUrl) {
-			const sent = await sendTelegramPhoto(
+			const sent = await outboundBot.sendPhoto(
 				uploaderChatId,
 				imageUrl,
 				caption,
@@ -566,188 +588,14 @@ export const sendUploaderReportMessage = internalAction({
 			}
 		}
 
-		await sendTelegramMessage(uploaderChatId, caption, replyMarkup);
+		await outboundBot.sendMessage(uploaderChatId, caption, replyMarkup);
 	},
 });
-
-async function logTelegramSendError(
-	ctx: ActionCtx,
-	chatId: string,
-	errorText: string,
-) {
-	await ctx.runMutation(internal.errors.logError, {
-		errorType: "telegram_send_message",
-		text: `chatId=${chatId}: ${errorText}`,
-	});
-}
-
-async function sendTelegramMessage(
-	chatId: string,
-	text: string,
-	replyMarkup?: Record<string, unknown>,
-	logCtx?: ActionCtx,
-) {
-	const token = process.env.TELEGRAM_BOT_TOKEN;
-	if (!token) {
-		console.error("TELEGRAM_BOT_TOKEN is not set");
-		return;
-	}
-
-	const url = `https://api.telegram.org/bot${token}/sendMessage`;
-	try {
-		const body: Record<string, unknown> = {
-			chat_id: chatId,
-			text,
-			parse_mode: "HTML",
-		};
-		if (replyMarkup) {
-			body.reply_markup = JSON.stringify(replyMarkup);
-		}
-		const response = await fetch(url, {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify(body),
-		});
-
-		if (!response.ok) {
-			const errorText = await response.text();
-			console.error("Failed to send Telegram message:", errorText);
-			if (logCtx) {
-				await logTelegramSendError(logCtx, chatId, errorText);
-			}
-		}
-	} catch (error) {
-		console.error("Network error sending Telegram message:", error);
-		if (logCtx) {
-			const errorText = error instanceof Error ? error.message : String(error);
-			await logTelegramSendError(logCtx, chatId, errorText);
-		}
-	}
-}
-
-async function sendTelegramPhoto(
-	chatId: string,
-	photoUrl: string,
-	caption?: string,
-	replyMarkup?: Record<string, unknown>,
-): Promise<boolean> {
-	const token = process.env.TELEGRAM_BOT_TOKEN;
-	if (!token) {
-		return false;
-	}
-
-	if (photoUrl === "image") {
-		await sendTelegramMessage(
-			chatId,
-			caption || "Sample image placeholder",
-			replyMarkup,
-		);
-		return true;
-	}
-
-	const url = `https://api.telegram.org/bot${token}/sendPhoto`;
-	try {
-		const imageRes = await fetch(photoUrl);
-		if (!imageRes.ok) {
-			console.error(
-				`Failed to fetch image from storage URL: ${photoUrl} - ${imageRes.statusText}`,
-			);
-			return false;
-		}
-		const imageBlob = await imageRes.blob();
-
-		const formData = new FormData();
-		formData.append("chat_id", chatId);
-		formData.append("photo", imageBlob, "voucher.jpg");
-		if (caption) {
-			formData.append("caption", caption);
-			formData.append("parse_mode", "HTML");
-		}
-		if (replyMarkup) {
-			formData.append("reply_markup", JSON.stringify(replyMarkup));
-		}
-
-		// 3. Send to Telegram
-		const response = await fetch(url, {
-			method: "POST",
-			body: formData,
-		});
-
-		if (!response.ok) {
-			const errorText = await response.text();
-			console.error("Failed to send Telegram photo:", errorText);
-			return false;
-		}
-
-		return true;
-	} catch (error) {
-		console.error("Network error sending Telegram photo:", error);
-		return false;
-	}
-}
-
-async function setBotCommands() {
-	const token = process.env.TELEGRAM_BOT_TOKEN;
-	if (!token) {
-		console.error("TELEGRAM_BOT_TOKEN is not set");
-		return;
-	}
-
-	const commands = [
-		{ command: "help", description: "Show help menu" },
-		{ command: "balance", description: "Check your coin balance" },
-		{ command: "share", description: "Share the bot with friends" },
-		{ command: "account", description: "Open My Account" },
-		{ command: "donate", description: "Support the project" },
-	];
-
-	const url = `https://api.telegram.org/bot${token}/setMyCommands`;
-	try {
-		const response = await fetch(url, {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ commands }),
-		});
-
-		if (!response.ok) {
-			const errorText = await response.text();
-			console.error("Failed to set bot commands:", errorText);
-		} else {
-			console.log("Bot commands registered successfully");
-		}
-	} catch (error) {
-		console.error("Network error setting bot commands:", error);
-	}
-
-	const menuButtonUrl = `https://api.telegram.org/bot${token}/setChatMenuButton`;
-	try {
-		const response = await fetch(menuButtonUrl, {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({
-				menu_button: {
-					type: "web_app",
-					text: "My Account",
-					web_app: { url: getMiniAppUrl() },
-				},
-			}),
-		});
-
-		if (!response.ok) {
-			const errorText = await response.text();
-			console.error("Failed to set chat menu button:", errorText);
-		} else {
-			console.log("Chat menu button set to My Account Mini App");
-		}
-	} catch (error) {
-		console.error("Network error setting chat menu button:", error);
-	}
-}
 
 export const registerBotCommands = internalAction({
 	args: {},
 	handler: async () => {
-		await setBotCommands();
+		await registerTelegramBotCommands();
 	},
 });
 
@@ -768,58 +616,9 @@ export const handleTelegramCallback = internalAction({
 				Array.isArray(callbackQuery.message.photo) &&
 				callbackQuery.message.photo.length > 0,
 		};
-	await dispatch(c, callbackQuery.data, realBotAdapter());
-},
+		await dispatch(c, callbackQuery.data, realBotAdapter());
+	},
 });
-
-async function editTelegramMessageText(
-	chatId: string,
-	messageId: number,
-	text: string,
-) {
-	const token = process.env.TELEGRAM_BOT_TOKEN;
-	if (!token) {
-		return;
-	}
-
-	const url = `https://api.telegram.org/bot${token}/editMessageText`;
-	try {
-		await fetch(url, {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({
-				chat_id: chatId,
-				message_id: messageId,
-				text,
-				parse_mode: "HTML",
-				reply_markup: { inline_keyboard: [] },
-			}),
-		});
-	} catch (error) {
-		console.error("Network error editing message text:", error);
-	}
-}
-
-async function answerTelegramCallback(callbackQueryId: string, text?: string) {
-	const token = process.env.TELEGRAM_BOT_TOKEN;
-	if (!token) {
-		return;
-	}
-
-	const url = `https://api.telegram.org/bot${token}/answerCallbackQuery`;
-	try {
-		await fetch(url, {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({
-				callback_query_id: callbackQueryId,
-				text: text,
-			}),
-		});
-	} catch (error) {
-		console.error("Network error answering callback:", error);
-	}
-}
 
 async function getTelegramFileUrl(fileId: string): Promise<string> {
 	const token = process.env.TELEGRAM_BOT_TOKEN;
