@@ -67,7 +67,8 @@ const SEED_MIX: SeedVoucherSpec[] = [
 	},
 ];
 
-// Spend threshold paired with each voucher value, as in the OCR prompt.
+// Spend threshold printed on the image; any pairing the OCR prompt accepts is
+// fine, this uses one per value.
 const THRESHOLD_BY_TYPE: Record<SeedVoucherSpec["type"], string> = {
 	"5": "20",
 	"10": "50",
@@ -106,6 +107,8 @@ function dayUtc(daysFromNow: number): Date {
 	return new Date(Date.now() + daysFromNow * DAY_MS);
 }
 
+// Same 22:59 UTC expiry convention as devSeed.ts dayAtUtc / storeVoucherFromOcr,
+// so the printed "Expires ..." matches the stored row.
 function expiryMs(spec: SeedVoucherSpec): number {
 	const day = dayUtc(spec.expiryDaysFromNow);
 	return Date.UTC(
@@ -129,8 +132,8 @@ function groupBarcode(barcode: string): string {
 		: barcode;
 }
 
-// EAN-style: two bars plus gaps per digit, widths derived deterministically
-// from the digit values.
+// Deliberately not a real EAN-13 encoding (won't scan): deterministic,
+// visually plausible bars for the dev-only image.
 function drawBarcode(
 	ctx: SKRSContext2D,
 	barcode: string,
@@ -345,7 +348,6 @@ function main() {
 	}
 	console.log(`Uploaded ${uploaded.size} new voucher image(s).`);
 
-	// Every seed barcode must have an image: newly uploaded or already stored.
 	const imageFor = (barcode: string): string => {
 		const id = uploaded.get(barcode) ?? existing.get(barcode);
 		if (!id) throw new Error(`No image found for ${barcode}`);

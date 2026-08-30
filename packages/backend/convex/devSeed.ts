@@ -28,7 +28,8 @@ function dayAtUtc(daysFromNow: number, hours: number, minutes: number): number {
 	);
 }
 
-// Days between validFrom and expiry when the spec doesn't say otherwise.
+// Mirrored by VALID_FROM_DAYS_BEFORE_EXPIRY in scripts/seed-dev.ts so the drawn
+// voucher's "Valid ..." range matches the stored row.
 const DEFAULT_VALID_FROM_DAYS_BEFORE_EXPIRY = 9;
 
 // Storage writes (ctx.storage.store) are action-only in Convex; mutations
@@ -98,10 +99,9 @@ export const seedDevVouchers = internalMutation({
 					lastActiveAt: Date.now(),
 				});
 
-		// Seed rows live under a fixed list of known numeric barcodes shared
-		// with scripts/seed-dev.ts: duplicates are skipped here and
-		// clearSeedVouchers only deletes explicitly listed barcodes, so
-		// neither path can touch a real user's voucher.
+		// Barcodes come from the fixed list in scripts/seed-dev.ts (SEED_MIX);
+		// keep that list in sync. Duplicates are skipped here, and
+		// clearSeedVouchers deletes only explicitly listed barcodes.
 		const inserted: Array<{
 			barcode: string;
 			status: string;
@@ -153,8 +153,6 @@ export const clearSeedVouchers = internalMutation({
 	handler: async (ctx, { barcodes }) => {
 		requireDevelopment();
 
-		// Only the explicitly listed barcodes are touched; there is no prefix
-		// or pattern scan, so a real user's voucher can never be deleted.
 		const deleted: string[] = [];
 		const missing: string[] = [];
 		for (const barcode of barcodes) {
