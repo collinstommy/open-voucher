@@ -245,6 +245,7 @@ function setupFetchMock(
 describe("Voucher Upload Flow", () => {
 	beforeEach(() => {
 		setupFetchMock("valid_10");
+		vi.stubEnv("TELEGRAM_BOT_TOKEN", "test-bot-token");
 		vi.stubEnv("GOOGLE_GENERATIVE_AI_API_KEY", "test-api-key");
 		vi.useFakeTimers({ now: Date.now() });
 	});

@@ -22,6 +22,7 @@ import type * as analytics from "../analytics.js";
 import type * as auth from "../auth.js";
 import type * as crons from "../crons.js";
 import type * as devSeed from "../devSeed.js";
+import type * as devTest from "../devTest.js";
 import type * as errors from "../errors.js";
 import type * as http from "../http.js";
 import type * as messages from "../messages.js";
@@ -54,6 +55,7 @@ declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   crons: typeof crons;
   devSeed: typeof devSeed;
+  devTest: typeof devTest;
   errors: typeof errors;
   http: typeof http;
   messages: typeof messages;
