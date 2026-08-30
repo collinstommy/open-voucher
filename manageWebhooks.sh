@@ -199,17 +199,23 @@ set_convex_vars() {
     echo ""
 }
 
-# Test-only Convex env vars must never leak into production; they redirect
-# outbound traffic at fake servers (tests/e2e/fakeBotApi.ts).
+# Test-only Convex env vars must never leak into production:
+#   - TELEGRAM_API_BASE redirects outbound bot traffic at the fake Bot API
+#     (tests/e2e/fakeBotApi.ts).
+#   - OCR_BYPASS makes uploads store placeholder vouchers instead of running
+#     Gemini OCR.
+#   - GOOGLE_JWKS_URL points auth token verification at a locally generated
+#     JWKS. Not wired yet (lands with the stage-1 auth slice); the name is
+#     pinned by the plan, so guard it from day one.
 assert_test_only_vars_unset() {
     echo "Verifying test-only Convex env vars are unset in prod..."
-    for VAR in TELEGRAM_API_BASE GOOGLE_JWKS_URL; do
+    for VAR in TELEGRAM_API_BASE GOOGLE_JWKS_URL OCR_BYPASS; do
         if (cd packages/backend && npx convex env list --prod) | grep -q "^${VAR}="; then
             echo "Error: ${VAR} must not be set in production"
             exit 1
         fi
     done
-    echo "OK: TELEGRAM_API_BASE and GOOGLE_JWKS_URL are unset in prod."
+    echo "OK: test-only vars are unset in prod."
 }
 
 # Delete existing webhook

@@ -186,8 +186,8 @@ async function start(): Promise<E2EEnv> {
 	convexSync(["env", "set", "TELEGRAM_WEBHOOK_SECRET", WEBHOOK_SECRET]);
 	convexSync(["env", "set", "ENVIRONMENT", "development"]);
 	convexSync(["env", "set", "TELEGRAM_API_BASE", fake.baseUrl]);
-	// Make sure the dev OCR bypass is active (no Google key on the local backend).
-	convexSync(["env", "remove", "GOOGLE_GENERATIVE_AI_API_KEY"], true);
+	// Make sure the dev OCR bypass is active (set OCR_BYPASS=1).
+	convexSync(["env", "set", "OCR_BYPASS", "1"]);
 
 	// HTTP actions endpoint health check (404 on unknown paths is fine).
 	{
@@ -213,8 +213,6 @@ async function start(): Promise<E2EEnv> {
 
 	const client = new ConvexHttpClient(convexUrl);
 
-	// Keep the child alive until tests needing it are done; when the last file
-	// releases the env, kill the backend.
 	const env: E2EEnv = {
 		fake,
 		convexUrl,

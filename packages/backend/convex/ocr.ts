@@ -6,6 +6,7 @@ import { callGeminiApi } from "../src/lib/gemini";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import {
+	type ActionCtx,
 	internalAction,
 	internalMutation,
 	type MutationCtx,
@@ -763,6 +764,31 @@ async function fetchImageAsBase64(url: string): Promise<string> {
 }
 
 // --- process.ts ---
+function usePlaceholderOcr(): boolean {
+	return process.env.OCR_BYPASS === "1";
+}
+
+async function storePlaceholderVoucher(
+	ctx: ActionCtx,
+	userId: Id<"users">,
+	imageStorageId: Id<"_storage">,
+) {
+	const result = await ctx.runMutation(internal.ocr.storeVoucherFromOcr, {
+		userId,
+		imageStorageId,
+		type: "10",
+		expiryDate: dayjs().add(14, "day").format("YYYY-MM-DD"),
+		barcode: `DEV-${imageStorageId}`,
+		isThreePlus: false,
+		rawResponse: "dev-ocr-bypass",
+	});
+	console.log(
+		result.success
+			? `Dev OCR bypass: voucher created ${result.voucherId}`
+			: `Dev OCR bypass: voucher rejected ${result.reason}`,
+	);
+}
+
 export const processVoucherImage = internalAction({
 	args: {
 		userId: v.id("users"),
@@ -771,26 +797,11 @@ export const processVoucherImage = internalAction({
 	handler: async (ctx, args) => {
 		const { userId, imageStorageId } = args;
 
-		// Dev bypass: with no Google API key configured, skip OCR and store a
-		// placeholder voucher so local dev and E2E work without external calls.
-		if (
-			process.env.ENVIRONMENT === "development" &&
-			!process.env.GOOGLE_GENERATIVE_AI_API_KEY
-		) {
-			const result = await ctx.runMutation(internal.ocr.storeVoucherFromOcr, {
-				userId,
-				imageStorageId,
-				type: "10",
-				expiryDate: dayjs().add(14, "day").format("YYYY-MM-DD"),
-				barcode: `DEV-${imageStorageId}`,
-				isThreePlus: false,
-				rawResponse: "dev-ocr-bypass",
-			});
-			console.log(
-				result.success
-					? `Dev OCR bypass: voucher created ${result.voucherId}`
-					: `Dev OCR bypass: voucher rejected ${result.reason}`,
-			);
+		// Dev bypass: only when explicitly enabled (OCR_BYPASS=1) on a development
+		// deployment. Never key this off a missing API key alone — prod must fail
+		// loudly instead of storing placeholder vouchers.
+		if (usePlaceholderOcr()) {
+			await storePlaceholderVoucher(ctx, userId, imageStorageId);
 			return;
 		}
 

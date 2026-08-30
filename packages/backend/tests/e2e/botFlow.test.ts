@@ -3,6 +3,7 @@
 // and DB/storage state is read back through the devTest seam.
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { SIGNUP_BONUS } from "../../src/lib/constants";
 import { reportData } from "../../src/telegram/router";
 import { type E2EEnv, releaseE2EEnv, useE2EEnv } from "./e2eTestEnv";
 import {
@@ -102,7 +103,7 @@ describe("E2E: Telegram bot happy paths", () => {
 			async () => await env.getUserByChatId(String(chatId)),
 		);
 		expect(user).not.toBeNull();
-		expect(user?.coins).toBe(10); // SIGNUP_BONUS
+		expect(user?.coins).toBe(SIGNUP_BONUS);
 	}, 45_000);
 
 	test("upload journey: photo message stores asset and creates an available voucher", async () => {

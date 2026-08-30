@@ -5,8 +5,7 @@ import { action, internalMutation, query } from "./_generated/server";
 
 // Dev-only test seam for local dev and E2E tests. Every public function is
 // guarded on ENVIRONMENT === "development" (same pattern as dev-auth in
-// http.ts) and does nothing on any other deployment. Keep this namespace
-// minimal.
+// http.ts) and throws on any other deployment. Keep this namespace minimal.
 
 function assertDevOnly() {
 	if (process.env.ENVIRONMENT !== "development") {
@@ -18,8 +17,9 @@ function assertDevOnly() {
 // uploader of a seeded voucher.
 const SEED_UPLOADER_CHAT_ID = "e2e-seed-uploader";
 
-// An action because only actions can write to storage; the DB insert happens
-// in the internal mutation below.
+// An action because the storage write lives in another action
+// (devSeed.uploadSeedImage) and mutations can't run actions; the DB insert
+// happens in the internal mutation below.
 export const seedVoucher = action({
 	args: {
 		// Raw bytes of a small test image (JPEG).

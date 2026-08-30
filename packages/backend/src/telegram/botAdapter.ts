@@ -15,7 +15,7 @@ export function telegramApiUrl(token: string, method: string): string {
 	return `${base}/bot${token}/${method}`;
 }
 
-// File downloads use a different URL shape than API methods.
+// File downloads use /file/bot<token>/<path>, not /bot<token>/<method>.
 export function telegramFileUrl(token: string, filePath: string): string {
 	const base = process.env.TELEGRAM_API_BASE ?? "https://api.telegram.org";
 	return `${base}/file/bot${token}/${filePath}`;
