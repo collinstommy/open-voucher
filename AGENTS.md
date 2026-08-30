@@ -53,6 +53,7 @@ The following `bun run` scripts are available from the root directory:
 *   `bun run dev:web`: Starts only the web frontend application in development mode.
 *   `bun run dev:server`: Starts only the Convex backend server in development mode.
 *   `bun run dev:setup`: Sets up and configures the Convex project.
+*   `bun run seed:dev`: Seeds the dev Convex database (`fastidious-okapi-116`) with 7 test vouchers.
 *   `bun run deploy:web`: Deploy production Cloudflare Worker.
 *   `bun run deploy:web:dev`: Deploy dev Cloudflare Worker (`dev.openvouchers.org`, always dev Convex).
 *   `bun run deploy:dev`: Deploy dev worker + register dev bot commands.
