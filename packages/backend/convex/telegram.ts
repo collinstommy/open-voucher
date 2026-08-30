@@ -1,22 +1,33 @@
 import { v } from "convex/values";
 import dayjs from "dayjs";
 import advancedFormat from "dayjs/plugin/advancedFormat";
+import { assertValidSession } from "../src/lib/adminAuth";
+import { UPLOAD_REWARDS } from "../src/lib/constants";
+import { classifyInboundMessage } from "../src/lib/messageIntent";
+import {
+	realBotAdapter,
+	telegramApiUrl,
+	telegramFileUrl,
+} from "../src/telegram/botAdapter";
+import {
+	appWebAppKeyboard,
+	faqMenuKeyboard,
+	feedbackWebAppKeyboard,
+	getMiniAppUrl,
+	helpMenuKeyboard,
+	webAppKeyboard,
+} from "../src/telegram/keyboards";
+import { reportData, uploaderData } from "../src/telegram/router";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import type { ActionCtx } from "./_generated/server";
 import { action, internalAction } from "./_generated/server";
-import { assertValidSession } from "../src/lib/adminAuth";
-import { UPLOAD_REWARDS } from "../src/lib/constants";
-import { classifyInboundMessage } from "../src/lib/messageIntent";
-import { realBotAdapter } from "../src/telegram/botAdapter";
-import { reportData, uploaderData } from "../src/telegram/router";
-import { helpMenuKeyboard, faqMenuKeyboard, appWebAppKeyboard, feedbackWebAppKeyboard, getMiniAppUrl, webAppKeyboard } from "../src/telegram/keyboards";
 import "../src/telegram/handlers/report";
 import "../src/telegram/handlers/help";
 import "../src/telegram/handlers/faq";
 import "../src/telegram/handlers/uploader";
-import { dispatch } from "../src/telegram/router";
 import type { CallbackContext } from "../src/telegram/router";
+import { dispatch } from "../src/telegram/router";
 
 dayjs.extend(advancedFormat);
 
@@ -593,7 +604,7 @@ async function sendTelegramMessage(
 		return;
 	}
 
-	const url = `https://api.telegram.org/bot${token}/sendMessage`;
+	const url = telegramApiUrl(token, "sendMessage");
 	try {
 		const body: Record<string, unknown> = {
 			chat_id: chatId,
@@ -645,7 +656,7 @@ async function sendTelegramPhoto(
 		return true;
 	}
 
-	const url = `https://api.telegram.org/bot${token}/sendPhoto`;
+	const url = telegramApiUrl(token, "sendPhoto");
 	try {
 		const imageRes = await fetch(photoUrl);
 		if (!imageRes.ok) {
@@ -701,7 +712,7 @@ async function setBotCommands() {
 		{ command: "donate", description: "Support the project" },
 	];
 
-	const url = `https://api.telegram.org/bot${token}/setMyCommands`;
+	const url = telegramApiUrl(token, "setMyCommands");
 	try {
 		const response = await fetch(url, {
 			method: "POST",
@@ -719,7 +730,7 @@ async function setBotCommands() {
 		console.error("Network error setting bot commands:", error);
 	}
 
-	const menuButtonUrl = `https://api.telegram.org/bot${token}/setChatMenuButton`;
+	const menuButtonUrl = telegramApiUrl(token, "setChatMenuButton");
 	try {
 		const response = await fetch(menuButtonUrl, {
 			method: "POST",
@@ -768,8 +779,8 @@ export const handleTelegramCallback = internalAction({
 				Array.isArray(callbackQuery.message.photo) &&
 				callbackQuery.message.photo.length > 0,
 		};
-	await dispatch(c, callbackQuery.data, realBotAdapter());
-},
+		await dispatch(c, callbackQuery.data, realBotAdapter());
+	},
 });
 
 async function editTelegramMessageText(
@@ -782,7 +793,7 @@ async function editTelegramMessageText(
 		return;
 	}
 
-	const url = `https://api.telegram.org/bot${token}/editMessageText`;
+	const url = telegramApiUrl(token, "editMessageText");
 	try {
 		await fetch(url, {
 			method: "POST",
@@ -806,7 +817,7 @@ async function answerTelegramCallback(callbackQueryId: string, text?: string) {
 		return;
 	}
 
-	const url = `https://api.telegram.org/bot${token}/answerCallbackQuery`;
+	const url = telegramApiUrl(token, "answerCallbackQuery");
 	try {
 		await fetch(url, {
 			method: "POST",
@@ -823,9 +834,10 @@ async function answerTelegramCallback(callbackQueryId: string, text?: string) {
 
 async function getTelegramFileUrl(fileId: string): Promise<string> {
 	const token = process.env.TELEGRAM_BOT_TOKEN;
-	const res = await fetch(
-		`https://api.telegram.org/bot${token}/getFile?file_id=${fileId}`,
-	);
+	if (!token) {
+		throw new Error("TELEGRAM_BOT_TOKEN is not set");
+	}
+	const res = await fetch(telegramApiUrl(token, `getFile?file_id=${fileId}`));
 	const data = (await res.json()) as {
 		ok: boolean;
 		description?: string;
@@ -834,7 +846,7 @@ async function getTelegramFileUrl(fileId: string): Promise<string> {
 	if (!data.ok) {
 		throw new Error(`Failed to get file path: ${data.description}`);
 	}
-	return `https://api.telegram.org/file/bot${token}/${data.result?.file_path}`;
+	return telegramFileUrl(token, data.result?.file_path ?? "");
 }
 
 type HealthCheckResult = {
@@ -859,10 +871,9 @@ async function performHealthCheck(ctx: ActionCtx): Promise<HealthCheckResult> {
 			message: "No test voucher image configured",
 		};
 	} else {
-		const ocrResult = await ctx.runAction(
-			internal.ocr.extractFromImage,
-			{ imageStorageId: testImageSetting as Id<"_storage"> },
-		);
+		const ocrResult = await ctx.runAction(internal.ocr.extractFromImage, {
+			imageStorageId: testImageSetting as Id<"_storage">,
+		});
 
 		if (ocrResult.expiryDate === expectedExpiry) {
 			ocrTest = {
@@ -885,9 +896,7 @@ async function performHealthCheck(ctx: ActionCtx): Promise<HealthCheckResult> {
 			message: "TELEGRAM_BOT_TOKEN not configured",
 		};
 	} else {
-		const response = await fetch(
-			`https://api.telegram.org/bot${telegramToken}/getMe`,
-		);
+		const response = await fetch(telegramApiUrl(telegramToken, "getMe"));
 		if (response.ok) {
 			telegramTest = {
 				success: true,
@@ -918,9 +927,12 @@ async function performHealthCheck(ctx: ActionCtx): Promise<HealthCheckResult> {
 export const runHealthCheck = action({
 	args: { token: v.string() },
 	handler: async (ctx, { token }) => {
-		const session = await ctx.runQuery(internal.adminSession.getSessionByToken, {
-			token,
-		});
+		const session = await ctx.runQuery(
+			internal.adminSession.getSessionByToken,
+			{
+				token,
+			},
+		);
 		assertValidSession(session);
 		return performHealthCheck(ctx);
 	},
@@ -960,9 +972,12 @@ export const runOcrEvals = action({
 			error?: string;
 		}>;
 	}> => {
-		const session = await ctx.runQuery(internal.adminSession.getSessionByToken, {
-			token,
-		});
+		const session = await ctx.runQuery(
+			internal.adminSession.getSessionByToken,
+			{
+				token,
+			},
+		);
 		assertValidSession(session);
 		return ctx.runAction(internal.ocr.runOcrEvalsInternal, {
 			images,
@@ -994,9 +1009,12 @@ export const runSingleOcrEval = action({
 			error?: string;
 		}>;
 	}> => {
-		const session = await ctx.runQuery(internal.adminSession.getSessionByToken, {
-			token,
-		});
+		const session = await ctx.runQuery(
+			internal.adminSession.getSessionByToken,
+			{
+				token,
+			},
+		);
 		assertValidSession(session);
 		return ctx.runAction(internal.ocr.runImageOcrEval, {
 			filename,

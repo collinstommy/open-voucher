@@ -1,13 +1,15 @@
+import { v } from "convex/values";
 import dayjs from "dayjs";
-import type { Id } from "./_generated/dataModel";
-import { UPLOAD_REWARDS } from "../src/lib/constants";
 import { applyCoinDelta } from "../src/lib/coinLedger";
+import { UPLOAD_REWARDS } from "../src/lib/constants";
 import { callGeminiApi } from "../src/lib/gemini";
 import { internal } from "./_generated/api";
-import { internalAction } from "./_generated/server";
-import { internalMutation, type MutationCtx } from "./_generated/server";
-import { v } from "convex/values";
-
+import type { Id } from "./_generated/dataModel";
+import {
+	internalAction,
+	internalMutation,
+	type MutationCtx,
+} from "./_generated/server";
 
 // --- evals.ts ---
 // Test configuration: image filename -> test date -> expected result
@@ -769,27 +771,44 @@ export const processVoucherImage = internalAction({
 	handler: async (ctx, args) => {
 		const { userId, imageStorageId } = args;
 
-		try {
-			const extracted = await ctx.runAction(
-				internal.ocr.extractFromImage,
-				{
-					imageStorageId,
-				},
+		// Dev bypass: with no Google API key configured, skip OCR and store a
+		// placeholder voucher so local dev and E2E work without external calls.
+		if (
+			process.env.ENVIRONMENT === "development" &&
+			!process.env.GOOGLE_GENERATIVE_AI_API_KEY
+		) {
+			const result = await ctx.runMutation(internal.ocr.storeVoucherFromOcr, {
+				userId,
+				imageStorageId,
+				type: "10",
+				expiryDate: dayjs().add(14, "day").format("YYYY-MM-DD"),
+				barcode: `DEV-${imageStorageId}`,
+				isThreePlus: false,
+				rawResponse: "dev-ocr-bypass",
+			});
+			console.log(
+				result.success
+					? `Dev OCR bypass: voucher created ${result.voucherId}`
+					: `Dev OCR bypass: voucher rejected ${result.reason}`,
 			);
+			return;
+		}
 
-			const result = await ctx.runMutation(
-				internal.ocr.storeVoucherFromOcr,
-				{
-					userId,
-					imageStorageId,
-					type: String(extracted.type),
-					validFrom: extracted.validFrom || undefined,
-					expiryDate: extracted.expiryDate || undefined,
-					barcode: extracted.barcode || undefined,
-					isThreePlus: extracted.isThreePlus,
-					rawResponse: extracted.rawResponse,
-				},
-			);
+		try {
+			const extracted = await ctx.runAction(internal.ocr.extractFromImage, {
+				imageStorageId,
+			});
+
+			const result = await ctx.runMutation(internal.ocr.storeVoucherFromOcr, {
+				userId,
+				imageStorageId,
+				type: String(extracted.type),
+				validFrom: extracted.validFrom || undefined,
+				expiryDate: extracted.expiryDate || undefined,
+				barcode: extracted.barcode || undefined,
+				isThreePlus: extracted.isThreePlus,
+				rawResponse: extracted.rawResponse,
+			});
 
 			if (result.success) {
 				console.log(`Voucher created: ${result.voucherId}`);
@@ -812,7 +831,7 @@ export const processVoucherImage = internalAction({
 			if (user) {
 				await ctx.scheduler.runAfter(0, internal.telegram.sendMessageAction, {
 					chatId: user.telegramChatId,
-					text: `❌ <b>Voucher Processing Failed</b>\n\nWe encountered an error while processing your voucher. Please try again.`,
+					text: "❌ <b>Voucher Processing Failed</b>\n\nWe encountered an error while processing your voucher. Please try again.",
 				});
 			}
 		}

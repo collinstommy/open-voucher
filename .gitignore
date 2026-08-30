@@ -49,6 +49,12 @@ coverage
 tmp
 temp
 
+# Convex local dev backend state
+.convex/
+
+# E2E runner pid file
+packages/backend/tests/e2e/.backend.pid
+
 *spec.md
 .note/
 .superpowers

@@ -6,7 +6,7 @@
 		"dev:setup": "convex dev --configure --until-success",
 		"test": "vitest run",
 		"test:watch": "vitest",
-		"test:e2e": "bun test tests/convex-test/",
+		"test:e2e": "bun test tests/e2e/",
 		"check-types": "tsc --noEmit",
 		"deploy": "convex deploy -y",
 		"register-commands": "convex run telegram:registerBotCommands --prod",

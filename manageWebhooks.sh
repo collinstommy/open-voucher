@@ -199,6 +199,19 @@ set_convex_vars() {
     echo ""
 }
 
+# Test-only Convex env vars must never leak into production; they redirect
+# outbound traffic at fake servers (tests/e2e/fakeBotApi.ts).
+assert_test_only_vars_unset() {
+    echo "Verifying test-only Convex env vars are unset in prod..."
+    for VAR in TELEGRAM_API_BASE GOOGLE_JWKS_URL; do
+        if (cd packages/backend && npx convex env list --prod) | grep -q "^${VAR}="; then
+            echo "Error: ${VAR} must not be set in production"
+            exit 1
+        fi
+    done
+    echo "OK: TELEGRAM_API_BASE and GOOGLE_JWKS_URL are unset in prod."
+}
+
 # Delete existing webhook
 echo "=== Step 1: Deleting existing webhook ==="
 delete_webhook "$TELEGRAM_TOKEN" "$ENV"
@@ -210,5 +223,9 @@ set_webhook "$TELEGRAM_TOKEN" "$CONVEX_WEBHOOK_URL" "$ENV" "$TELEGRAM_WEBHOOK_SE
 # Set Convex environment variables
 echo "=== Step 3: Setting Convex environment variables ==="
 set_convex_vars "$ENV" "$TELEGRAM_TOKEN" "$GOOGLE_GENERATIVE_AI_API_KEY" "$TELEGRAM_WEBHOOK_SECRET" "$ADMIN_PASSWORD"
+
+if [ "$ENV" = "prd" ]; then
+    assert_test_only_vars_unset
+fi
 
 echo "=== Complete webhook and environment setup for $ENV ==="
