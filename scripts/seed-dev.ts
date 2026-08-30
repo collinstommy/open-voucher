@@ -233,6 +233,23 @@ function runConvex(args: string[], cwd: string) {
 	return { stdout, stderr };
 }
 
+// The devSeed module lives on the branch; a code push from a checkout
+// without it can remove the functions from the deployment. Retry once with
+// --push, which redeploys this checkout's convex code.
+function runDevSeed(args: string[], cwd: string) {
+	try {
+		return runConvex(args, cwd);
+	} catch (error) {
+		if (
+			error instanceof Error &&
+			error.message.includes("Could not find function")
+		) {
+			return runConvex([...args, "--push"], cwd);
+		}
+		throw error;
+	}
+}
+
 type UploadResult = { storageId: string };
 type ClearResult = { deleted: string[]; missing: string[] };
 type SeedSummary = {
@@ -292,7 +309,7 @@ function main() {
 
 	if (reset) {
 		const result = parseResult<ClearResult>(
-			runConvex(
+			runDevSeed(
 				[
 					"run",
 					"devSeed:clearSeedVouchers",
@@ -330,7 +347,7 @@ function main() {
 	);
 
 	const uploaded = new Map<string, string>();
-	for (const [i, { spec, base64 }] of pngs.entries()) {
+	for (const { spec, base64 } of pngs) {
 		const args = [
 			"run",
 			"devSeed:uploadSeedImage",
@@ -338,11 +355,8 @@ function main() {
 			"--deployment",
 			deployment,
 		];
-		// Push the devSeed module to the dev deployment on the first upload;
-		// later uploads reuse the already-pushed code.
-		if (i === 0) args.push("--push");
 		const parsed = parseResult<UploadResult>(
-			runConvex(args, BACKEND_DIR).stdout,
+			runDevSeed(args, BACKEND_DIR).stdout,
 		);
 		uploaded.set(spec.barcode, parsed.storageId);
 	}
@@ -362,7 +376,7 @@ function main() {
 		})),
 	};
 	const summary = parseResult<SeedSummary>(
-		runConvex(
+		runDevSeed(
 			[
 				"run",
 				"devSeed:seedDevVouchers",
