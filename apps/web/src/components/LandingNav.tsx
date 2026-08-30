@@ -1,13 +1,15 @@
+import { Link } from "@tanstack/react-router";
+
 export default function LandingNav() {
 	return (
 		<nav className="bg-gray-900 py-4">
 			<div className="container mx-auto px-6 flex justify-between items-center">
-				<div className="flex items-center gap-2">
+				<Link to="/" className="flex items-center gap-2">
 					<span className="text-2xl">🛒</span>
 					<span className="font-bold text-xl tracking-tight text-white">
 						Open Vouchers
 					</span>
-				</div>
+				</Link>
 				<a
 					href="https://buymeacoffee.com/openvouchers"
 					target="_blank"
