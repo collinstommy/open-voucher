@@ -5,6 +5,7 @@ export type MenuItemId =
 	| "transactions"
 	| "faq"
 	| "feedback"
+	| "discord"
 	| "share"
 	| "donate";
 
@@ -82,5 +83,13 @@ export const MENU_ITEMS: MenuItem[] = [
 		href: "/app/feedback",
 		icon: "💬",
 		iconClass: "bg-orange-100 text-orange-600",
+	},
+	{
+		id: "discord",
+		label: "Join our Discord",
+		description: "Chat with the community",
+		external: true,
+		icon: "👥",
+		iconClass: "bg-indigo-100 text-indigo-600",
 	},
 ];

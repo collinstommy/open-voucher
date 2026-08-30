@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { DISCORD_URL, openDiscordLink } from "@/lib/openDiscordLink";
 
 export type FaqItem = {
 	id: string;
@@ -106,4 +107,28 @@ export const LANDING_FAQ_ITEMS: FaqItem[] = [
 export const APP_FAQ_ITEMS: FaqItem[] = [
 	...UPLOAD_CLAIM_FAQ,
 	...LANDING_FAQ_ITEMS,
+	{
+		id: "discord",
+		q: "How do I join the community?",
+		a: (
+			<>
+				<p>
+					Ask questions, report problems, and chat with other members in our{" "}
+					<a
+						href={DISCORD_URL}
+						target="_blank"
+						rel="noopener noreferrer"
+						onClick={(e) => {
+							e.preventDefault();
+							openDiscordLink();
+						}}
+						className="text-blue-600 underline"
+					>
+						Discord server
+					</a>
+					.
+				</p>
+			</>
+		),
+	},
 ];
