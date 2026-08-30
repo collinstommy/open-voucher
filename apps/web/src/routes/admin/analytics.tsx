@@ -249,7 +249,7 @@ function AnalyticsPage() {
 											<span className="font-medium">Unknown user</span>
 										)}
 										<div className="text-muted-foreground text-xs">
-											{item.telegramChatId} • {formatDateTime(item.createdAt)}
+											{item.telegramChatId ?? "Not linked"} • {formatDateTime(item.createdAt)}
 										</div>
 										{item.classifiedIntent && (
 											<div className="mt-1 text-xs">

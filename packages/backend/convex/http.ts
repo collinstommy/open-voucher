@@ -3,6 +3,8 @@ import { httpAction, type ActionCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { verifyTelegramInitData } from "../src/lib/telegramAuth";
 import { issueJwt } from "../src/lib/jwt";
+import { verifyGoogleIdToken } from "../src/lib/googleAuth";
+import type { GoogleAuthUser } from "./auth";
 
 const http = httpRouter();
 
@@ -24,6 +26,125 @@ function getCorsHeaders(request: Request): Record<string, string> {
 		"Access-Control-Allow-Methods": "POST, OPTIONS",
 		"Access-Control-Allow-Headers": "Content-Type",
 	};
+}
+
+/** JSON response with the user's telegramChatId normalized to null for the wire. */
+function authUserJson(user: GoogleAuthUser) {
+	return { ...user, telegramChatId: user.telegramChatId ?? null };
+}
+
+/**
+ * POST /api/google-auth — Google sign-in, /link-code redemption, and
+ * self-serve fork merge. Status mapping (pinned in the auth contract):
+ *   400 dead link code (unknown, used, expired, over attempt cap)
+ *   401 invalid / expired / wrong-audience Google token
+ *   409 link conflicts (google_linked_to_other_user, user_already_has_google)
+ *   429 rate limited (per verified Google sub)
+ *   200 known user, or { known: false } choice screen, or created/merged user
+ * Ban behavior unchanged: a JWT is issued regardless of isBanned.
+ */
+async function handleGoogleAuth(
+	ctx: ActionCtx,
+	corsHeaders: Record<string, string>,
+	body: { idToken?: unknown; linkCode?: unknown; intent?: unknown },
+): Promise<Response> {
+	const idToken = typeof body.idToken === "string" ? body.idToken : undefined;
+	if (!idToken) {
+		return new Response(JSON.stringify({ error: "Missing idToken" }), {
+			status: 400,
+			headers: corsHeaders,
+		});
+	}
+
+	const clientId = process.env.GOOGLE_ANDROID_CLIENT_ID;
+	if (!clientId) {
+		console.error("GOOGLE_ANDROID_CLIENT_ID is not set");
+		return new Response(JSON.stringify({ error: "Server configuration error" }), {
+			status: 500,
+			headers: corsHeaders,
+		});
+	}
+
+	const verified = await verifyGoogleIdToken(idToken, { clientId });
+	if ("error" in verified) {
+		return new Response(JSON.stringify({ error: verified.error }), {
+			status: 401,
+			headers: corsHeaders,
+		});
+	}
+
+	const rateLimit = await ctx.runMutation(internal.auth.checkGoogleAuthRateLimit, {
+		sub: verified.sub,
+	});
+	if (!rateLimit.allowed) {
+		return new Response(JSON.stringify({ error: "rate_limited" }), {
+			status: 429,
+			headers: {
+				...corsHeaders,
+				"Retry-After": String(Math.ceil(rateLimit.retryAfterMs / 1000)),
+			},
+		});
+	}
+
+	const linkCode =
+		typeof body.linkCode === "string" && body.linkCode.trim().length > 0
+			? body.linkCode
+			: undefined;
+
+	if (linkCode) {
+		const result = await ctx.runMutation(internal.auth.redeemLinkCode, {
+			code: linkCode,
+			sub: verified.sub,
+			email: verified.email,
+			name: verified.displayName,
+		});
+		if (!result.ok) {
+			const deadCode =
+				result.conflict === "code_invalid_or_expired" ||
+				result.conflict === "too_many_attempts";
+			return new Response(JSON.stringify({ error: result.conflict }), {
+				status: deadCode ? 400 : 409,
+				headers: corsHeaders,
+			});
+		}
+		const jwt = await issueJwt(result.user._id);
+		return new Response(
+			JSON.stringify({
+				user: authUserJson(result.user),
+				jwt,
+				created: false,
+				...(result.idempotent ? { idempotent: true } : {}),
+				...(result.merged ? { merged: true } : {}),
+				...(result.warning ? { warning: result.warning } : {}),
+			}),
+			{ status: 200, headers: corsHeaders },
+		);
+	}
+
+	const intent = body.intent === "create" ? "create" : undefined;
+	const resolved = await ctx.runMutation(internal.auth.resolveGoogleIdentity, {
+		sub: verified.sub,
+		email: verified.email,
+		name: verified.displayName,
+		allowCreate: intent === "create",
+	});
+
+	if (resolved.status === "unknown") {
+		return new Response(JSON.stringify({ known: false }), {
+			status: 200,
+			headers: corsHeaders,
+		});
+	}
+
+	const jwt = await issueJwt(resolved.user._id);
+	return new Response(
+		JSON.stringify({
+			user: authUserJson(resolved.user),
+			jwt,
+			created: resolved.status === "created",
+		}),
+		{ status: 200, headers: corsHeaders },
+	);
 }
 
 async function handleDevAuth(
@@ -157,6 +278,50 @@ http.route({
 
 http.route({
 	path: "/api/dev-auth",
+	method: "OPTIONS",
+	handler: httpAction(async (_ctx, request) => {
+		return new Response(null, {
+			status: 204,
+			headers: getCorsHeaders(request),
+		});
+	}),
+});
+
+http.route({
+	path: "/api/google-auth",
+	method: "POST",
+	handler: httpAction(async (ctx, request) => {
+		const corsHeaders = {
+			...getCorsHeaders(request),
+			"Content-Type": "application/json",
+		};
+		try {
+			const body = await request.json();
+			return await handleGoogleAuth(
+				ctx,
+				corsHeaders,
+				typeof body === "object" && body !== null ? body : {},
+			);
+		} catch (error) {
+			if (error instanceof SyntaxError) {
+				return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
+					status: 400,
+					headers: corsHeaders,
+				});
+			}
+			const message =
+				error instanceof Error ? error.message : "Google auth failed";
+			console.error("Google auth error:", error);
+			return new Response(JSON.stringify({ error: message }), {
+				status: 500,
+				headers: corsHeaders,
+			});
+		}
+	}),
+});
+
+http.route({
+	path: "/api/google-auth",
 	method: "OPTIONS",
 	handler: httpAction(async (_ctx, request) => {
 		return new Response(null, {

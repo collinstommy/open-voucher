@@ -3,6 +3,7 @@ import dayjs from "dayjs";
 import { applyCoinDelta } from "../src/lib/coinLedger";
 import { UPLOAD_REWARDS } from "../src/lib/constants";
 import { callGeminiApi } from "../src/lib/gemini";
+import { notifyUser } from "../src/lib/notify";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import {
@@ -840,10 +841,11 @@ export const processVoucherImage = internalAction({
 
 			const user = await ctx.runQuery(internal.users.getUserById, { userId });
 			if (user) {
-				await ctx.scheduler.runAfter(0, internal.telegram.sendMessageAction, {
-					chatId: user.telegramChatId,
-					text: "❌ <b>Voucher Processing Failed</b>\n\nWe encountered an error while processing your voucher. Please try again.",
-				});
+				await notifyUser(
+					ctx,
+					user,
+					"❌ <b>Voucher Processing Failed</b>\n\nWe encountered an error while processing your voucher. Please try again.",
+				);
 			}
 		}
 	},
@@ -960,7 +962,7 @@ export const storeVoucherFromOcr = internalMutation({
 				expiryDate,
 				validFrom,
 			});
-			await sendErrorMessage(ctx, user.telegramChatId, "INVALID_TYPE");
+			await sendErrorMessage(ctx, user, "INVALID_TYPE");
 			return { success: false, reason: "INVALID_TYPE" };
 		}
 
@@ -979,11 +981,7 @@ export const storeVoucherFromOcr = internalMutation({
 					validFrom,
 				},
 			);
-			await sendErrorMessage(
-				ctx,
-				user.telegramChatId,
-				"COULD_NOT_READ_EXPIRY_DATE",
-			);
+			await sendErrorMessage(ctx, user, "COULD_NOT_READ_EXPIRY_DATE");
 			return { success: false, reason: "COULD_NOT_READ_EXPIRY_DATE" };
 		}
 
@@ -995,7 +993,7 @@ export const storeVoucherFromOcr = internalMutation({
 				expiryDate,
 				validFrom,
 			});
-			await sendErrorMessage(ctx, user.telegramChatId, "EXPIRED", expiryDateMs);
+			await sendErrorMessage(ctx, user, "EXPIRED", expiryDateMs);
 			return { success: false, reason: "EXPIRED", expiryDate: expiryDateMs };
 		}
 
@@ -1007,12 +1005,7 @@ export const storeVoucherFromOcr = internalMutation({
 				expiryDate,
 				validFrom,
 			});
-			await sendErrorMessage(
-				ctx,
-				user.telegramChatId,
-				"TOO_LATE_TODAY",
-				expiryDateMs,
-			);
+			await sendErrorMessage(ctx, user, "TOO_LATE_TODAY", expiryDateMs);
 			return {
 				success: false,
 				reason: "TOO_LATE_TODAY",
@@ -1034,11 +1027,7 @@ export const storeVoucherFromOcr = internalMutation({
 					validFrom,
 				},
 			);
-			await sendErrorMessage(
-				ctx,
-				user.telegramChatId,
-				"COULD_NOT_READ_BARCODE",
-			);
+			await sendErrorMessage(ctx, user, "COULD_NOT_READ_BARCODE");
 			return { success: false, reason: "COULD_NOT_READ_BARCODE" };
 		}
 
@@ -1061,7 +1050,7 @@ export const storeVoucherFromOcr = internalMutation({
 					validFrom,
 				},
 			);
-			await sendErrorMessage(ctx, user.telegramChatId, "DUPLICATE_BARCODE");
+			await sendErrorMessage(ctx, user, "DUPLICATE_BARCODE");
 			return { success: false, reason: "DUPLICATE_BARCODE" };
 		}
 
@@ -1101,10 +1090,11 @@ export const storeVoucherFromOcr = internalMutation({
 			uploadCount: (user.uploadCount || 0) + 1,
 		});
 
-		await ctx.scheduler.runAfter(0, internal.telegram.sendMessageAction, {
-			chatId: user.telegramChatId,
-			text: `✅ <b>Voucher Accepted!</b>\n\nThanks for sharing a €${type} voucher.\nCoins earned: +${reward}\nNew balance: ${newBalance}`,
-		});
+		await notifyUser(
+			ctx,
+			user,
+			`✅ <b>Voucher Accepted!</b>\n\nThanks for sharing a €${type} voucher.\nCoins earned: +${reward}\nNew balance: ${newBalance}`,
+		);
 
 		console.log(
 			`Voucher created: ${voucherId} (type=${type}, barcode=${barcode})`,
@@ -1115,8 +1105,8 @@ export const storeVoucherFromOcr = internalMutation({
 });
 
 async function sendErrorMessage(
-	ctx: any,
-	chatId: string | number,
+	ctx: MutationCtx,
+	user: { telegramChatId?: string },
 	reason: VoucherOcrFailureReason,
 	expiryDate?: number,
 ) {
@@ -1159,10 +1149,7 @@ async function sendErrorMessage(
 				"We encountered an unknown error while processing your voucher. Please try again or contact support.";
 	}
 
-	await ctx.scheduler.runAfter(0, internal.telegram.sendMessageAction, {
-		chatId,
-		text: message,
-	});
+	await notifyUser(ctx, user, message);
 }
 
 export const recordSystemError = internalMutation({

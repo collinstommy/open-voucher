@@ -11,9 +11,11 @@ export default defineSchema({
 		createdAt: v.number(),
 	}),
 
-	// Users table - stores Telegram users
+	// Users table - stores Telegram users. telegramChatId is optional since
+	// Google sign-in introduced chatless users (authIdentities holds their
+	// identity); Telegram identity stays on this field.
 	users: defineTable({
-		telegramChatId: v.string(),
+		telegramChatId: v.optional(v.string()),
 		username: v.optional(v.string()),
 		firstName: v.optional(v.string()),
 		coins: v.number(),
@@ -37,6 +39,38 @@ export default defineSchema({
 			),
 		),
 	}).index("by_chat_id", ["telegramChatId"]),
+
+	// Google (and later Apple) identities. Telegram identity intentionally
+	// stays on users.telegramChatId — no "telegram" rows here.
+	authIdentities: defineTable({
+		provider: v.union(v.literal("google"), v.literal("apple")),
+		// Google `sub`. Stable across email changes; lookup key.
+		providerAccountId: v.string(),
+		userId: v.id("users"),
+		// Last seen values, display only — never used for lookup.
+		email: v.optional(v.string()),
+		displayName: v.optional(v.string()),
+	})
+		.index("by_provider_account", ["provider", "providerAccountId"])
+		.index("by_user_provider", ["userId", "provider"]),
+
+	// Single-use bot /link codes: prove Telegram ownership for the app to
+	// redeem inside POST /api/google-auth. Dead rows are never cleaned.
+	linkCodes: defineTable({
+		// 8 chars, no 0/1/I/L/O/U, uppercase.
+		code: v.string(),
+		userId: v.id("users"),
+		attempts: v.number(),
+		expiresAt: v.number(),
+		usedAt: v.optional(v.number()),
+	}).index("by_code", ["code"]),
+
+	// Small keyed counters for endpoint rate limiting (see src/lib/rateLimit.ts).
+	rateLimits: defineTable({
+		key: v.string(),
+		count: v.number(),
+		windowStart: v.number(),
+	}).index("by_key", ["key"]),
 
 	messages: defineTable({
 		telegramMessageId: v.number(),
@@ -124,6 +158,7 @@ export default defineSchema({
 			v.literal("self_invalidated"),
 			v.literal("claim_returned"),
 			v.literal("replacement_received"),
+			v.literal("fork_merge_clawback"),
 		),
 		amount: v.number(),
 		voucherId: v.optional(v.id("vouchers")),

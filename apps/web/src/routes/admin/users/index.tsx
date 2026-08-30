@@ -252,7 +252,7 @@ function UsersPage() {
 												{user.username || user.firstName || "Unknown"}
 											</div>
 											<div className="text-muted-foreground text-xs">
-												{user.telegramChatId}
+												{user.telegramChatId ?? "Not linked"}
 											</div>
 										</div>
 									</Link>

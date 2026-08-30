@@ -11,6 +11,7 @@ import { userMutation, userQuery } from "./auth";
 import { CLAIM_COSTS, UPLOAD_REWARDS } from "../src/lib/constants";
 import { applyCoinDelta } from "../src/lib/coinLedger";
 import { recalculateReportCounts } from "../src/lib/reportCounts";
+import { notifyUser } from "../src/lib/notify";
 
 function getVoucherExpiryCalendarDay(expiryDate: number): string {
 	const date = new Date(expiryDate);
@@ -71,10 +72,11 @@ export const uploadVoucher = internalMutation({
 			.collect();
 
 		if (recentUploads.length >= MAX_DAILY_UPLOADS) {
-			await ctx.scheduler.runAfter(0, internal.telegram.sendMessageAction, {
-				chatId: user.telegramChatId,
-				text: "🚫 <b>Daily Upload Limit Reached</b>\n\nYou can only upload 10 vouchers per 24 hours. Please try again later.",
-			});
+			await notifyUser(
+				ctx,
+				user,
+				"🚫 <b>Daily Upload Limit Reached</b>\n\nYou can only upload 10 vouchers per 24 hours. Please try again later.",
+			);
 			return null;
 		}
 
@@ -322,7 +324,7 @@ export const reportVoucher = internalMutation({
 			);
 			if (last5Reported.length >= 3 && !user.flaggedForReviewAt) {
 				console.log(
-					`🚫 REPORTER FLAG: User ${user._id} (${user.telegramChatId}) flagged for excessive reporting. ` +
+					`🚫 REPORTER FLAG: User ${user._id} flagged for excessive reporting. ` +
 						`Reported ${last5Reported.length} of last 5 claims. ` +
 						`Total claims: ${last5Claims.length}, Total reports: ${reporterReports.length}`,
 				);
@@ -356,7 +358,7 @@ export const reportVoucher = internalMutation({
 			await recalculateReportCounts(ctx, [user._id, voucher.uploaderId]);
 
 			const uploader = await ctx.db.get(voucher.uploaderId);
-			if (uploader) {
+			if (uploader && uploader.telegramChatId !== undefined) {
 				// Send message to uploader asking if they used the voucher
 				await ctx.scheduler.runAfter(
 					0,

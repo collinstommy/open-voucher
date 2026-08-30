@@ -1,12 +1,12 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { convexQuery } from "@convex-dev/react-query";
 import { api } from "@open-voucher/backend/convex/_generated/api";
+import type { Id } from "@open-voucher/backend/convex/_generated/dataModel";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useConvex } from "convex/react";
+import { Button } from "@/components/ui/button";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
 import { formatDateTime } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import { useConvex } from "convex/react";
-import type { Id } from "@open-voucher/backend/convex/_generated/dataModel";
 
 export const Route = createFileRoute("/admin/banned")({
 	component: BannedUsers,
@@ -66,9 +66,9 @@ function BannedUsers() {
 		_id: Id<"users">;
 		username?: string;
 		firstName?: string;
-		telegramChatId: string;
+		telegramChatId: string | undefined;
 	}) => {
-		const name = user.username || user.firstName || user.telegramChatId;
+		const name = user.username || user.firstName || "this user";
 		if (
 			window.confirm(
 				`Send this warning to ${name}?\n\n${UPLOAD_WARNING_MESSAGE}`,
@@ -88,7 +88,7 @@ function BannedUsers() {
 			<div className="space-y-6">
 				<div className="flex items-center justify-between">
 					<div>
-						<h1 className="text-2xl font-bold">Flagged for Review</h1>
+						<h1 className="font-bold text-2xl">Flagged for Review</h1>
 						<p className="text-muted-foreground">
 							Users automatically flagged by the system. Review and either ban
 							or dismiss.
@@ -103,7 +103,7 @@ function BannedUsers() {
 						</div>
 					) : (
 						flaggedUsers.map((user) => (
-							<div key={user._id} className="rounded-lg border p-6 space-y-3">
+							<div key={user._id} className="space-y-3 rounded-lg border p-6">
 								<div className="flex items-start justify-between">
 									<div>
 										<h3 className="font-medium">
@@ -114,16 +114,16 @@ function BannedUsers() {
 											>
 												{user.firstName || user.username || "Unknown User"}
 												{user.username && (
-													<span className="text-muted-foreground ml-2">
+													<span className="ml-2 text-muted-foreground">
 														@{user.username}
 													</span>
 												)}
 											</Link>
 										</h3>
-										<p className="text-sm text-muted-foreground">
-											Chat ID: {user.telegramChatId}
+										<p className="text-muted-foreground text-sm">
+											Chat ID: {user.telegramChatId ?? "Not linked"}
 										</p>
-										<div className="mt-2 flex gap-4 text-sm text-muted-foreground">
+										<div className="mt-2 flex gap-4 text-muted-foreground text-sm">
 											<span>Uploads: {user.uploadCount}</span>
 											<span>Claims: {user.claimCount}</span>
 											<span>Upload Reports: {user.uploadReportCount}</span>
@@ -135,7 +135,7 @@ function BannedUsers() {
 											)}
 										</div>
 									</div>
-									<div className="text-sm text-muted-foreground">
+									<div className="text-muted-foreground text-sm">
 										Flagged: {formatDateTime(user.flaggedForReviewAt!)}
 									</div>
 								</div>
@@ -174,7 +174,7 @@ function BannedUsers() {
 			<div className="space-y-6">
 				<div className="flex items-center justify-between">
 					<div>
-						<h2 className="text-2xl font-bold">Banned Users</h2>
+						<h2 className="font-bold text-2xl">Banned Users</h2>
 						<p className="text-muted-foreground">
 							Users who have been banned from the service
 						</p>
@@ -188,7 +188,7 @@ function BannedUsers() {
 						</div>
 					) : (
 						bannedUsers.map((user) => (
-							<div key={user._id} className="rounded-lg border p-6 space-y-3">
+							<div key={user._id} className="space-y-3 rounded-lg border p-6">
 								<div className="flex items-start justify-between">
 									<div>
 										<h3 className="font-medium">
@@ -199,18 +199,18 @@ function BannedUsers() {
 											>
 												{user.firstName || user.username || "Unknown User"}
 												{user.username && (
-													<span className="text-muted-foreground ml-2">
+													<span className="ml-2 text-muted-foreground">
 														@{user.username}
 													</span>
 												)}
 											</Link>
 										</h3>
-										<p className="text-sm text-muted-foreground">
-											Chat ID: {user.telegramChatId}
+										<p className="text-muted-foreground text-sm">
+											Chat ID: {user.telegramChatId ?? "Not linked"}
 										</p>
 										{user.adminMessageCount > 0 && (
 											<div
-												className="mt-2 text-sm text-muted-foreground"
+												className="mt-2 text-muted-foreground text-sm"
 												title="Admin messages sent"
 											>
 												✉️ {user.adminMessageCount}
@@ -218,7 +218,7 @@ function BannedUsers() {
 										)}
 									</div>
 									{user.bannedAt && (
-										<div className="text-sm text-muted-foreground">
+										<div className="text-muted-foreground text-sm">
 											Banned: {formatDateTime(user.bannedAt)}
 										</div>
 									)}

@@ -12,12 +12,21 @@ import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { ConvexHttpClient } from "convex/browser";
 import type { FunctionReturnType } from "convex/server";
+import type * as jose from "jose";
 import { api } from "../../convex/_generated/api";
 import {
 	type FakeBotApi,
 	startFakeBotApi,
 	TEST_IMAGE_BYTES,
 } from "./fakeBotApi";
+import {
+	GOOGLE_TEST_AUDIENCE,
+	type GoogleIdTokenClaims,
+	generateGoogleTestKeys,
+	generateJwtSigningKeys,
+	signGoogleIdToken,
+	verifySessionJwt,
+} from "./googleTokens";
 
 const BACKEND_DIR = join(import.meta.dir, "../..");
 const CONVEX_BIN = join(BACKEND_DIR, "node_modules/.bin/convex");
@@ -34,6 +43,9 @@ type DevVoucher = NonNullable<
 	FunctionReturnType<typeof api.devTest.getVoucher>
 >;
 type SeedResult = FunctionReturnType<typeof api.devTest.seedVoucher>;
+type DevAuthIdentity = NonNullable<
+	FunctionReturnType<typeof api.devTest.getAuthIdentity>
+>;
 
 export interface E2EEnv {
 	fake: FakeBotApi;
@@ -45,6 +57,16 @@ export interface E2EEnv {
 	webhookSecret: string;
 	client: ConvexHttpClient;
 	postWebhook(update: unknown, secret?: string | null): Promise<Response>;
+	/** Sign a Google ID token with the E2E key ring (fake JWKS on the fake server). */
+	signGoogleIdToken(claims: GoogleIdTokenClaims): Promise<string>;
+	/** Verify a backend-issued session JWT (signature + iss/aud claims). */
+	verifyIssuedJwt(token: string): Promise<{ sub?: string } & jose.JWTPayload>;
+	/** POST /api/google-auth over real HTTP. */
+	postGoogleAuth(body: {
+		idToken: string;
+		linkCode?: string;
+		intent?: string;
+	}): Promise<Response>;
 	seedVoucher(args?: {
 		type?: "5" | "10" | "20";
 		expiryInDays?: number;
@@ -57,6 +79,7 @@ export interface E2EEnv {
 	getStorageUrl(
 		storageId: DevVoucher["imageStorageId"],
 	): Promise<string | null>;
+	getAuthIdentity(googleSub: string): Promise<DevAuthIdentity | null>;
 }
 
 function readEnvFile(): Record<string, string> {
@@ -138,7 +161,9 @@ export async function releaseE2EEnv(): Promise<void> {
 
 async function start(): Promise<E2EEnv> {
 	reapStaleBackend();
-	const fake = await startFakeBotApi();
+	const googleKeys = await generateGoogleTestKeys();
+	const jwtKeys = await generateJwtSigningKeys();
+	const fake = await startFakeBotApi({ jwks: googleKeys.jwksDoc });
 
 	// Long-running watch process; killed when the last test file releases the env.
 	let stdout = "";
@@ -186,6 +211,13 @@ async function start(): Promise<E2EEnv> {
 	convexSync(["env", "set", "TELEGRAM_WEBHOOK_SECRET", WEBHOOK_SECRET]);
 	convexSync(["env", "set", "ENVIRONMENT", "development"]);
 	convexSync(["env", "set", "TELEGRAM_API_BASE", fake.baseUrl]);
+	// Google sign-in: verify against the fake server's locally generated JWKS.
+	convexSync(["env", "set", "GOOGLE_JWKS_URL", `${fake.baseUrl}/__jwks`]);
+	convexSync(["env", "set", "GOOGLE_ANDROID_CLIENT_ID", GOOGLE_TEST_AUDIENCE]);
+	// Session JWTs: the local backend gets a fresh signing key (the real one
+	// exists only in the cloud deployment's env). `--` keeps the CLI from
+	// parsing the PEM's leading dashes as an option.
+	convexSync(["env", "set", "--", "JWT_PRIVATE_KEY", jwtKeys.pkcs8Pem]);
 	// Make sure the dev OCR bypass is active (set OCR_BYPASS=1).
 	convexSync(["env", "set", "OCR_BYPASS", "1"]);
 
@@ -231,6 +263,19 @@ async function start(): Promise<E2EEnv> {
 				body: JSON.stringify(update),
 			});
 		},
+		async signGoogleIdToken(claims) {
+			return await signGoogleIdToken(googleKeys.privateKey, claims);
+		},
+		async verifyIssuedJwt(token) {
+			return await verifySessionJwt(jwtKeys.publicKey, token);
+		},
+		async postGoogleAuth(body) {
+			return await fetch(`${siteUrl}/api/google-auth`, {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify(body),
+			});
+		},
 		async seedVoucher(args) {
 			const expiryInDays = args?.expiryInDays ?? 14;
 			const expiryDate = Date.now() + expiryInDays * 24 * 60 * 60 * 1000;
@@ -251,6 +296,11 @@ async function start(): Promise<E2EEnv> {
 			client.query(api.devTest.getVouchersByClaimer, { claimerId }),
 		getStorageUrl: (storageId) =>
 			client.query(api.devTest.getStorageUrl, { storageId }),
+		getAuthIdentity: (googleSub) =>
+			client.query(api.devTest.getAuthIdentity, {
+				provider: "google",
+				providerAccountId: googleSub,
+			}),
 	};
 
 	return env;

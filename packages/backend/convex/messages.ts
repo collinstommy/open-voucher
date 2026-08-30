@@ -110,6 +110,11 @@ export const sendMessageToUser = adminMutation({
 		if (!user) {
 			throw new Error("User not found");
 		}
+		if (user.telegramChatId === undefined) {
+			// Google-only user: no Telegram chat to deliver to (and messages are
+			// keyed by chatId). Reject before inserting or sending.
+			throw new Error("User is not on Telegram");
+		}
 
 		await ctx.db.insert("messages", {
 			telegramMessageId: 0,

@@ -5,7 +5,8 @@ import { useAuthBootstrap } from "./useAuthBootstrap";
 
 export type AppUser = {
 	_id: Id<"users">;
-	telegramChatId: string;
+	// Absent for Google-only (chatless) users.
+	telegramChatId: string | undefined;
 	firstName: string | undefined;
 	username: string | undefined;
 	coins: number;

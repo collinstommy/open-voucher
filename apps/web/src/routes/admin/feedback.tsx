@@ -150,7 +150,7 @@ function FeedbackPage() {
 										)}
 									</div>
 									<div className="text-muted-foreground text-xs">
-										{item.user?.telegramChatId} •{" "}
+										{item.user?.telegramChatId ?? "Not linked"} •{" "}
 										{formatDateTime(item.createdAt)}
 									</div>
 								</div>

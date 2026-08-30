@@ -185,3 +185,21 @@ export const getStorageUrl = query({
 		return await ctx.storage.getUrl(args.storageId);
 	},
 });
+
+export const getAuthIdentity = query({
+	args: {
+		provider: v.union(v.literal("google"), v.literal("apple")),
+		providerAccountId: v.string(),
+	},
+	handler: async (ctx, args) => {
+		assertDevOnly();
+		return await ctx.db
+			.query("authIdentities")
+			.withIndex("by_provider_account", (q) =>
+				q
+					.eq("provider", args.provider)
+					.eq("providerAccountId", args.providerAccountId),
+			)
+			.first();
+	},
+});

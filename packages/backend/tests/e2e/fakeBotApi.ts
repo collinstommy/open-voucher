@@ -16,6 +16,15 @@ export interface RecordedCall {
 	timestamp: number;
 }
 
+export interface FakeBotApiOptions {
+	/**
+	 * Optional JWKS document served at GET /__jwks (Google ID token signing
+	 * keys for auth E2E). Not recorded in calls — it is transport plumbing,
+	 * not bot traffic.
+	 */
+	jwks?: unknown;
+}
+
 export interface FakeBotApi {
 	port: number;
 	baseUrl: string;
@@ -39,7 +48,9 @@ export const TEST_IMAGE_BYTES = Uint8Array.from(
 	(c) => c.charCodeAt(0),
 );
 
-export async function startFakeBotApi(): Promise<FakeBotApi> {
+export async function startFakeBotApi(
+	options: FakeBotApiOptions = {},
+): Promise<FakeBotApi> {
 	const calls: RecordedCall[] = [];
 	const imageBytes = TEST_IMAGE_BYTES;
 	let messageIdCounter = 1000;
@@ -131,6 +142,9 @@ export async function startFakeBotApi(): Promise<FakeBotApi> {
 				return new Response(imageBytes, {
 					headers: { "Content-Type": "image/jpeg" },
 				});
+			}
+			if (path === "/__jwks" && options.jwks !== undefined) {
+				return Response.json(options.jwks);
 			}
 
 			const botMatch = path.match(/^\/bot([^/]+)\/(.+)$/);
