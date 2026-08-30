@@ -3,6 +3,7 @@ import { MenuRow } from "@/components/mini-app/MenuRow";
 import { SharePanel } from "@/components/mini-app/SharePanel";
 import { MENU_ITEMS } from "@/components/mini-app/menuConfig";
 import { useUserAuth } from "@/hooks/useUserAuth";
+import { openDiscordLink } from "@/lib/openDiscordLink";
 import { openDonateLink } from "@/lib/openDonateLink";
 import { api } from "@open-voucher/backend/convex/_generated/api";
 import { createFileRoute } from "@tanstack/react-router";
@@ -26,6 +27,8 @@ function AppHome() {
 			setShowShare(true);
 		} else if (id === "donate") {
 			openDonateLink();
+		} else if (id === "discord") {
+			openDiscordLink();
 		}
 	};
 

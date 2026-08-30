@@ -1,6 +1,7 @@
 import { useState } from "react";
-import LandingNav from "@/components/LandingNav";
+import LandingNav, { DiscordIcon } from "@/components/LandingNav";
 import { LANDING_FAQ_ITEMS } from "@/lib/faqContent";
+import { DISCORD_URL } from "@/lib/openDiscordLink";
 
 export default function LandingPage() {
 	return (
@@ -356,6 +357,17 @@ function Footer() {
 	return (
 		<footer className="mt-auto bg-gray-900 text-gray-400 py-12">
 			<div className="container mx-auto px-6 text-center">
+				<div className="mb-6">
+					<a
+						href={DISCORD_URL}
+						target="_blank"
+						rel="noopener noreferrer"
+						className="inline-flex items-center gap-2 text-gray-300 hover:text-white transition-colors text-sm font-medium"
+					>
+						<DiscordIcon />
+						Join our Discord
+					</a>
+				</div>
 				<div className="text-sm opacity-60">
 					<p>Not affiliated with Dunnes Stores.</p>
 				</div>
