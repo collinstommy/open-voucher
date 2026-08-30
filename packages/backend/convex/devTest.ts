@@ -41,9 +41,17 @@ export const seedVoucher = action({
 		assertDevOnly();
 
 		// Reuse the devSeed storage seam (base64 image in, storage id out).
-		const { storageId } = await ctx.runAction(internal.devSeed.uploadSeedImage, {
-			bytes: Buffer.from(new Uint8Array(args.bytes)).toString("base64"),
-		});
+		// No Buffer in the action runtime; build the base64 by hand.
+		let binary = "";
+		for (let i = 0; i < args.bytes.length; i++) {
+			binary += String.fromCharCode(args.bytes[i]);
+		}
+		const { storageId } = await ctx.runAction(
+			internal.devSeed.uploadSeedImage,
+			{
+				bytes: btoa(binary),
+			},
+		);
 
 		return await ctx.runMutation(internal.devTest.insertSeedVoucher, {
 			imageStorageId: storageId,
