@@ -40,13 +40,13 @@ export const seedVoucher = action({
 	}> => {
 		assertDevOnly();
 
-		const blob = new Blob([new Uint8Array(args.bytes)], {
-			type: "image/jpeg",
+		// Reuse the devSeed storage seam (base64 image in, storage id out).
+		const { storageId } = await ctx.runAction(internal.devSeed.uploadSeedImage, {
+			bytes: Buffer.from(new Uint8Array(args.bytes)).toString("base64"),
 		});
-		const imageStorageId = await ctx.storage.store(blob);
 
 		return await ctx.runMutation(internal.devTest.insertSeedVoucher, {
-			imageStorageId,
+			imageStorageId: storageId,
 			type: args.type,
 			expiryDate: args.expiryDate,
 			validFrom: args.validFrom,
