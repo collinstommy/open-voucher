@@ -251,9 +251,14 @@ If **3 or more of an uploader's last 5 uploads** are reported as not working, th
 | Uploads | 10 per 24 hours |
 | Claims | 5 per 24 hours |
 
+## Seed dev data
+
+`bun run seed:dev` seeds the dev Convex deployment (`fastidious-okapi-116`) with 7 Dunnes-style test vouchers (available, claimed, expired, invalidated) under the test user. It requires the deployment to have `ENVIRONMENT=development` and refuses to run otherwise. Rerunnable: vouchers with already-seeded barcodes are skipped; `--reset` deletes and re-seeds them.
+
+Flags: `--chat-id <id>` to override the test user (defaults to `DEV_TELEGRAM_CHAT_ID` on the deployment), `--deployment <name>` to target a different dev deployment.
+
 ## Todo
 
-- [ ] seed dev data - https://docs.convex.dev/database/import-export/import
 - [ ] update landing page with faq
 - [ ] cron job to clean up old vouchers and failed uploads
 
