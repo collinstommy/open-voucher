@@ -6,7 +6,7 @@ import { DISCORD_URL } from "@/lib/openDiscordLink";
 
 export default function LandingPage() {
 	return (
-		<div className="bg-gray-50 text-gray-800 flex flex-col min-h-screen font-[Inter]">
+		<div className="bg-gray-50 text-gray-800 flex flex-col min-h-screen font-sans">
 			<LandingNav />
 			<Hero />
 			<HowItWorks />
