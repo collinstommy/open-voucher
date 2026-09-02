@@ -11,15 +11,20 @@
 //   useful negative test).
 
 import { api } from "@open-voucher/backend/convex/_generated/api";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, notFound } from "@tanstack/react-router";
 import { ConvexHttpClient } from "convex/browser";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { CONVEX_SITE_URLS } from "@/lib/convexConfig";
+import { CONVEX_SITE_URLS, CONVEX_URLS } from "@/lib/convexConfig";
 
 export const Route = createFileRoute("/auth-tester")({
+	beforeLoad: () => {
+		if (!import.meta.env.DEV && import.meta.env.VITE_DEPLOYMENT !== "dev") {
+			throw notFound();
+		}
+	},
 	head: () => ({
 		meta: [
 			{ charSet: "utf-8" },
@@ -100,8 +105,8 @@ function AuthTester() {
 	const [convexCheck, setConvexCheck] = useState<string | null>(null);
 	const buttonRef = useRef<HTMLDivElement>(null);
 	const logId = useRef(0);
-	// Latest credential handler, so the one-time GIS effect can stay mounted
-	// without re-initializing Google Identity Services on every render.
+	// Latest credential handler, so the GIS effect can re-render the button after
+	// reset without re-initializing Google Identity Services on every render.
 	const onCredentialRef = useRef<(credential: string) => void>(() => {});
 
 	function appendLog(label: string, status: number | null, body: string) {
@@ -165,6 +170,8 @@ function AuthTester() {
 
 	// Google Identity Services: load the script once, render the sign-in button.
 	useEffect(() => {
+		if (screen !== "sign-in") return;
+
 		let cancelled = false;
 		if (window.google?.accounts?.id) {
 			renderButton();
@@ -199,7 +206,7 @@ function AuthTester() {
 		return () => {
 			cancelled = true;
 		};
-	}, []);
+	}, [screen]);
 
 	// Keep the ref current on every render.
 	useEffect(() => {
@@ -251,9 +258,7 @@ function AuthTester() {
 			return;
 		}
 		let cancelled = false;
-		const client = new ConvexHttpClient(
-			"https://fastidious-okapi-116.convex.cloud",
-		);
+		const client = new ConvexHttpClient(CONVEX_URLS.dev);
 		client.setAuth(login.jwt);
 		client
 			.query(api.users.getCurrentUser, {})
@@ -407,6 +412,30 @@ function AuthTester() {
 								{convexCheck}
 							</p>
 						)}
+						<div className="space-y-3 rounded-md border border-zinc-800 p-3">
+							<p className="text-zinc-400">
+								Link or merge a Telegram account. Send /link in the dev bot, then
+								redeem the code here. This also exercises the conflict responses for
+								already-linked accounts.
+							</p>
+							<div className="flex gap-2">
+								<Input
+									value={linkCode}
+									onChange={(event) =>
+										setLinkCode(event.target.value.toUpperCase())
+									}
+									placeholder="8-char code from /link"
+									maxLength={8}
+									className="border-zinc-800 bg-zinc-950 font-mono"
+								/>
+								<Button
+									onClick={() => void redeemLinkCode()}
+									disabled={busy || linkCode.trim().length === 0}
+								>
+									Redeem link code
+								</Button>
+							</div>
+						</div>
 						<Button variant="outline" onClick={reset}>
 							Start over
 						</Button>
