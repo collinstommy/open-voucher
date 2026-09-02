@@ -205,8 +205,7 @@ set_convex_vars() {
 #   - OCR_BYPASS makes uploads store placeholder vouchers instead of running
 #     Gemini OCR.
 #   - GOOGLE_JWKS_URL points auth token verification at a locally generated
-#     JWKS. Not wired yet (lands with the stage-1 auth slice); the name is
-#     pinned by the plan, so guard it from day one.
+#     JWKS instead of Google's real certs (stage-1 auth slice).
 assert_test_only_vars_unset() {
     echo "Verifying test-only Convex env vars are unset in prod..."
     for VAR in TELEGRAM_API_BASE GOOGLE_JWKS_URL OCR_BYPASS; do

@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as UpdatesRouteImport } from './routes/updates'
 import { Route as TelegramRouteImport } from './routes/telegram'
+import { Route as AuthTesterRouteImport } from './routes/auth-tester'
 import { Route as AppRouteImport } from './routes/app'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
@@ -41,6 +42,11 @@ const UpdatesRoute = UpdatesRouteImport.update({
 const TelegramRoute = TelegramRouteImport.update({
   id: '/telegram',
   path: '/telegram',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthTesterRoute = AuthTesterRouteImport.update({
+  id: '/auth-tester',
+  path: '/auth-tester',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AppRoute = AppRouteImport.update({
@@ -153,6 +159,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
   '/app': typeof AppRouteWithChildren
+  '/auth-tester': typeof AuthTesterRoute
   '/telegram': typeof TelegramRoute
   '/updates': typeof UpdatesRoute
   '/admin/analytics': typeof AdminAnalyticsRoute
@@ -176,6 +183,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/auth-tester': typeof AuthTesterRoute
   '/telegram': typeof TelegramRoute
   '/updates': typeof UpdatesRoute
   '/admin/analytics': typeof AdminAnalyticsRoute
@@ -202,6 +210,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
   '/app': typeof AppRouteWithChildren
+  '/auth-tester': typeof AuthTesterRoute
   '/telegram': typeof TelegramRoute
   '/updates': typeof UpdatesRoute
   '/admin/analytics': typeof AdminAnalyticsRoute
@@ -229,6 +238,7 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/app'
+    | '/auth-tester'
     | '/telegram'
     | '/updates'
     | '/admin/analytics'
@@ -252,6 +262,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/auth-tester'
     | '/telegram'
     | '/updates'
     | '/admin/analytics'
@@ -277,6 +288,7 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/app'
+    | '/auth-tester'
     | '/telegram'
     | '/updates'
     | '/admin/analytics'
@@ -303,6 +315,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRouteWithChildren
   AppRoute: typeof AppRouteWithChildren
+  AuthTesterRoute: typeof AuthTesterRoute
   TelegramRoute: typeof TelegramRoute
   UpdatesRoute: typeof UpdatesRoute
 }
@@ -321,6 +334,13 @@ declare module '@tanstack/react-router' {
       path: '/telegram'
       fullPath: '/telegram'
       preLoaderRoute: typeof TelegramRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth-tester': {
+      id: '/auth-tester'
+      path: '/auth-tester'
+      fullPath: '/auth-tester'
+      preLoaderRoute: typeof AuthTesterRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/app': {
@@ -529,6 +549,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRouteWithChildren,
   AppRoute: AppRouteWithChildren,
+  AuthTesterRoute: AuthTesterRoute,
   TelegramRoute: TelegramRoute,
   UpdatesRoute: UpdatesRoute,
 }

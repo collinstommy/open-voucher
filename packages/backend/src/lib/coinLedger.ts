@@ -20,7 +20,8 @@ export type TransactionType =
 	| "claim_reversed"
 	| "self_invalidated"
 	| "claim_returned"
-	| "replacement_received";
+	| "replacement_received"
+	| "fork_merge_clawback";
 
 export type ApplyCoinDeltaArgs = {
 	userId: Id<"users">;

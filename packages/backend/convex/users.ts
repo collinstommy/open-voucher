@@ -1,8 +1,7 @@
 import { v } from "convex/values";
 import { internalMutation, internalQuery } from "./_generated/server";
-import { SIGNUP_BONUS } from "../src/lib/constants";
 import { userMutation, userQuery } from "./auth";
-import { applyCoinDelta } from "../src/lib/coinLedger";
+import { createUserRecord } from "../src/lib/users";
 import { messageIntentValidator } from "../src/lib/messageIntent";
 
 /**
@@ -29,27 +28,16 @@ export const createUser = internalMutation({
 			};
 		}
 
-		const now = Date.now();
-		const userId = await ctx.db.insert("users", {
+		const created = await createUserRecord(ctx, {
 			telegramChatId,
 			username,
 			firstName,
-			coins: 0,
-			isBanned: false,
-			createdAt: now,
-			lastActiveAt: now,
-		});
-
-		await applyCoinDelta(ctx, {
-			userId,
-			delta: SIGNUP_BONUS,
-			type: "signup_bonus",
 		});
 
 		return {
-			_id: userId,
-			coins: SIGNUP_BONUS,
-			isBanned: false,
+			_id: created.userId,
+			coins: created.coins,
+			isBanned: created.isBanned,
 		};
 	},
 });
@@ -235,12 +223,16 @@ export const getFeedbackThread = userQuery({
 			(item) => (item.type ?? "feedback") === "feedback",
 		);
 
-		const adminMessages = await ctx.db
-			.query("messages")
-			.withIndex("by_admin_message", (q) =>
-				q.eq("isAdminMessage", true).eq("telegramChatId", user.telegramChatId),
-			)
-			.collect();
+		const chatId = user.telegramChatId;
+		const adminMessages =
+			chatId === undefined
+				? []
+				: await ctx.db
+						.query("messages")
+						.withIndex("by_admin_message", (q) =>
+							q.eq("isAdminMessage", true).eq("telegramChatId", chatId),
+						)
+						.collect();
 
 		const items = [
 			...userFeedback.map((item) => ({

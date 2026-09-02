@@ -1,6 +1,6 @@
 import dayjs from "dayjs";
 import { internal } from "./_generated/api";
-import type { Id } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import { internalAction, internalQuery } from "./_generated/server";
 
 /**
@@ -72,7 +72,10 @@ export const getUsersWhoClaimedYesterday = internalQuery({
 		const chatIds = (
 			await Promise.all(claimerIdsNeedingReminder.map((id) => ctx.db.get(id)))
 		)
-			.filter((user) => user !== null)
+			.filter(
+				(user): user is Doc<"users"> & { telegramChatId: string } =>
+					user !== null && user.telegramChatId !== undefined,
+			)
 			.map((user) => user.telegramChatId);
 
 		return chatIds;

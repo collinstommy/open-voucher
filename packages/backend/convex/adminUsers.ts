@@ -1,7 +1,31 @@
 import { v } from "convex/values";
 import { applyCoinDelta } from "../src/lib/coinLedger";
 import { adminMutation, adminQuery } from "./adminGuards";
-import { internalMutation, internalQuery } from "./_generated/server";
+import type { Doc } from "./_generated/dataModel";
+import {
+	internalMutation,
+	internalQuery,
+	type QueryCtx,
+} from "./_generated/server";
+
+/**
+ * Admin messages are keyed by telegramChatId; chatless (Google-only) users
+ * have none, so skip the query instead of filtering on undefined.
+ */
+async function countAdminMessages(
+	ctx: QueryCtx,
+	user: Doc<"users">,
+): Promise<number> {
+	const chatId = user.telegramChatId;
+	if (chatId === undefined) return 0;
+	const messages = await ctx.db
+		.query("messages")
+		.withIndex("by_admin_message", (q) =>
+			q.eq("isAdminMessage", true).eq("telegramChatId", chatId),
+		)
+		.collect();
+	return messages.length;
+}
 
 export const getAllUsers = adminQuery({
 	args: {},
@@ -96,16 +120,7 @@ export const getFlaggedUsers = adminQuery({
 					claimCount: user.claimCount || 0,
 					uploadReportCount: user.uploadReportCount || 0,
 					claimReportCount: user.claimReportCount || 0,
-					adminMessageCount: (
-						await ctx.db
-							.query("messages")
-							.withIndex("by_admin_message", (q) =>
-								q
-									.eq("isAdminMessage", true)
-									.eq("telegramChatId", user.telegramChatId),
-							)
-							.collect()
-					).length,
+					adminMessageCount: await countAdminMessages(ctx, user),
 				})),
 		);
 	},
@@ -170,16 +185,7 @@ export const getBannedUsers = adminQuery({
 					firstName: user.firstName,
 					bannedAt: user.bannedAt,
 					flaggedForReviewAt: user.flaggedForReviewAt,
-					adminMessageCount: (
-						await ctx.db
-							.query("messages")
-							.withIndex("by_admin_message", (q) =>
-								q
-									.eq("isAdminMessage", true)
-									.eq("telegramChatId", user.telegramChatId),
-							)
-							.collect()
-					).length,
+					adminMessageCount: await countAdminMessages(ctx, user),
 				})),
 		);
 	},
@@ -371,13 +377,17 @@ export const getUserDetails = adminQuery({
 			.order("desc")
 			.collect();
 
-		const adminMessages = await ctx.db
-			.query("messages")
-			.withIndex("by_admin_message", (q) =>
-				q.eq("isAdminMessage", true).eq("telegramChatId", user.telegramChatId),
-			)
-			.order("desc")
-			.collect();
+		const userChatId = user.telegramChatId;
+		const adminMessages =
+			userChatId === undefined
+				? []
+				: await ctx.db
+						.query("messages")
+						.withIndex("by_admin_message", (q) =>
+							q.eq("isAdminMessage", true).eq("telegramChatId", userChatId),
+						)
+						.order("desc")
+						.collect();
 
 		const transactions = await ctx.db
 			.query("transactions")

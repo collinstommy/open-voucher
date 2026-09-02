@@ -18,6 +18,7 @@ import {
 	webAppKeyboard,
 } from "../src/telegram/keyboards";
 import { reportData, uploaderData } from "../src/telegram/router";
+import { generateLinkCode, LINK_CODE_TTL_MS } from "../src/lib/linkCode";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import type { ActionCtx } from "./_generated/server";
@@ -272,6 +273,49 @@ async function sendAppWebAppButton(chatId: string) {
 	);
 }
 
+/**
+ * /link — issue a single-use code that lets the user's Google sign-in attach
+ * to this Telegram account (redeemed by POST /api/google-auth). Codes are
+ * generated here, in the action runtime; the mutation only validates and
+ * persists. A collision is near-impossible (~2^39 space) but retried.
+ */
+async function handleLinkCommand(ctx: ActionCtx, chatId: string, user: User) {
+	const alreadyLinked = await ctx.runQuery(internal.auth.hasGoogleIdentity, {
+		userId: user._id,
+	});
+	if (alreadyLinked) {
+		await sendTelegramMessage(
+			chatId,
+			"🔗 Your account is already linked to a Google account.\n\nJust sign in with Google in the Open Vouchers app — no code needed.",
+		);
+		return;
+	}
+
+	const expiresMinutes = Math.round(LINK_CODE_TTL_MS / 60_000);
+	for (let attempt = 0; attempt < 3; attempt++) {
+		const code = generateLinkCode();
+		const result = await ctx.runMutation(internal.auth.createLinkCode, {
+			userId: user._id,
+			code,
+		});
+		if (!result.ok) continue;
+
+		await sendTelegramMessage(
+			chatId,
+			"📱 <b>Link the Open Vouchers app</b>\n\n" +
+				"Open the app, sign in with Google, and enter this code to connect this account:\n\n" +
+				`<code>${code}</code>\n\n` +
+				`⏱ Expires in ${expiresMinutes} minutes. Single use.`,
+		);
+		return;
+	}
+	console.error("Failed to allocate a unique link code after 3 attempts");
+	await sendTelegramMessage(
+		chatId,
+		"❌ Could not generate a link code right now. Please try again.",
+	);
+}
+
 async function handleCommand(
 	ctx: ActionCtx,
 	chatId: string,
@@ -291,6 +335,11 @@ async function handleCommand(
 
 	if (lowerText === "help") {
 		await sendHelpMenu(chatId);
+		return true;
+	}
+
+	if (lowerText === "link") {
+		await handleLinkCommand(ctx, chatId, user);
 		return true;
 	}
 
@@ -429,13 +478,18 @@ export const handleTelegramMessage = internalAction({
 			return;
 		}
 
+		// Bot users always come from a message with a chat id; keep the local
+		// User type's required chatId anchored to the message, since the schema
+		// made the column optional for Google-only users.
+		const botUser: User = { ...user, telegramChatId: chatId };
+
 		// handle user state (support, feedback, onboarding, etc.)
-		const stateHandled = await handleUserState(ctx, chatId, text, user);
+		const stateHandled = await handleUserState(ctx, chatId, text, botUser);
 		if (stateHandled) return;
 
-		if (user.isBanned) {
+		if (botUser.isBanned) {
 			await ctx.runMutation(internal.users.setUserTelegramState, {
-				userId: user._id,
+				userId: botUser._id,
 				state: "waiting_for_ban_appeal",
 			});
 			await sendTelegramMessage(
@@ -446,15 +500,15 @@ export const handleTelegramMessage = internalAction({
 		}
 
 		if (isImage) {
-			await handleImageUpload(ctx, chatId, message, messageDbId, user);
+			await handleImageUpload(ctx, chatId, message, messageDbId, botUser);
 			return;
 		}
 
 		const lowerText = text.toLowerCase().trim().replace(/^\//, "");
 
-		if (await handleCommand(ctx, chatId, lowerText, text, user)) return;
+		if (await handleCommand(ctx, chatId, lowerText, text, botUser)) return;
 
-		if (await handleVoucherRequest(ctx, chatId, lowerText, user)) return;
+		if (await handleVoucherRequest(ctx, chatId, lowerText, botUser)) return;
 
 		if (intent === "unknown") {
 			await ctx.scheduler.runAfter(
@@ -707,6 +761,7 @@ async function setBotCommands() {
 	const commands = [
 		{ command: "help", description: "Show help menu" },
 		{ command: "balance", description: "Check your coin balance" },
+		{ command: "link", description: "Link the Open Vouchers app" },
 		{ command: "share", description: "Share the bot with friends" },
 		{ command: "account", description: "Open My Account" },
 		{ command: "donate", description: "Support the project" },

@@ -62,13 +62,13 @@ type ReportActivity = {
 		_id: Id<"users">;
 		username?: string;
 		firstName?: string;
-		telegramChatId: string;
+		telegramChatId: string | undefined;
 	} | null;
 	reporter?: {
 		_id: Id<"users">;
 		username?: string;
 		firstName?: string;
-		telegramChatId: string;
+		telegramChatId: string | undefined;
 	} | null;
 };
 
@@ -134,7 +134,7 @@ function UserLink({
 		_id: Id<"users">;
 		username?: string;
 		firstName?: string;
-		telegramChatId: string;
+		telegramChatId: string | undefined;
 	};
 }) {
 	return (
@@ -143,7 +143,7 @@ function UserLink({
 			params={{ userId: user._id }}
 			className="text-blue-600 hover:underline"
 		>
-			{user.username || user.firstName || user.telegramChatId}
+			{user.username || user.firstName || "Unknown"}
 		</Link>
 	);
 }
@@ -232,7 +232,7 @@ function UserDetailPage() {
 			return;
 		}
 		const confirmed = window.confirm(
-			`Deduct ${amount} coin${amount === 1 ? "" : "s"} from ${user?.username || user?.firstName || user?.telegramChatId || "this user"}?\n\nDeduction type: ${DEDUCTION_TYPE_LABELS[deductType]}\nTheir current balance is ${user?.coins ?? "?"} coins.`,
+			`Deduct ${amount} coin${amount === 1 ? "" : "s"} from ${user?.username || user?.firstName || "this user"}?\n\nDeduction type: ${DEDUCTION_TYPE_LABELS[deductType]}\nTheir current balance is ${user?.coins ?? "?"} coins.`,
 		);
 		if (confirmed) {
 			deductCoinsMutation.mutate({ amount, deductionType: deductType });
@@ -256,7 +256,7 @@ function UserDetailPage() {
 		if (!user || !token) return;
 
 		const confirmed = window.confirm(
-			`Send this warning to ${user.username || user.firstName || user.telegramChatId}?\n\n${UPLOAD_WARNING_MESSAGE}`,
+			`Send this warning to ${user.username || user.firstName || "this user"}?\n\n${UPLOAD_WARNING_MESSAGE}`,
 		);
 		if (confirmed) {
 			sendMessageMutation.mutate(UPLOAD_WARNING_MESSAGE);
@@ -386,7 +386,7 @@ function UserDetailPage() {
 							)}
 						</div>
 						<p className="text-muted-foreground text-sm">
-							{user.telegramChatId}
+							{user.telegramChatId ?? "Not linked"}
 						</p>
 					</div>
 					<div className="flex gap-2">
@@ -771,7 +771,7 @@ function UserDetailPage() {
 												>
 													{voucher.claimer.username ||
 														voucher.claimer.firstName ||
-														voucher.claimer.telegramChatId}
+														"Unknown"}
 												</Link>
 											</div>
 										)}
@@ -869,7 +869,7 @@ function UserDetailPage() {
 												>
 													{voucher.uploader.username ||
 														voucher.uploader.firstName ||
-														voucher.uploader.telegramChatId}
+														"Unknown"}
 												</Link>
 											</div>
 										)}
@@ -1035,7 +1035,7 @@ function UserDetailPage() {
 												>
 													{report.uploader.username ||
 														report.uploader.firstName ||
-														report.uploader.telegramChatId}
+														"Unknown"}
 												</Link>
 											) : (
 												"Unknown"
@@ -1137,7 +1137,7 @@ function UserDetailPage() {
 												>
 													{report.reporter.username ||
 														report.reporter.firstName ||
-														report.reporter.telegramChatId}
+														"Unknown"}
 												</Link>
 											) : (
 												"Unknown"
