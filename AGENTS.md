@@ -6,6 +6,10 @@ Do not run `bun run deploy:all`, `bun run deploy:web`, `bun run deploy:web:dev`,
 
 Do not run `git commit` or `git push` unless the user explicitly asks you to, or you have their explicit go-ahead to save work. Show the diff and ask for confirmation first.
 
+## Branching
+
+For this project, base new feature branches and pull requests on the `android` branch.
+
 # Project Overview
 
 This project, `open-voucher`, is a modern TypeScript monorepo built with Better-T-Stack. It combines React, TanStack Start, and Convex to provide a full-stack application development experience.
