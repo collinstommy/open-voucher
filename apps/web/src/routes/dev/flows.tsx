@@ -1,12 +1,5 @@
-// Stage-4 flows tester: temporary dev-only page driving the real app
-// wrappers (upload/claim/report) plus the notificationOutbox inspector.
-// Test instrument — park or delete once the stage-3 app absorbs the flows.
-//
-// Session: reuses auth like any app page (JwtAuthProvider + dev-auth on
-// localhost). To act as a chatless Google user, paste the JWT from the
-// stage-2 auth tester (/auth-tester) into the session box below.
-// In production builds this route renders a stub and skips its Convex flow
-// queries (auth bootstrap still runs, like any app page).
+// Dev-only flows tester (upload/claim/report + outbox inspector).
+// Throwaway: delete once the app absorbs these flows.
 
 import { api } from "@open-voucher/backend/convex/_generated/api";
 import { useJwtAuth } from "@/auth/JwtAuthProvider";
