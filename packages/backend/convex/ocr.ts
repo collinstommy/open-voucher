@@ -3,7 +3,7 @@ import dayjs from "dayjs";
 import { applyCoinDelta } from "../src/lib/coinLedger";
 import { UPLOAD_REWARDS } from "../src/lib/constants";
 import { callGeminiApi } from "../src/lib/gemini";
-import { notifyUser } from "../src/lib/notify";
+import { notifyUser, notifyUserFromAction } from "../src/lib/notify";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import {
@@ -841,12 +841,17 @@ export const processVoucherImage = internalAction({
 
 			const user = await ctx.runQuery(internal.users.getUserById, { userId });
 			if (user) {
-				const text =
-					"❌ <b>Voucher Processing Failed</b>\n\nWe encountered an error while processing your voucher. Please try again.";
-				await notifyUser(ctx, user, text, {
-					kind: "processing_failed",
-					payload: { text },
-				});
+				await notifyUserFromAction(
+					ctx,
+					user,
+					"❌ <b>Voucher Processing Failed</b>\n\nWe encountered an error while processing your voucher. Please try again.",
+					{
+						kind: "processing_failed",
+						payload: {
+							text: "❌ <b>Voucher Processing Failed</b>\n\nWe encountered an error while processing your voucher. Please try again.",
+						},
+					},
+				);
 			}
 		}
 	},

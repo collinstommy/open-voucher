@@ -4,10 +4,10 @@ import { internalMutation } from "./_generated/server";
 import { userMutation, userQuery } from "./auth";
 
 // notificationOutbox readers/writers. The writer half for mutation contexts
-// is ctx.db.insert directly (see reportVoucher, claim/report app wrappers);
-// this internal mutation exists for the action-runtime path (notifyUser from
-// actions), since actions cannot touch the DB. First reader until push exists
-// is the dev flows page inspector panel via getMyNotifications.
+// is ctx.db.insert directly; insertOutboxRow exists for the action-runtime
+// path (notifyUserFromAction), since actions cannot touch the DB. First
+// reader until push exists is the dev flows page inspector panel via
+// getMyNotifications.
 
 export const insertOutboxRow = internalMutation({
 	args: {

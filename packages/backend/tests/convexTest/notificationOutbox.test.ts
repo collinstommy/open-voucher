@@ -1,14 +1,4 @@
-/**
- * Stage 4 (HTML flows tester + notification outbox) at unit layer:
- * - chatless users get notificationOutbox rows where Telegram sends would
- *   have happened, and zero Bot API sends are recorded for them
- * - linked users still get Telegram sends and zero outbox rows
- * - public upload/claim/report wrappers are thin over the internals
- *
- * E2E (bun test tests/e2e/) re-proves the same routing over real HTTP with
- * OCR_BYPASS=1 once a provisioned local backend exists; granular coverage
- * lives here with the same scoped fetch-stub pattern as vouchers.test.ts.
- */
+/** Stage-4 outbox routing at unit layer: chatless users get rows, linked users get sends. */
 
 import { convexTest } from "convex-test";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
@@ -350,5 +340,49 @@ describe("Stage 4: outbox reader", () => {
 				notificationId: rowId,
 			}),
 		).rejects.toThrowError("Notification not found");
+	});
+
+	test("action path: OCR system error writes processing_failed via notifyUserFromAction", async () => {
+		// Force the processVoucherImage catch block: Gemini fetch throws.
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async (url: string) => {
+				if (url.includes("generativelanguage.googleapis.com")) {
+					throw new Error("Gemini API error");
+				}
+				if (url.includes("api.telegram.org") && url.includes("/sendMessage")) {
+					return {
+						ok: true,
+						json: async () => mockTelegramResponse(),
+					} as Response;
+				}
+				if (url.includes("convex.cloud") || url.includes("convex.site")) {
+					return {
+						ok: true,
+						arrayBuffer: async () => new ArrayBuffer(100),
+						blob: async () =>
+							new Blob(["voucher-image"], { type: "image/jpeg" }),
+					} as Response;
+				}
+				return { ok: false, status: 404 } as Response;
+			}),
+		);
+
+		const t = convexTest(schema, modules);
+		const userId = await createChatlessUser(t);
+		const imageStorageId = await t.run(async (ctx: any) => {
+			return await ctx.storage.store(new Blob(["fake-image"]));
+		});
+
+		const authed = t.withIdentity({ subject: userId });
+		await authed.mutation(api.vouchers.uploadVoucherFromApp, {
+			imageStorageId,
+		});
+		await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+		expect(sentMessages).toEqual([]);
+		const outbox = await getOutbox(t, userId);
+		expect(outbox.length).toBe(1);
+		expect(outbox[0].kind).toBe("processing_failed");
 	});
 });

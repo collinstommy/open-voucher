@@ -1,36 +1,74 @@
-// Telegram notification guard for the optional-chatId world: users created via
+// Notification fan-out for the optional-chatId world: users created via
 // Google sign-in have no telegramChatId and must never be sent Bot API
-// messages. Call sites schedule through this helper instead of checking the
-// chatId themselves; chatless users get a notificationOutbox row instead, so
-// no notification is ever silently lost (stage 4 decoupling proof). Linked
-// users get the Telegram send and no outbox row.
+// messages. Linked users get the Telegram send and no outbox row; chatless
+// users get a notificationOutbox row instead, so no notification is lost.
 
 import { internal } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import type { ActionCtx, MutationCtx } from "../../convex/_generated/server";
 import type { OutboxKind, OutboxPayload } from "./outbox";
 
-export async function notifyUser(
+type NotifyUser = { _id: Id<"users">; telegramChatId?: string };
+
+type OutboxRow = {
+	userId: Id<"users">;
+	kind: OutboxKind;
+	payload: OutboxPayload;
+};
+
+function buildOutboxRow(
+	user: NotifyUser,
+	text: string,
+	opts?: { kind?: OutboxKind; payload?: OutboxPayload },
+): OutboxRow {
+	return {
+		userId: user._id,
+		kind: opts?.kind ?? "generic",
+		payload: opts?.payload ?? { text },
+	};
+}
+
+async function scheduleTelegramSend(
 	ctx: MutationCtx | ActionCtx,
-	user: { _id: Id<"users">; telegramChatId?: string },
+	chatId: string,
+	text: string,
+): Promise<void> {
+	await ctx.scheduler.runAfter(0, internal.telegram.sendMessageAction, {
+		chatId,
+		text,
+	});
+}
+
+/** Mutation context: Telegram schedule for linked users, direct insert otherwise. */
+export async function notifyUser(
+	ctx: MutationCtx,
+	user: NotifyUser,
 	text: string,
 	opts?: { kind?: OutboxKind; payload?: OutboxPayload },
 ): Promise<void> {
 	if (user.telegramChatId !== undefined) {
-		await ctx.scheduler.runAfter(0, internal.telegram.sendMessageAction, {
-			chatId: user.telegramChatId,
-			text,
-		});
+		await scheduleTelegramSend(ctx, user.telegramChatId, text);
 		return;
 	}
-	const row = {
-		userId: user._id,
-		kind: opts?.kind ?? ("generic" as const),
-		payload: opts?.payload ?? { text },
-	};
-	if ("db" in ctx) {
-		await ctx.db.insert("notificationOutbox", row);
+	await ctx.db.insert("notificationOutbox", buildOutboxRow(user, text, opts));
+}
+
+/**
+ * Action context: actions have no ctx.db, so the outbox write goes through
+ * the insertOutboxRow mutation. Same routing as notifyUser otherwise.
+ */
+export async function notifyUserFromAction(
+	ctx: ActionCtx,
+	user: NotifyUser,
+	text: string,
+	opts?: { kind?: OutboxKind; payload?: OutboxPayload },
+): Promise<void> {
+	if (user.telegramChatId !== undefined) {
+		await scheduleTelegramSend(ctx, user.telegramChatId, text);
 		return;
 	}
-	await ctx.runMutation(internal.notifications.insertOutboxRow, row);
+	await ctx.runMutation(
+		internal.notifications.insertOutboxRow,
+		buildOutboxRow(user, text, opts),
+	);
 }
