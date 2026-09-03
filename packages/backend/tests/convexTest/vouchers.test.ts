@@ -566,6 +566,7 @@ describe("Voucher Expiration Flow", () => {
 		});
 
 		expect(result.success).toBe(false);
+		if (result.success !== false) throw new Error("expected failure");
 		expect(result.error).toContain("No €5 vouchers currently available");
 	});
 });

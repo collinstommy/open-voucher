@@ -3,7 +3,7 @@ import dayjs from "dayjs";
 import { applyCoinDelta } from "../src/lib/coinLedger";
 import { UPLOAD_REWARDS } from "../src/lib/constants";
 import { callGeminiApi } from "../src/lib/gemini";
-import { notifyUser } from "../src/lib/notify";
+import { notifyUser, notifyUserFromAction } from "../src/lib/notify";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import {
@@ -826,7 +826,8 @@ export const processVoucherImage = internalAction({
 				console.log(`Voucher created: ${result.voucherId}`);
 			} else {
 				console.log(`Voucher rejected: ${result.reason}`);
-				// Error message is sent by storeVoucherFromOcr
+				// Rejection notice fanned out by storeVoucherFromOcr (Telegram
+				// send for linked users, outbox row for chatless ones)
 			}
 		} catch (error: any) {
 			console.error("OCR system error:", { userId, imageStorageId, error });
@@ -841,10 +842,12 @@ export const processVoucherImage = internalAction({
 
 			const user = await ctx.runQuery(internal.users.getUserById, { userId });
 			if (user) {
-				await notifyUser(
+				// payload defaults to { text } — kept in sync by construction.
+				await notifyUserFromAction(
 					ctx,
 					user,
 					"❌ <b>Voucher Processing Failed</b>\n\nWe encountered an error while processing your voucher. Please try again.",
+					{ kind: "processing_failed" },
 				);
 			}
 		}
@@ -1090,11 +1093,14 @@ export const storeVoucherFromOcr = internalMutation({
 			uploadCount: (user.uploadCount || 0) + 1,
 		});
 
-		await notifyUser(
-			ctx,
-			user,
-			`✅ <b>Voucher Accepted!</b>\n\nThanks for sharing a €${type} voucher.\nCoins earned: +${reward}\nNew balance: ${newBalance}`,
-		);
+		const acceptedText = `✅ <b>Voucher Accepted!</b>\n\nThanks for sharing a €${type} voucher.\nCoins earned: +${reward}\nNew balance: ${newBalance}`;
+		await notifyUser(ctx, user, acceptedText, {
+			kind: "upload_accepted",
+			payload: {
+				text: acceptedText,
+				data: { voucherId, type, reward, newBalance },
+			},
+		});
 
 		console.log(
 			`Voucher created: ${voucherId} (type=${type}, barcode=${barcode})`,
@@ -1106,7 +1112,7 @@ export const storeVoucherFromOcr = internalMutation({
 
 async function sendErrorMessage(
 	ctx: MutationCtx,
-	user: { telegramChatId?: string },
+	user: { _id: Id<"users">; telegramChatId?: string },
 	reason: VoucherOcrFailureReason,
 	expiryDate?: number,
 ) {
@@ -1149,7 +1155,10 @@ async function sendErrorMessage(
 				"We encountered an unknown error while processing your voucher. Please try again or contact support.";
 	}
 
-	await notifyUser(ctx, user, message);
+	await notifyUser(ctx, user, message, {
+		kind: "upload_rejected",
+		payload: { text: message, data: { reason } },
+	});
 }
 
 export const recordSystemError = internalMutation({

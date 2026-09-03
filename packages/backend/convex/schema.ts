@@ -1,5 +1,6 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
+import { outboxKindValidator, outboxPayloadValidator } from "../src/lib/outbox";
 
 export default defineSchema({
 	inviteCodes: defineTable({
@@ -211,4 +212,14 @@ export default defineSchema({
 		errorType: v.string(),
 		text: v.string(),
 	}),
+
+	// Chatless fallback for Bot API sends (see src/lib/notify.ts). No
+	// createdAt column — use _creationTime. Single-user reads only (by_user);
+	// revisit the index if unread-first or cross-user reads ever arrive.
+	notificationOutbox: defineTable({
+		userId: v.id("users"),
+		kind: outboxKindValidator,
+		payload: outboxPayloadValidator,
+		readAt: v.optional(v.number()),
+	}).index("by_user", ["userId"]),
 });

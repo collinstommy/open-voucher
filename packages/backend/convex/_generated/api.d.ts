@@ -26,6 +26,7 @@ import type * as devTest from "../devTest.js";
 import type * as errors from "../errors.js";
 import type * as http from "../http.js";
 import type * as messages from "../messages.js";
+import type * as notifications from "../notifications.js";
 import type * as ocr from "../ocr.js";
 import type * as reminders from "../reminders.js";
 import type * as settings from "../settings.js";
@@ -59,6 +60,7 @@ declare const fullApi: ApiFromModules<{
   errors: typeof errors;
   http: typeof http;
   messages: typeof messages;
+  notifications: typeof notifications;
   ocr: typeof ocr;
   reminders: typeof reminders;
   settings: typeof settings;

@@ -46,6 +46,9 @@ type SeedResult = FunctionReturnType<typeof api.devTest.seedVoucher>;
 type DevAuthIdentity = NonNullable<
 	FunctionReturnType<typeof api.devTest.getAuthIdentity>
 >;
+type DevOutboxRow = FunctionReturnType<
+	typeof api.devTest.getOutboxByUser
+>[number];
 
 export interface E2EEnv {
 	fake: FakeBotApi;
@@ -80,6 +83,7 @@ export interface E2EEnv {
 		storageId: DevVoucher["imageStorageId"],
 	): Promise<string | null>;
 	getAuthIdentity(googleSub: string): Promise<DevAuthIdentity | null>;
+	getOutboxByUser(userId: DevUser["_id"]): Promise<Array<DevOutboxRow>>;
 }
 
 function readEnvFile(): Record<string, string> {
@@ -301,6 +305,8 @@ async function start(): Promise<E2EEnv> {
 				provider: "google",
 				providerAccountId: googleSub,
 			}),
+		getOutboxByUser: (userId) =>
+			client.query(api.devTest.getOutboxByUser, { userId }),
 	};
 
 	return env;

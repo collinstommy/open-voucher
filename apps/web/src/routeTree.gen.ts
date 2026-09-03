@@ -17,6 +17,7 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppIndexRouteImport } from './routes/app/index'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
+import { Route as DevFlowsRouteImport } from './routes/dev/flows'
 import { Route as AppTransactionsRouteImport } from './routes/app/transactions'
 import { Route as AppMyUploadsRouteImport } from './routes/app/my-uploads'
 import { Route as AppMyClaimsRouteImport } from './routes/app/my-claims'
@@ -73,6 +74,11 @@ const AdminIndexRoute = AdminIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AdminRoute,
+} as any)
+const DevFlowsRoute = DevFlowsRouteImport.update({
+  id: '/dev/flows',
+  path: '/dev/flows',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AppTransactionsRoute = AppTransactionsRouteImport.update({
   id: '/transactions',
@@ -176,6 +182,7 @@ export interface FileRoutesByFullPath {
   '/app/my-claims': typeof AppMyClaimsRoute
   '/app/my-uploads': typeof AppMyUploadsRoute
   '/app/transactions': typeof AppTransactionsRoute
+  '/dev/flows': typeof DevFlowsRoute
   '/admin/': typeof AdminIndexRoute
   '/app/': typeof AppIndexRoute
   '/admin/users/$userId': typeof AdminUsersUserIdRoute
@@ -200,6 +207,7 @@ export interface FileRoutesByTo {
   '/app/my-claims': typeof AppMyClaimsRoute
   '/app/my-uploads': typeof AppMyUploadsRoute
   '/app/transactions': typeof AppTransactionsRoute
+  '/dev/flows': typeof DevFlowsRoute
   '/admin': typeof AdminIndexRoute
   '/app': typeof AppIndexRoute
   '/admin/users/$userId': typeof AdminUsersUserIdRoute
@@ -227,6 +235,7 @@ export interface FileRoutesById {
   '/app/my-claims': typeof AppMyClaimsRoute
   '/app/my-uploads': typeof AppMyUploadsRoute
   '/app/transactions': typeof AppTransactionsRoute
+  '/dev/flows': typeof DevFlowsRoute
   '/admin/': typeof AdminIndexRoute
   '/app/': typeof AppIndexRoute
   '/admin/users/$userId': typeof AdminUsersUserIdRoute
@@ -255,6 +264,7 @@ export interface FileRouteTypes {
     | '/app/my-claims'
     | '/app/my-uploads'
     | '/app/transactions'
+    | '/dev/flows'
     | '/admin/'
     | '/app/'
     | '/admin/users/$userId'
@@ -279,6 +289,7 @@ export interface FileRouteTypes {
     | '/app/my-claims'
     | '/app/my-uploads'
     | '/app/transactions'
+    | '/dev/flows'
     | '/admin'
     | '/app'
     | '/admin/users/$userId'
@@ -305,6 +316,7 @@ export interface FileRouteTypes {
     | '/app/my-claims'
     | '/app/my-uploads'
     | '/app/transactions'
+    | '/dev/flows'
     | '/admin/'
     | '/app/'
     | '/admin/users/$userId'
@@ -318,6 +330,7 @@ export interface RootRouteChildren {
   AuthTesterRoute: typeof AuthTesterRoute
   TelegramRoute: typeof TelegramRoute
   UpdatesRoute: typeof UpdatesRoute
+  DevFlowsRoute: typeof DevFlowsRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -377,6 +390,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/'
       preLoaderRoute: typeof AdminIndexRouteImport
       parentRoute: typeof AdminRoute
+    }
+    '/dev/flows': {
+      id: '/dev/flows'
+      path: '/dev/flows'
+      fullPath: '/dev/flows'
+      preLoaderRoute: typeof DevFlowsRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/app/transactions': {
       id: '/app/transactions'
@@ -552,16 +572,8 @@ const rootRouteChildren: RootRouteChildren = {
   AuthTesterRoute: AuthTesterRoute,
   TelegramRoute: TelegramRoute,
   UpdatesRoute: UpdatesRoute,
+  DevFlowsRoute: DevFlowsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-  }
-}

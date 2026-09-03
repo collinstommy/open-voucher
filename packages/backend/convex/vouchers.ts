@@ -1,41 +1,22 @@
 import { v } from "convex/values";
 import dayjs from "dayjs";
-import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import {
 	internalMutation,
 	internalQuery,
 	type QueryCtx,
 } from "./_generated/server";
+import {
+	reportVoucherCore,
+	requestVoucherCore,
+	uploadVoucherCore,
+	type ClaimResult,
+	type ReportResult,
+} from "../src/lib/voucherFlows";
 import { userMutation, userQuery } from "./auth";
 import { CLAIM_COSTS, UPLOAD_REWARDS } from "../src/lib/constants";
 import { applyCoinDelta } from "../src/lib/coinLedger";
 import { recalculateReportCounts } from "../src/lib/reportCounts";
-import { notifyUser } from "../src/lib/notify";
-
-function getVoucherExpiryCalendarDay(expiryDate: number): string {
-	const date = new Date(expiryDate);
-	const year = date.getUTCFullYear();
-	const month = String(date.getUTCMonth() + 1).padStart(2, "0");
-	const day = String(date.getUTCDate()).padStart(2, "0");
-	return `${year}-${month}-${day}`;
-}
-
-function getIrishCalendarDay(now: number = Date.now()): string {
-	return new Intl.DateTimeFormat("en-CA", {
-		timeZone: "Europe/Dublin",
-		year: "numeric",
-		month: "2-digit",
-		day: "2-digit",
-	}).format(new Date(now));
-}
-
-function canReportClaimedVoucher(
-	expiryDate: number,
-	now: number = Date.now(),
-): boolean {
-	return getVoucherExpiryCalendarDay(expiryDate) >= getIrishCalendarDay(now);
-}
 
 export const getVoucherByBarcode = internalQuery({
 	args: { barcodeNumber: v.string() },
@@ -52,142 +33,19 @@ export const uploadVoucher = internalMutation({
 		userId: v.id("users"),
 		imageStorageId: v.id("_storage"),
 	},
-	handler: async (ctx, { userId, imageStorageId }) => {
-		const user = await ctx.db.get(userId);
-		if (!user) {
-			throw new Error("User not found");
-		}
-		if (user.isBanned) {
-			throw new Error("You have been banned from this service");
-		}
-
-		const now = Date.now();
-		const oneDayAgo = now - 24 * 60 * 60 * 1000;
-		const MAX_DAILY_UPLOADS = 10;
-		const recentUploads = await ctx.db
-			.query("vouchers")
-			.withIndex("by_uploader_created", (q) =>
-				q.eq("uploaderId", userId).gt("createdAt", oneDayAgo),
-			)
-			.collect();
-
-		if (recentUploads.length >= MAX_DAILY_UPLOADS) {
-			await notifyUser(
-				ctx,
-				user,
-				"🚫 <b>Daily Upload Limit Reached</b>\n\nYou can only upload 10 vouchers per 24 hours. Please try again later.",
-			);
-			return null;
-		}
-
-		await ctx.scheduler.runAfter(0, internal.ocr.processVoucherImage, {
-			userId,
-			imageStorageId,
-		});
-
-		return null;
+	handler: async (ctx, args) => {
+		return await uploadVoucherCore(ctx, args);
 	},
 });
-
 export const requestVoucher = internalMutation({
 	args: {
 		userId: v.id("users"),
 		type: v.union(v.literal("5"), v.literal("10"), v.literal("20")),
 	},
-	handler: async (ctx, { userId, type }) => {
-		const user = await ctx.db.get(userId);
-		if (!user) {
-			throw new Error("User not found");
-		}
-
-		const cost = CLAIM_COSTS[type];
-		if (user.coins < cost) {
-			return {
-				success: false,
-				error: `Insufficient coins. You need ${cost} coins.`,
-			};
-		}
-
-		const now = Date.now();
-		const oneDayAgo = now - 24 * 60 * 60 * 1000;
-		const MAX_DAILY_CLAIMS = 5;
-		const recentClaims = await ctx.db
-			.query("vouchers")
-			.withIndex("by_claimer_claimed_at", (q) =>
-				q.eq("claimerId", userId).gt("claimedAt", oneDayAgo),
-			)
-			.collect();
-
-		if (recentClaims.length >= MAX_DAILY_CLAIMS) {
-			return {
-				success: false,
-				error:
-					"<b>Daily Claim Limit Reached</b>\n\nYou can only claim 5 vouchers per 24 hours. Please try again later.",
-			};
-		}
-
-		// Find available voucher expiring soonest
-		const vouchers = await ctx.db
-			.query("vouchers")
-			.withIndex("by_status_type", (q) =>
-				q.eq("status", "available").eq("type", type),
-			)
-			.filter((q) =>
-				q.and(
-					q.gt(q.field("expiryDate"), now),
-					q.or(
-						q.eq(q.field("validFrom"), undefined),
-						q.lte(q.field("validFrom"), now),
-					),
-				),
-			)
-			.collect();
-
-		if (vouchers.length === 0) {
-			return {
-				success: false,
-				error: `No €${type} vouchers currently available.`,
-			};
-		}
-
-		const voucher = vouchers.sort((a, b) => a.expiryDate - b.expiryDate)[0];
-
-		const imageUrl = await ctx.storage.getUrl(voucher.imageStorageId);
-		if (!imageUrl) {
-			return {
-				success: false,
-				error:
-					"Failed to retrieve voucher image. No coins used. Please try again.",
-			};
-		}
-
-		const { newBalance } = await applyCoinDelta(ctx, {
-			userId,
-			delta: -cost,
-			type: "claim_spend",
-			voucherId: voucher._id,
-		});
-
-		await ctx.db.patch(userId, {
-			claimCount: (user.claimCount || 0) + 1,
-		});
-
-		await ctx.db.patch(voucher._id, {
-			status: "claimed",
-			claimerId: userId,
-			claimedAt: now,
-		});
-
-		return {
-			success: true,
-			voucherId: voucher._id,
-			imageUrl,
-			remainingCoins: newBalance,
-			expiryDate: voucher.expiryDate,
-		};
+	handler: async (ctx, args) => {
+		return await requestVoucherCore(ctx, args);
 	},
 });
-
 export const refundFailedClaimDelivery = internalMutation({
 	args: {
 		userId: v.id("users"),
@@ -248,211 +106,10 @@ export const reportVoucher = internalMutation({
 		userId: v.id("users"),
 		voucherId: v.id("vouchers"),
 	},
-	handler: async (ctx, { userId, voucherId }) => {
-		const user = await ctx.db.get(userId);
-		if (!user) throw new Error("User not found");
-
-		if (user.isBanned) {
-			return {
-				status: "banned",
-				message: "You have been banned from this service.",
-			};
-		}
-
-		const now = Date.now();
-		const startOfDay = dayjs(now).startOf("day").valueOf();
-
-		// Check reports from today
-		const todayReports = await ctx.db
-			.query("reports")
-			.withIndex("by_reporterId", (q) => q.eq("reporterId", user._id))
-			.filter((q) => q.gte(q.field("createdAt"), startOfDay))
-			.collect();
-
-		if (todayReports.length >= 2) {
-			return {
-				status: "rate_limited",
-				message:
-					"You can only report 2 vouchers per day. Please try again tomorrow.",
-			};
-		}
-
-		const voucher = await ctx.db.get(voucherId);
-
-		if (!voucher) throw new Error("Voucher not found");
-		if (voucher.claimerId !== user._id) {
-			throw new Error("You did not claim this voucher");
-		}
-
-		if (!canReportClaimedVoucher(voucher.expiryDate, now)) {
-			return {
-				status: "expired",
-				message:
-					"This voucher expired before today and can no longer be reported.",
-			};
-		}
-
-		const existingReport = await ctx.db
-			.query("reports")
-			.withIndex("by_voucher", (q) => q.eq("voucherId", voucherId))
-			.filter((q) => q.eq(q.field("reporterId"), user._id))
-			.first();
-
-		if (existingReport) {
-			return {
-				status: "already_reported",
-				message: "You have already reported this voucher.",
-			};
-		}
-		const last5Claims = await ctx.db
-			.query("vouchers")
-			.withIndex("by_claimer_claimed_at", (q) => q.eq("claimerId", user._id))
-			.order("desc")
-			.take(5);
-
-		const reporterReports = await ctx.db
-			.query("reports")
-			.withIndex("by_reporterId", (q) => q.eq("reporterId", user._id))
-			.order("desc")
-			.collect();
-
-		// Check if 3+ of last 5 claims were reported
-		if (last5Claims.length >= 5) {
-			const last5ClaimIds = last5Claims.map((v) => v._id);
-			const last5Reported = reporterReports.filter((r) =>
-				last5ClaimIds.includes(r.voucherId),
-			);
-			if (last5Reported.length >= 3 && !user.flaggedForReviewAt) {
-				console.log(
-					`🚫 REPORTER FLAG: User ${user._id} flagged for excessive reporting. ` +
-						`Reported ${last5Reported.length} of last 5 claims. ` +
-						`Total claims: ${last5Claims.length}, Total reports: ${reporterReports.length}`,
-				);
-				console.log(
-					"Last 5 claims:",
-					last5Claims.map((v) => ({
-						voucherId: v._id,
-						type: v.type,
-						claimedAt: new Date(v.claimedAt || 0).toISOString(),
-						wasReported: last5Reported.some((r) => r.voucherId === v._id),
-					})),
-				);
-				await ctx.db.patch(user._id, {
-					flaggedForReviewAt: Date.now(),
-				});
-			}
-		}
-
-		let reportId: Id<"reports"> | undefined;
-		if (voucher.status !== "reported") {
-			await ctx.db.patch(voucherId, { status: "reported" });
-			reportId = await ctx.db.insert("reports", {
-				voucherId,
-				reporterId: user._id,
-				uploaderId: voucher.uploaderId,
-				reason: "not_working",
-				createdAt: Date.now(),
-			});
-
-			await ctx.db.patch(user._id, { lastReportAt: now });
-			await recalculateReportCounts(ctx, [user._id, voucher.uploaderId]);
-
-			const uploader = await ctx.db.get(voucher.uploaderId);
-			if (uploader && uploader.telegramChatId !== undefined) {
-				// Send message to uploader asking if they used the voucher
-				await ctx.scheduler.runAfter(
-					0,
-					internal.telegram.sendUploaderReportMessage,
-					{
-						uploaderChatId: uploader.telegramChatId,
-						voucherId: voucher._id,
-						voucherType: voucher.type as "5" | "10" | "20",
-						imageStorageId: voucher.imageStorageId,
-						barcodeNumber: voucher.barcodeNumber,
-					},
-				);
-			}
-		}
-
-		const totalUploads = await ctx.db
-			.query("vouchers")
-			.withIndex("by_uploader_created", (q) =>
-				q.eq("uploaderId", voucher.uploaderId),
-			)
-			.collect();
-
-		const totalUploadCount = totalUploads.length;
-
-		// For accounts with 20+ uploads: check 5+ of last 10
-		// For accounts with fewer uploads: check 3+ of last 5
-		const isHighVolumeUploader = totalUploadCount >= 20;
-		const uploadsToCheck = isHighVolumeUploader ? 10 : 5;
-		const reportsThreshold = isHighVolumeUploader ? 5 : 3;
-
-		const recentUploads = await ctx.db
-			.query("vouchers")
-			.withIndex("by_uploader_created", (q) =>
-				q.eq("uploaderId", voucher.uploaderId),
-			)
-			.order("desc")
-			.take(uploadsToCheck);
-
-		if (recentUploads.length >= uploadsToCheck) {
-			const uploaderReports = await ctx.db
-				.query("reports")
-				.withIndex("by_uploader", (q) => q.eq("uploaderId", voucher.uploaderId))
-				.collect();
-
-			const validReports = [];
-			for (const report of uploaderReports) {
-				const reporter = await ctx.db.get(report.reporterId);
-				if (reporter && !reporter.isBanned) {
-					validReports.push(report);
-				}
-			}
-
-			// Check if threshold of recent uploads were reported
-			const recentUploadIds = recentUploads.map((v) => v._id);
-			const recentReported = validReports.filter((r) =>
-				recentUploadIds.includes(r.voucherId),
-			);
-
-			const shouldFlag = recentReported.length >= reportsThreshold;
-
-			if (shouldFlag) {
-				const uploader = await ctx.db.get(voucher.uploaderId);
-				if (uploader && !uploader.flaggedForReviewAt) {
-					console.log(
-						`🚫 UPLOADER FLAG: User ${voucher.uploaderId} flagged for bad uploads. ` +
-							`${recentReported.length} of last ${uploadsToCheck} uploads reported. ` +
-							`Total uploads: ${totalUploadCount}, Valid reports (non-banned): ${validReports.length}`,
-					);
-					console.log(
-						`Last ${uploadsToCheck} uploads:`,
-						recentUploads.map((v) => ({
-							voucherId: v._id,
-							type: v.type,
-							status: v.status,
-							createdAt: new Date(v.createdAt).toISOString(),
-							wasReported: recentReported.some((r) => r.voucherId === v._id),
-						})),
-					);
-					await ctx.db.patch(voucher.uploaderId, {
-						flaggedForReviewAt: Date.now(),
-					});
-				}
-			}
-		}
-
-		return {
-			status: "reported",
-			reportId: reportId,
-			message:
-				"Report received. You can request a replacement voucher if you need one.",
-		};
+	handler: async (ctx, args) => {
+		return await reportVoucherCore(ctx, args);
 	},
 });
-
 export const refundReportedVoucher = internalMutation({
 	args: {
 		userId: v.id("users"),
@@ -817,5 +474,107 @@ export const recordUploaderDenied = internalMutation({
 			voucherId,
 			createdAt: Date.now(),
 		});
+	},
+});
+
+// --- Public app wrappers (the app consumes them; see cores in
+// src/lib/voucherFlows.ts) ---
+//
+// userMutation shells: identity plumbing (the authed userId) plus chatless
+// outbox writes. Claim/report wrappers write rows only on success —
+// validation failures are displayed synchronously by the caller. (Upload is
+// the exception: a daily-limit hit writes an upload_limit row via the core's
+// notifyUser call while the wrapper still returns success.)
+
+/** Storage upload URL for app voucher uploads (client POSTs image bytes). */
+export const generateVoucherUploadUrl = userMutation({
+	args: {},
+	handler: async (ctx) => {
+		return await ctx.storage.generateUploadUrl();
+	},
+});
+
+/** App upload: feeds the existing OCR pipeline (processVoucherImage). */
+export const uploadVoucherFromApp = userMutation({
+	args: {
+		imageStorageId: v.id("_storage"),
+	},
+	handler: async (ctx, { userId, imageStorageId }) => {
+		await uploadVoucherCore(ctx, { userId, imageStorageId });
+		return { success: true as const };
+	},
+});
+
+/** App claim: same core as the bot path; delivery is the returned image. */
+export type ClaimVoucherFromAppResult = ClaimResult;
+
+export const claimVoucherFromApp = userMutation({
+	args: {
+		type: v.union(v.literal("5"), v.literal("10"), v.literal("20")),
+	},
+	handler: async (
+		ctx,
+		{ userId, type },
+	): Promise<ClaimVoucherFromAppResult> => {
+		const result = await requestVoucherCore(ctx, { userId, type });
+		// Linked users get neither row nor send here: bot-path claim delivery
+		// was the voucher image itself, never a separate message, and the app
+		// already renders the returned imageUrl. Only chatless users — who
+		// have no other delivery channel — get the outbox row.
+		if (result.success) {
+			const user = await ctx.db.get(userId);
+			if (user && user.telegramChatId === undefined) {
+				const text =
+					`✅ <b>Here is your €${type} voucher!</b>\n\n` +
+					`Expires: ${dayjs(result.expiryDate).format("MMM Do")}\n` +
+					`Remaining coins: ${result.remainingCoins}`;
+				await ctx.db.insert("notificationOutbox", {
+					userId,
+					kind: "claim_success",
+					payload: {
+						text,
+						data: {
+							voucherId: result.voucherId,
+							type,
+							expiryDate: result.expiryDate,
+							remainingCoins: result.remainingCoins,
+						},
+					},
+				});
+			}
+		}
+		return result;
+	},
+});
+
+export type ReportVoucherFromAppResult = ReportResult;
+
+export const reportVoucherFromApp = userMutation({
+	args: {
+		voucherId: v.id("vouchers"),
+	},
+	handler: async (
+		ctx,
+		{ userId, voucherId },
+	): Promise<ReportVoucherFromAppResult> => {
+		const result = await reportVoucherCore(ctx, { userId, voucherId });
+		// Only the reported outcome writes a row: every other status carries
+		// its message back synchronously for the caller to display.
+		if (result.status === "reported") {
+			const user = await ctx.db.get(userId);
+			if (user && user.telegramChatId === undefined) {
+				const text =
+					"✅ Report received. You can request a replacement voucher if you need one.";
+				await ctx.db.insert("notificationOutbox", {
+					userId,
+					kind: "report_received",
+					payload: {
+						text,
+						data: { voucherId, reportId: result.reportId },
+					},
+				});
+			}
+		}
+		return result;
 	},
 });
