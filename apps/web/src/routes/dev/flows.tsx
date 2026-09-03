@@ -5,7 +5,8 @@
 // Session: reuses auth like any app page (JwtAuthProvider + dev-auth on
 // localhost). To act as a chatless Google user, paste the JWT from the
 // stage-2 auth tester (/auth-tester) into the session box below.
-// In production builds this route renders nothing and fires no requests.
+// In production builds this route renders a stub and skips its Convex flow
+// queries (auth bootstrap still runs, like any app page).
 
 import { api } from "@open-voucher/backend/convex/_generated/api";
 import { useJwtAuth } from "@/auth/JwtAuthProvider";

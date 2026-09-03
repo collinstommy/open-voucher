@@ -1,9 +1,11 @@
-// Shared voucher-flow cores. The bot path (internalMutation shells below in
+// Shared voucher-flow cores. The bot path (internalMutation shells in
 // convex/vouchers.ts, called from the Telegram actions with a chat-looked-up
-// userId) and the app path (userMutation wrappers with the authed userId)
-// execute the same state machine: guards, coin ledger, and notifications live
-// here so the two transports cannot drift. Shells own only identity plumbing
-// (who the userId comes from) and transport-specific delivery.
+// userId) and the app path (userMutation wrappers in the same file, with the
+// authed userId) execute the same state machine: guards, coin ledger, and
+// notifications live here so the two transports cannot drift. Shells own only
+// identity plumbing (where the userId comes from); delivery details stay with
+// each caller (Telegram actions send bot messages, app wrappers write the
+// chatless outbox rows).
 
 import dayjs from "dayjs";
 import { internal } from "../../convex/_generated/api";
@@ -368,6 +370,9 @@ export async function reportVoucherCore(
 
 	const totalUploadCount = totalUploads.length;
 
+	// Uploader auto-flag: looser quorum for high-volume uploaders (5 of last
+	// 10 at 20+ uploads) than for occasional ones (3 of last 5), so a single
+	// bad batch cannot sink a new account while repeat offenders still trip.
 	// For accounts with 20+ uploads: check 5+ of last 10
 	// For accounts with fewer uploads: check 3+ of last 5
 	const isHighVolumeUploader = totalUploadCount >= 20;

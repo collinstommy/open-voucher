@@ -21,6 +21,9 @@ function buildOutboxRow(
 	text: string,
 	opts?: { kind?: OutboxKind; payload?: OutboxPayload },
 ): OutboxRow {
+	// payload defaults to { text }: pass an explicit payload only when the
+	// row needs machine-readable data (e.g. voucherId for deep-linking).
+	// The bare-kind default exists for one-line fire-and-forget notifies.
 	return {
 		userId: user._id,
 		kind: opts?.kind ?? "generic",

@@ -826,7 +826,8 @@ export const processVoucherImage = internalAction({
 				console.log(`Voucher created: ${result.voucherId}`);
 			} else {
 				console.log(`Voucher rejected: ${result.reason}`);
-				// Error message is sent by storeVoucherFromOcr
+				// Rejection notice fanned out by storeVoucherFromOcr (Telegram
+				// send for linked users, outbox row for chatless ones)
 			}
 		} catch (error: any) {
 			console.error("OCR system error:", { userId, imageStorageId, error });
@@ -841,16 +842,12 @@ export const processVoucherImage = internalAction({
 
 			const user = await ctx.runQuery(internal.users.getUserById, { userId });
 			if (user) {
+				// payload defaults to { text } — kept in sync by construction.
 				await notifyUserFromAction(
 					ctx,
 					user,
 					"❌ <b>Voucher Processing Failed</b>\n\nWe encountered an error while processing your voucher. Please try again.",
-					{
-						kind: "processing_failed",
-						payload: {
-							text: "❌ <b>Voucher Processing Failed</b>\n\nWe encountered an error while processing your voucher. Please try again.",
-						},
-					},
+					{ kind: "processing_failed" },
 				);
 			}
 		}

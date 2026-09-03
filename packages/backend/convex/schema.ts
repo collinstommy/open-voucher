@@ -213,11 +213,9 @@ export default defineSchema({
 		text: v.string(),
 	}),
 
-	// Decoupling proof: notifications for users with no Telegram chat land
-	// here instead of the Bot API (see src/lib/notify.ts). First reader is
-	// the dev flows page inspector plus a user query; push reads the same
-	// rows later. No createdAt — use _creationTime. If it proves useless it
-	// is one table to drop.
+	// Chatless fallback for Bot API sends (see src/lib/notify.ts). No
+	// createdAt column — use _creationTime. Single-user reads only (by_user);
+	// revisit the index if unread-first or cross-user reads ever arrive.
 	notificationOutbox: defineTable({
 		userId: v.id("users"),
 		kind: outboxKindValidator,

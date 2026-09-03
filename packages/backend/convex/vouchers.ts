@@ -477,13 +477,14 @@ export const recordUploaderDenied = internalMutation({
 	},
 });
 
-// --- Public app wrappers (the Expo app consumes them) ---
+// --- Public app wrappers (the app consumes them; see cores in
+// src/lib/voucherFlows.ts) ---
 //
-// userMutation shells over the shared cores in src/lib/voucherFlows.ts.
-// Shells own only identity plumbing (the authed userId) and chatless outbox
-// writes; the state machine stays in the core so bot and app paths cannot
-// drift. Synchronous failure outcomes (already displayed by the caller)
-// write no rows.
+// userMutation shells: identity plumbing (the authed userId) plus chatless
+// outbox writes. Claim/report wrappers write rows only on success —
+// validation failures are displayed synchronously by the caller. (Upload is
+// the exception: a daily-limit hit writes an upload_limit row via the core's
+// notifyUser call while the wrapper still returns success.)
 
 /** Storage upload URL for app voucher uploads (client POSTs image bytes). */
 export const generateVoucherUploadUrl = userMutation({
@@ -516,6 +517,10 @@ export const claimVoucherFromApp = userMutation({
 		{ userId, type },
 	): Promise<ClaimVoucherFromAppResult> => {
 		const result = await requestVoucherCore(ctx, { userId, type });
+		// Linked users get neither row nor send here: bot-path claim delivery
+		// was the voucher image itself, never a separate message, and the app
+		// already renders the returned imageUrl. Only chatless users — who
+		// have no other delivery channel — get the outbox row.
 		if (result.success) {
 			const user = await ctx.db.get(userId);
 			if (user && user.telegramChatId === undefined) {
@@ -553,6 +558,8 @@ export const reportVoucherFromApp = userMutation({
 		{ userId, voucherId },
 	): Promise<ReportVoucherFromAppResult> => {
 		const result = await reportVoucherCore(ctx, { userId, voucherId });
+		// Only the reported outcome writes a row: every other status carries
+		// its message back synchronously for the caller to display.
 		if (result.status === "reported") {
 			const user = await ctx.db.get(userId);
 			if (user && user.telegramChatId === undefined) {
