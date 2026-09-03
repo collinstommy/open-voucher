@@ -1,5 +1,6 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
+import { outboxKindValidator, outboxPayloadValidator } from "../src/lib/outbox";
 
 export default defineSchema({
 	inviteCodes: defineTable({
@@ -211,4 +212,16 @@ export default defineSchema({
 		errorType: v.string(),
 		text: v.string(),
 	}),
+
+	// Decoupling proof: notifications for users with no Telegram chat land
+	// here instead of the Bot API (see src/lib/notify.ts). First reader is
+	// the dev flows page inspector plus a user query; push reads the same
+	// rows later. No createdAt — use _creationTime. If it proves useless it
+	// is one table to drop.
+	notificationOutbox: defineTable({
+		userId: v.id("users"),
+		kind: outboxKindValidator,
+		payload: outboxPayloadValidator,
+		readAt: v.optional(v.number()),
+	}).index("by_user", ["userId"]),
 });

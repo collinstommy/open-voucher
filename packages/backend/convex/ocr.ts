@@ -841,11 +841,12 @@ export const processVoucherImage = internalAction({
 
 			const user = await ctx.runQuery(internal.users.getUserById, { userId });
 			if (user) {
-				await notifyUser(
-					ctx,
-					user,
-					"❌ <b>Voucher Processing Failed</b>\n\nWe encountered an error while processing your voucher. Please try again.",
-				);
+				const text =
+					"❌ <b>Voucher Processing Failed</b>\n\nWe encountered an error while processing your voucher. Please try again.";
+				await notifyUser(ctx, user, text, {
+					kind: "processing_failed",
+					payload: { text },
+				});
 			}
 		}
 	},
@@ -1090,11 +1091,14 @@ export const storeVoucherFromOcr = internalMutation({
 			uploadCount: (user.uploadCount || 0) + 1,
 		});
 
-		await notifyUser(
-			ctx,
-			user,
-			`✅ <b>Voucher Accepted!</b>\n\nThanks for sharing a €${type} voucher.\nCoins earned: +${reward}\nNew balance: ${newBalance}`,
-		);
+		const acceptedText = `✅ <b>Voucher Accepted!</b>\n\nThanks for sharing a €${type} voucher.\nCoins earned: +${reward}\nNew balance: ${newBalance}`;
+		await notifyUser(ctx, user, acceptedText, {
+			kind: "upload_accepted",
+			payload: {
+				text: acceptedText,
+				data: { voucherId, type, reward, newBalance },
+			},
+		});
 
 		console.log(
 			`Voucher created: ${voucherId} (type=${type}, barcode=${barcode})`,
@@ -1106,7 +1110,7 @@ export const storeVoucherFromOcr = internalMutation({
 
 async function sendErrorMessage(
 	ctx: MutationCtx,
-	user: { telegramChatId?: string },
+	user: { _id: Id<"users">; telegramChatId?: string },
 	reason: VoucherOcrFailureReason,
 	expiryDate?: number,
 ) {
@@ -1149,7 +1153,10 @@ async function sendErrorMessage(
 				"We encountered an unknown error while processing your voucher. Please try again or contact support.";
 	}
 
-	await notifyUser(ctx, user, message);
+	await notifyUser(ctx, user, message, {
+		kind: "upload_rejected",
+		payload: { text: message, data: { reason } },
+	});
 }
 
 export const recordSystemError = internalMutation({

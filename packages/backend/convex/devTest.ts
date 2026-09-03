@@ -203,3 +203,14 @@ export const getAuthIdentity = query({
 			.first();
 	},
 });
+
+export const getOutboxByUser = query({
+	args: { userId: v.id("users") },
+	handler: async (ctx, args) => {
+		assertDevOnly();
+		return await ctx.db
+			.query("notificationOutbox")
+			.withIndex("by_user", (q) => q.eq("userId", args.userId))
+			.collect();
+	},
+});

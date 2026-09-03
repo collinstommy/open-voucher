@@ -72,11 +72,12 @@ export const uploadVoucher = internalMutation({
 			.collect();
 
 		if (recentUploads.length >= MAX_DAILY_UPLOADS) {
-			await notifyUser(
-				ctx,
-				user,
-				"🚫 <b>Daily Upload Limit Reached</b>\n\nYou can only upload 10 vouchers per 24 hours. Please try again later.",
-			);
+			const text =
+				"🚫 <b>Daily Upload Limit Reached</b>\n\nYou can only upload 10 vouchers per 24 hours. Please try again later.";
+			await notifyUser(ctx, user, text, {
+				kind: "upload_limit",
+				payload: { text },
+			});
 			return null;
 		}
 
@@ -371,6 +372,29 @@ export const reportVoucher = internalMutation({
 						barcodeNumber: voucher.barcodeNumber,
 					},
 				);
+			} else if (uploader) {
+				// Chatless uploader: the Telegram send has nowhere to go, so
+				// the report lands in their outbox instead (decoupling proof).
+				const suffix =
+					voucher.barcodeNumber && voucher.barcodeNumber.length >= 4
+						? voucher.barcodeNumber.slice(-4)
+						: voucher.barcodeNumber;
+				const text =
+					"⚠️ <b>Someone has reported one of your vouchers as not working.</b>\n\n" +
+					`€${voucher.type} voucher${suffix ? ` (ending in ${suffix})` : ""}\n\n` +
+					"Did you use this voucher already?";
+				await ctx.db.insert("notificationOutbox", {
+					userId: uploader._id,
+					kind: "uploader_reported",
+					payload: {
+						text,
+						data: {
+							voucherId: voucher._id,
+							voucherType: voucher.type,
+							barcodeNumber: voucher.barcodeNumber,
+						},
+					},
+				});
 			}
 		}
 
@@ -817,5 +841,165 @@ export const recordUploaderDenied = internalMutation({
 			voucherId,
 			createdAt: Date.now(),
 		});
+	},
+});
+
+// --- Stage 4: public app wrappers (permanent; the Expo app consumes them) ---
+//
+// Thin userMutation shells over the internal flows above. State machines stay
+// inside the internal functions so bot and app paths stay symmetric; the only
+// app-specific behavior is the outbox write for chatless users, mirroring the
+// Telegram message the bot path would have sent. Synchronous outcomes
+// (validation failures the page already displays) write no rows.
+
+/** Storage upload URL for app voucher uploads (client POSTs image bytes). */
+export const generateVoucherUploadUrl = userMutation({
+	args: {},
+	handler: async (ctx) => {
+		return await ctx.storage.generateUploadUrl();
+	},
+});
+
+/** App upload: feeds the existing OCR pipeline (processVoucherImage). */
+export const uploadVoucherFromApp = userMutation({
+	args: {
+		imageStorageId: v.id("_storage"),
+	},
+	handler: async (ctx, { userId, imageStorageId }) => {
+		await ctx.runMutation(internal.vouchers.uploadVoucher, {
+			userId,
+			imageStorageId,
+		});
+		return { success: true as const };
+	},
+});
+
+/** App claim: wrapper around requestVoucher; delivery is the returned image. */
+export type ClaimVoucherFromAppResult =
+	| {
+			success: true;
+			voucherId: Id<"vouchers">;
+			imageUrl: string;
+			remainingCoins: number;
+			expiryDate: number;
+	  }
+	| { success: false; error: string };
+
+export const claimVoucherFromApp = userMutation({
+	args: {
+		type: v.union(v.literal("5"), v.literal("10"), v.literal("20")),
+	},
+	handler: async (
+		ctx,
+		{ userId, type },
+	): Promise<ClaimVoucherFromAppResult> => {
+		// Same-module internal call: normalize through a local shape so the
+		// public result type stays a precise discriminated union.
+		const raw = (await ctx.runMutation(internal.vouchers.requestVoucher, {
+			userId,
+			type,
+		})) as {
+			success: boolean;
+			voucherId?: Id<"vouchers">;
+			imageUrl?: string;
+			remainingCoins?: number;
+			expiryDate?: number;
+			error?: string;
+		};
+		if (!raw.success) {
+			return { success: false, error: raw.error ?? "Request failed" };
+		}
+		const result: ClaimVoucherFromAppResult = {
+			success: true,
+			voucherId: raw.voucherId as Id<"vouchers">,
+			imageUrl: raw.imageUrl as string,
+			remainingCoins: raw.remainingCoins as number,
+			expiryDate: raw.expiryDate as number,
+		};
+		{
+			const user = await ctx.db.get(userId);
+			if (user && user.telegramChatId === undefined) {
+				const text =
+					`✅ <b>Here is your €${type} voucher!</b>\n\n` +
+					`Expires: ${dayjs(result.expiryDate).format("MMM Do")}\n` +
+					`Remaining coins: ${result.remainingCoins}`;
+				await ctx.db.insert("notificationOutbox", {
+					userId,
+					kind: "claim_success",
+					payload: {
+						text,
+						data: {
+							voucherId: result.voucherId,
+							type,
+							expiryDate: result.expiryDate,
+							remainingCoins: result.remainingCoins,
+						},
+					},
+				});
+			}
+		}
+		return result;
+	},
+});
+
+/** App report: wrapper around reportVoucher. */
+export type ReportVoucherFromAppResult =
+	| { status: "banned"; message: string }
+	| { status: "rate_limited"; message: string }
+	| { status: "expired"; message: string }
+	| { status: "already_reported"; message: string }
+	| {
+			status: "reported";
+			reportId: Id<"reports"> | undefined;
+			message: string;
+	  };
+
+export const reportVoucherFromApp = userMutation({
+	args: {
+		voucherId: v.id("vouchers"),
+	},
+	handler: async (
+		ctx,
+		{ userId, voucherId },
+	): Promise<ReportVoucherFromAppResult> => {
+		// Same-module internal call: normalize through a local shape (see claim).
+		const raw = (await ctx.runMutation(internal.vouchers.reportVoucher, {
+			userId,
+			voucherId,
+		})) as {
+			status: string;
+			message: string;
+			reportId?: Id<"reports">;
+		};
+		if (raw.status === "reported") {
+			const user = await ctx.db.get(userId);
+			if (user && user.telegramChatId === undefined) {
+				const text =
+					"✅ Report received. You can request a replacement voucher if you need one.";
+				await ctx.db.insert("notificationOutbox", {
+					userId,
+					kind: "report_received",
+					payload: {
+						text,
+						data: { voucherId, reportId: raw.reportId },
+					},
+				});
+			}
+			return {
+				status: "reported",
+				reportId: raw.reportId,
+				message: raw.message,
+			};
+		}
+		if (raw.status === "banned") {
+			return { status: "banned", message: raw.message };
+		}
+		if (raw.status === "rate_limited") {
+			return { status: "rate_limited", message: raw.message };
+		}
+		if (raw.status === "expired") {
+			return { status: "expired", message: raw.message };
+		}
+		return { status: "already_reported", message: raw.message };
 	},
 });
