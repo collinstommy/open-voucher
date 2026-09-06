@@ -12,13 +12,13 @@
 
 import { api } from "@open-voucher/backend/convex/_generated/api";
 import { createFileRoute, notFound } from "@tanstack/react-router";
-import { ConvexHttpClient } from "convex/browser";
-import type { FunctionReturnType } from "convex/server";
+import { useQuery } from "convex/react";
 import { useEffect, useRef, useState } from "react";
+import { useJwtAuth } from "@/auth/JwtAuthProvider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { CONVEX_SITE_URLS, CONVEX_URLS } from "@/lib/convexConfig";
+import { CONVEX_SITE_URLS } from "@/lib/convexConfig";
 
 export const Route = createFileRoute("/auth-tester")({
 	beforeLoad: () => {
@@ -41,10 +41,6 @@ const GOOGLE_TEST_CLIENT_ID =
 	"975332129644-ltsmsjl4bmconkph4oqj71cbdnehq1mq.apps.googleusercontent.com";
 // The tester always runs against dev (the deployment stage 1 is live on).
 const SITE_URL = CONVEX_SITE_URLS.dev;
-const CONVEX_URL = CONVEX_URLS.dev;
-
-type Uploads = FunctionReturnType<typeof api.vouchers.getMyAvailableUploads>;
-type Claims = FunctionReturnType<typeof api.vouchers.getMyClaimedVouchers>;
 
 function formatDay(timestamp: number): string {
 	return new Date(timestamp).toLocaleDateString("en-IE", {
@@ -108,19 +104,24 @@ function decodeJwtPayload(jwt: string): Record<string, unknown> | null {
 }
 
 function AuthTester() {
+	const { jwt, setJwt } = useJwtAuth();
 	const [screen, setScreen] = useState<Screen>("sign-in");
 	const [idToken, setIdToken] = useState<string>("");
 	const [login, setLogin] = useState<LoginSuccess | null>(null);
 	const [linkCode, setLinkCode] = useState("");
 	const [busy, setBusy] = useState(false);
 	const [log, setLog] = useState<LogEntry[]>([]);
-	const [convexCheck, setConvexCheck] = useState<string | null>(null);
-	const [vouchers, setVouchers] = useState<{
-		uploads: Uploads;
-		claims: Claims;
-	} | null>(null);
-	const [vouchersError, setVouchersError] = useState<string | null>(null);
 	const buttonRef = useRef<HTMLDivElement>(null);
+	const live = screen === "logged-in" && jwt !== null;
+	const currentUser = useQuery(
+		api.users.getCurrentUser,
+		live ? {} : "skip",
+	);
+	const uploads = useQuery(
+		api.vouchers.getMyAvailableUploads,
+		live ? {} : "skip",
+	);
+	const claims = useQuery(api.vouchers.getMyClaimedVouchers, live ? {} : "skip");
 	const logId = useRef(0);
 	// Latest credential handler, so the GIS effect can re-render the button after
 	// reset without re-initializing Google Identity Services on every render.
@@ -166,6 +167,7 @@ function AuthTester() {
 	}
 
 	function handleLoginSuccess(data: LoginSuccess) {
+		setJwt(data.jwt);
 		setLogin(data);
 		setScreen("logged-in");
 	}
@@ -267,54 +269,13 @@ function AuthTester() {
 		}
 	}
 
-	// Prove the issued JWT authenticates against the real backend (customJwt
-	// pipeline): setAuth + userQueries, exactly like the app would.
-	useEffect(() => {
-		if (!login?.jwt) {
-			setConvexCheck(null);
-			setVouchers(null);
-			setVouchersError(null);
-			return;
-		}
-		let cancelled = false;
-		const client = new ConvexHttpClient(CONVEX_URL);
-		client.setAuth(login.jwt);
-		void (async () => {
-			try {
-				const [user, uploads, claims] = await Promise.all([
-					client.query(api.users.getCurrentUser, {}),
-					client.query(api.vouchers.getMyAvailableUploads, {}),
-					client.query(api.vouchers.getMyClaimedVouchers, {}),
-				]);
-				if (cancelled) return;
-				setConvexCheck(
-					`getCurrentUser OK: ${user._id} · ${user.coins} coins · chat ${user.telegramChatId ?? "none"}`,
-				);
-				setVouchers({ uploads, claims });
-				setVouchersError(null);
-			} catch (error: unknown) {
-				if (cancelled) return;
-				const message =
-					error instanceof Error ? error.message : String(error);
-				setConvexCheck(`Convex query FAILED: ${message}`);
-				setVouchers(null);
-				setVouchersError(message);
-			}
-		})();
-		return () => {
-			cancelled = true;
-		};
-	}, [login?.jwt]);
-
 	function reset() {
 		window.google?.accounts?.id?.disableAutoSelect();
+		setJwt(null);
 		setScreen("sign-in");
 		setIdToken("");
 		setLogin(null);
 		setLinkCode("");
-		setConvexCheck(null);
-		setVouchers(null);
-		setVouchersError(null);
 	}
 
 	return (
@@ -428,28 +389,21 @@ function AuthTester() {
 								</pre>
 							</details>
 						</div>
-						{convexCheck && (
-							<p
-								className={
-									convexCheck.startsWith("getCurrentUser OK")
-										? "text-green-400"
-										: "text-red-400"
-								}
-							>
-								{convexCheck}
+						{currentUser === undefined && live && (
+							<p className="text-zinc-500">Loading Convex userQueries…</p>
+						)}
+						{currentUser && (
+							<p className="text-green-400">
+								getCurrentUser OK: {currentUser._id} · {currentUser.coins} coins
+								· chat {currentUser.telegramChatId ?? "none"}
 							</p>
 						)}
-						{vouchersError && (
-							<p className="text-red-400">
-								Voucher lists failed: {vouchersError}
-							</p>
-						)}
-						{vouchers && (
+						{uploads !== undefined && claims !== undefined && (
 							<div className="grid gap-4 md:grid-cols-2">
 								<VoucherColumn
-									title={`Uploads (${vouchers.uploads.length})`}
+									title={`Uploads (${uploads.length})`}
 									empty="No uploads in the pool."
-									rows={vouchers.uploads.map((voucher) => ({
+									rows={uploads.map((voucher) => ({
 										id: voucher._id,
 										title: `€${voucher.type} · ${voucher.status}`,
 										detail: `expires ${formatDay(voucher.expiryDate)} · ${voucher.coinValue} coins`,
@@ -457,9 +411,9 @@ function AuthTester() {
 									}))}
 								/>
 								<VoucherColumn
-									title={`Claims (${vouchers.claims.length})`}
+									title={`Claims (${claims.length})`}
 									empty="No claimed vouchers."
-									rows={vouchers.claims.map((voucher) => ({
+									rows={claims.map((voucher) => ({
 										id: voucher._id,
 										title: `€${voucher.type} claimed`,
 										detail: `expires ${formatDay(voucher.expiryDate)} · ${voucher.coinValue} coins`,
