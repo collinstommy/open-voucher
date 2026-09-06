@@ -13,6 +13,7 @@
 import { api } from "@open-voucher/backend/convex/_generated/api";
 import { createFileRoute, notFound } from "@tanstack/react-router";
 import { ConvexHttpClient } from "convex/browser";
+import type { FunctionReturnType } from "convex/server";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -40,6 +41,17 @@ const GOOGLE_TEST_CLIENT_ID =
 	"975332129644-ltsmsjl4bmconkph4oqj71cbdnehq1mq.apps.googleusercontent.com";
 // The tester always runs against dev (the deployment stage 1 is live on).
 const SITE_URL = CONVEX_SITE_URLS.dev;
+const CONVEX_URL = CONVEX_URLS.dev;
+
+type Uploads = FunctionReturnType<typeof api.vouchers.getMyAvailableUploads>;
+type Claims = FunctionReturnType<typeof api.vouchers.getMyClaimedVouchers>;
+
+function formatDay(timestamp: number): string {
+	return new Date(timestamp).toLocaleDateString("en-IE", {
+		day: "numeric",
+		month: "short",
+	});
+}
 
 interface GsiIdApi {
 	initialize(config: {
@@ -103,6 +115,11 @@ function AuthTester() {
 	const [busy, setBusy] = useState(false);
 	const [log, setLog] = useState<LogEntry[]>([]);
 	const [convexCheck, setConvexCheck] = useState<string | null>(null);
+	const [vouchers, setVouchers] = useState<{
+		uploads: Uploads;
+		claims: Claims;
+	} | null>(null);
+	const [vouchersError, setVouchersError] = useState<string | null>(null);
 	const buttonRef = useRef<HTMLDivElement>(null);
 	const logId = useRef(0);
 	// Latest credential handler, so the GIS effect can re-render the button after
@@ -251,31 +268,39 @@ function AuthTester() {
 	}
 
 	// Prove the issued JWT authenticates against the real backend (customJwt
-	// pipeline): setAuth + a userQuery, exactly like the app would.
+	// pipeline): setAuth + userQueries, exactly like the app would.
 	useEffect(() => {
 		if (!login?.jwt) {
 			setConvexCheck(null);
+			setVouchers(null);
+			setVouchersError(null);
 			return;
 		}
 		let cancelled = false;
-		const client = new ConvexHttpClient(CONVEX_URLS.dev);
+		const client = new ConvexHttpClient(CONVEX_URL);
 		client.setAuth(login.jwt);
-		client
-			.query(api.users.getCurrentUser, {})
-			.then((user) => {
-				if (!cancelled) {
-					setConvexCheck(
-						`getCurrentUser OK: ${user._id} · ${user.coins} coins · chat ${user.telegramChatId ?? "none"}`,
-					);
-				}
-			})
-			.catch((error: unknown) => {
-				if (!cancelled) {
-					setConvexCheck(
-						`getCurrentUser FAILED: ${error instanceof Error ? error.message : String(error)}`,
-					);
-				}
-			});
+		void (async () => {
+			try {
+				const [user, uploads, claims] = await Promise.all([
+					client.query(api.users.getCurrentUser, {}),
+					client.query(api.vouchers.getMyAvailableUploads, {}),
+					client.query(api.vouchers.getMyClaimedVouchers, {}),
+				]);
+				if (cancelled) return;
+				setConvexCheck(
+					`getCurrentUser OK: ${user._id} · ${user.coins} coins · chat ${user.telegramChatId ?? "none"}`,
+				);
+				setVouchers({ uploads, claims });
+				setVouchersError(null);
+			} catch (error: unknown) {
+				if (cancelled) return;
+				const message =
+					error instanceof Error ? error.message : String(error);
+				setConvexCheck(`Convex query FAILED: ${message}`);
+				setVouchers(null);
+				setVouchersError(message);
+			}
+		})();
 		return () => {
 			cancelled = true;
 		};
@@ -288,6 +313,8 @@ function AuthTester() {
 		setLogin(null);
 		setLinkCode("");
 		setConvexCheck(null);
+		setVouchers(null);
+		setVouchersError(null);
 	}
 
 	return (
@@ -412,6 +439,35 @@ function AuthTester() {
 								{convexCheck}
 							</p>
 						)}
+						{vouchersError && (
+							<p className="text-red-400">
+								Voucher lists failed: {vouchersError}
+							</p>
+						)}
+						{vouchers && (
+							<div className="grid gap-4 md:grid-cols-2">
+								<VoucherColumn
+									title={`Uploads (${vouchers.uploads.length})`}
+									empty="No uploads in the pool."
+									rows={vouchers.uploads.map((voucher) => ({
+										id: voucher._id,
+										title: `€${voucher.type} · ${voucher.status}`,
+										detail: `expires ${formatDay(voucher.expiryDate)} · ${voucher.coinValue} coins`,
+										barcode: voucher.barcodeNumber,
+									}))}
+								/>
+								<VoucherColumn
+									title={`Claims (${vouchers.claims.length})`}
+									empty="No claimed vouchers."
+									rows={vouchers.claims.map((voucher) => ({
+										id: voucher._id,
+										title: `€${voucher.type} claimed`,
+										detail: `expires ${formatDay(voucher.expiryDate)} · ${voucher.coinValue} coins`,
+										barcode: voucher.barcodeNumber,
+									}))}
+								/>
+							</div>
+						)}
 						<div className="space-y-3 rounded-md border border-zinc-800 p-3">
 							<p className="text-zinc-400">
 								Link or merge a Telegram account. Send /link in the dev bot, then
@@ -472,6 +528,47 @@ function AuthTester() {
 					</details>
 				))}
 			</section>
+		</div>
+	);
+}
+
+function VoucherColumn({
+	title,
+	empty,
+	rows,
+}: {
+	title: string;
+	empty: string;
+	rows: Array<{
+		id: string;
+		title: string;
+		detail: string;
+		barcode?: string;
+	}>;
+}) {
+	return (
+		<div className="space-y-2">
+			<p className="text-zinc-400">{title}</p>
+			{rows.length === 0 ? (
+				<p className="rounded-md border border-zinc-800 bg-zinc-950 p-3 text-zinc-500">
+					{empty}
+				</p>
+			) : (
+				<ul className="space-y-2">
+					{rows.map((row) => (
+						<li
+							key={row.id}
+							className="rounded-md border border-zinc-800 bg-zinc-950 p-3"
+						>
+							<p>{row.title}</p>
+							<p className="text-zinc-500">{row.detail}</p>
+							{row.barcode && (
+								<p className="mt-1 text-xs text-zinc-500">{row.barcode}</p>
+							)}
+						</li>
+					))}
+				</ul>
+			)}
 		</div>
 	);
 }
