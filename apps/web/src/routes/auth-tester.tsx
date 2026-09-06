@@ -12,12 +12,13 @@
 
 import { api } from "@open-voucher/backend/convex/_generated/api";
 import { createFileRoute, notFound } from "@tanstack/react-router";
-import { ConvexHttpClient } from "convex/browser";
+import { useQuery } from "convex/react";
 import { useEffect, useRef, useState } from "react";
+import { useJwtAuth } from "@/auth/JwtAuthProvider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { CONVEX_SITE_URLS, CONVEX_URLS } from "@/lib/convexConfig";
+import { CONVEX_SITE_URLS } from "@/lib/convexConfig";
 
 export const Route = createFileRoute("/auth-tester")({
 	beforeLoad: () => {
@@ -40,6 +41,13 @@ const GOOGLE_TEST_CLIENT_ID =
 	"975332129644-ltsmsjl4bmconkph4oqj71cbdnehq1mq.apps.googleusercontent.com";
 // The tester always runs against dev (the deployment stage 1 is live on).
 const SITE_URL = CONVEX_SITE_URLS.dev;
+
+function formatDay(timestamp: number): string {
+	return new Date(timestamp).toLocaleDateString("en-IE", {
+		day: "numeric",
+		month: "short",
+	});
+}
 
 interface GsiIdApi {
 	initialize(config: {
@@ -96,14 +104,24 @@ function decodeJwtPayload(jwt: string): Record<string, unknown> | null {
 }
 
 function AuthTester() {
+	const { jwt, setJwt } = useJwtAuth();
 	const [screen, setScreen] = useState<Screen>("sign-in");
 	const [idToken, setIdToken] = useState<string>("");
 	const [login, setLogin] = useState<LoginSuccess | null>(null);
 	const [linkCode, setLinkCode] = useState("");
 	const [busy, setBusy] = useState(false);
 	const [log, setLog] = useState<LogEntry[]>([]);
-	const [convexCheck, setConvexCheck] = useState<string | null>(null);
 	const buttonRef = useRef<HTMLDivElement>(null);
+	const live = screen === "logged-in" && jwt !== null;
+	const currentUser = useQuery(
+		api.users.getCurrentUser,
+		live ? {} : "skip",
+	);
+	const uploads = useQuery(
+		api.vouchers.getMyAvailableUploads,
+		live ? {} : "skip",
+	);
+	const claims = useQuery(api.vouchers.getMyClaimedVouchers, live ? {} : "skip");
 	const logId = useRef(0);
 	// Latest credential handler, so the GIS effect can re-render the button after
 	// reset without re-initializing Google Identity Services on every render.
@@ -149,6 +167,7 @@ function AuthTester() {
 	}
 
 	function handleLoginSuccess(data: LoginSuccess) {
+		setJwt(data.jwt);
 		setLogin(data);
 		setScreen("logged-in");
 	}
@@ -250,44 +269,13 @@ function AuthTester() {
 		}
 	}
 
-	// Prove the issued JWT authenticates against the real backend (customJwt
-	// pipeline): setAuth + a userQuery, exactly like the app would.
-	useEffect(() => {
-		if (!login?.jwt) {
-			setConvexCheck(null);
-			return;
-		}
-		let cancelled = false;
-		const client = new ConvexHttpClient(CONVEX_URLS.dev);
-		client.setAuth(login.jwt);
-		client
-			.query(api.users.getCurrentUser, {})
-			.then((user) => {
-				if (!cancelled) {
-					setConvexCheck(
-						`getCurrentUser OK: ${user._id} · ${user.coins} coins · chat ${user.telegramChatId ?? "none"}`,
-					);
-				}
-			})
-			.catch((error: unknown) => {
-				if (!cancelled) {
-					setConvexCheck(
-						`getCurrentUser FAILED: ${error instanceof Error ? error.message : String(error)}`,
-					);
-				}
-			});
-		return () => {
-			cancelled = true;
-		};
-	}, [login?.jwt]);
-
 	function reset() {
 		window.google?.accounts?.id?.disableAutoSelect();
+		setJwt(null);
 		setScreen("sign-in");
 		setIdToken("");
 		setLogin(null);
 		setLinkCode("");
-		setConvexCheck(null);
 	}
 
 	return (
@@ -401,16 +389,38 @@ function AuthTester() {
 								</pre>
 							</details>
 						</div>
-						{convexCheck && (
-							<p
-								className={
-									convexCheck.startsWith("getCurrentUser OK")
-										? "text-green-400"
-										: "text-red-400"
-								}
-							>
-								{convexCheck}
+						{currentUser === undefined && live && (
+							<p className="text-zinc-500">Loading Convex userQueries…</p>
+						)}
+						{currentUser && (
+							<p className="text-green-400">
+								getCurrentUser OK: {currentUser._id} · {currentUser.coins} coins
+								· chat {currentUser.telegramChatId ?? "none"}
 							</p>
+						)}
+						{uploads !== undefined && claims !== undefined && (
+							<div className="grid gap-4 md:grid-cols-2">
+								<VoucherColumn
+									title={`Uploads (${uploads.length})`}
+									empty="No uploads in the pool."
+									rows={uploads.map((voucher) => ({
+										id: voucher._id,
+										title: `€${voucher.type} · ${voucher.status}`,
+										detail: `expires ${formatDay(voucher.expiryDate)} · ${voucher.coinValue} coins`,
+										barcode: voucher.barcodeNumber,
+									}))}
+								/>
+								<VoucherColumn
+									title={`Claims (${claims.length})`}
+									empty="No claimed vouchers."
+									rows={claims.map((voucher) => ({
+										id: voucher._id,
+										title: `€${voucher.type} claimed`,
+										detail: `expires ${formatDay(voucher.expiryDate)} · ${voucher.coinValue} coins`,
+										barcode: voucher.barcodeNumber,
+									}))}
+								/>
+							</div>
 						)}
 						<div className="space-y-3 rounded-md border border-zinc-800 p-3">
 							<p className="text-zinc-400">
@@ -472,6 +482,47 @@ function AuthTester() {
 					</details>
 				))}
 			</section>
+		</div>
+	);
+}
+
+function VoucherColumn({
+	title,
+	empty,
+	rows,
+}: {
+	title: string;
+	empty: string;
+	rows: Array<{
+		id: string;
+		title: string;
+		detail: string;
+		barcode?: string;
+	}>;
+}) {
+	return (
+		<div className="space-y-2">
+			<p className="text-zinc-400">{title}</p>
+			{rows.length === 0 ? (
+				<p className="rounded-md border border-zinc-800 bg-zinc-950 p-3 text-zinc-500">
+					{empty}
+				</p>
+			) : (
+				<ul className="space-y-2">
+					{rows.map((row) => (
+						<li
+							key={row.id}
+							className="rounded-md border border-zinc-800 bg-zinc-950 p-3"
+						>
+							<p>{row.title}</p>
+							<p className="text-zinc-500">{row.detail}</p>
+							{row.barcode && (
+								<p className="mt-1 text-xs text-zinc-500">{row.barcode}</p>
+							)}
+						</li>
+					))}
+				</ul>
+			)}
 		</div>
 	);
 }
