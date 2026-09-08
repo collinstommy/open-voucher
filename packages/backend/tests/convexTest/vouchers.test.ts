@@ -612,6 +612,7 @@ describe("OCR Flow with Mocked Gemini", () => {
 		await t.mutation(internal.ocr.storeVoucherFromOcr, {
 			userId,
 			imageStorageId,
+			client: "telegram",
 			type: "10",
 			expiryDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
 			validFrom: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
@@ -669,6 +670,7 @@ describe("OCR Flow with Mocked Gemini", () => {
 		await t.mutation(internal.ocr.storeVoucherFromOcr, {
 			userId,
 			imageStorageId,
+			client: "telegram",
 			type: "10",
 			expiryDate: pastDate,
 			barcode: "1234567890",

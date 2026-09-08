@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import dayjs from "dayjs";
 import { applyCoinDelta } from "../src/lib/coinLedger";
+import { clientValidator, type Client } from "../src/lib/client";
 import { UPLOAD_REWARDS } from "../src/lib/constants";
 import { callGeminiApi } from "../src/lib/gemini";
 import { notifyUser } from "../src/lib/notify";
@@ -773,10 +774,12 @@ async function storePlaceholderVoucher(
 	ctx: ActionCtx,
 	userId: Id<"users">,
 	imageStorageId: Id<"_storage">,
+	client: Client,
 ) {
 	const result = await ctx.runMutation(internal.ocr.storeVoucherFromOcr, {
 		userId,
 		imageStorageId,
+		client,
 		type: "10",
 		expiryDate: dayjs().add(14, "day").format("YYYY-MM-DD"),
 		barcode: `DEV-${imageStorageId}`,
@@ -794,15 +797,16 @@ export const processVoucherImage = internalAction({
 	args: {
 		userId: v.id("users"),
 		imageStorageId: v.id("_storage"),
+		client: clientValidator,
 	},
 	handler: async (ctx, args) => {
-		const { userId, imageStorageId } = args;
+		const { userId, imageStorageId, client } = args;
 
 		// Dev bypass: only when explicitly enabled (OCR_BYPASS=1) on a development
 		// deployment. Never key this off a missing API key alone — prod must fail
 		// loudly instead of storing placeholder vouchers.
 		if (usePlaceholderOcr()) {
-			await storePlaceholderVoucher(ctx, userId, imageStorageId);
+			await storePlaceholderVoucher(ctx, userId, imageStorageId, client);
 			return;
 		}
 
@@ -814,6 +818,7 @@ export const processVoucherImage = internalAction({
 			const result = await ctx.runMutation(internal.ocr.storeVoucherFromOcr, {
 				userId,
 				imageStorageId,
+				client,
 				type: String(extracted.type),
 				validFrom: extracted.validFrom || undefined,
 				expiryDate: extracted.expiryDate || undefined,
@@ -845,6 +850,7 @@ export const processVoucherImage = internalAction({
 					ctx,
 					user,
 					"❌ <b>Voucher Processing Failed</b>\n\nWe encountered an error while processing your voucher. Please try again.",
+					client,
 				);
 			}
 		}
@@ -892,6 +898,7 @@ export const storeVoucherFromOcr = internalMutation({
 	args: {
 		userId: v.id("users"),
 		imageStorageId: v.id("_storage"),
+		client: clientValidator,
 		type: v.string(),
 		validFrom: v.optional(v.string()),
 		expiryDate: v.optional(v.string()),
@@ -903,6 +910,7 @@ export const storeVoucherFromOcr = internalMutation({
 		const {
 			userId,
 			imageStorageId,
+			client,
 			type,
 			validFrom,
 			expiryDate,
@@ -962,7 +970,7 @@ export const storeVoucherFromOcr = internalMutation({
 				expiryDate,
 				validFrom,
 			});
-			await sendErrorMessage(ctx, user, "INVALID_TYPE");
+			await sendErrorMessage(ctx, user, "INVALID_TYPE", client);
 			return { success: false, reason: "INVALID_TYPE" };
 		}
 
@@ -981,7 +989,7 @@ export const storeVoucherFromOcr = internalMutation({
 					validFrom,
 				},
 			);
-			await sendErrorMessage(ctx, user, "COULD_NOT_READ_EXPIRY_DATE");
+			await sendErrorMessage(ctx, user, "COULD_NOT_READ_EXPIRY_DATE", client);
 			return { success: false, reason: "COULD_NOT_READ_EXPIRY_DATE" };
 		}
 
@@ -993,7 +1001,7 @@ export const storeVoucherFromOcr = internalMutation({
 				expiryDate,
 				validFrom,
 			});
-			await sendErrorMessage(ctx, user, "EXPIRED", expiryDateMs);
+			await sendErrorMessage(ctx, user, "EXPIRED", client, expiryDateMs);
 			return { success: false, reason: "EXPIRED", expiryDate: expiryDateMs };
 		}
 
@@ -1005,7 +1013,7 @@ export const storeVoucherFromOcr = internalMutation({
 				expiryDate,
 				validFrom,
 			});
-			await sendErrorMessage(ctx, user, "TOO_LATE_TODAY", expiryDateMs);
+			await sendErrorMessage(ctx, user, "TOO_LATE_TODAY", client, expiryDateMs);
 			return {
 				success: false,
 				reason: "TOO_LATE_TODAY",
@@ -1027,7 +1035,7 @@ export const storeVoucherFromOcr = internalMutation({
 					validFrom,
 				},
 			);
-			await sendErrorMessage(ctx, user, "COULD_NOT_READ_BARCODE");
+			await sendErrorMessage(ctx, user, "COULD_NOT_READ_BARCODE", client);
 			return { success: false, reason: "COULD_NOT_READ_BARCODE" };
 		}
 
@@ -1050,7 +1058,7 @@ export const storeVoucherFromOcr = internalMutation({
 					validFrom,
 				},
 			);
-			await sendErrorMessage(ctx, user, "DUPLICATE_BARCODE");
+			await sendErrorMessage(ctx, user, "DUPLICATE_BARCODE", client);
 			return { success: false, reason: "DUPLICATE_BARCODE" };
 		}
 
@@ -1094,6 +1102,7 @@ export const storeVoucherFromOcr = internalMutation({
 			ctx,
 			user,
 			`✅ <b>Voucher Accepted!</b>\n\nThanks for sharing a €${type} voucher.\nCoins earned: +${reward}\nNew balance: ${newBalance}`,
+			client,
 		);
 
 		console.log(
@@ -1108,6 +1117,7 @@ async function sendErrorMessage(
 	ctx: MutationCtx,
 	user: { telegramChatId?: string },
 	reason: VoucherOcrFailureReason,
+	client: Client,
 	expiryDate?: number,
 ) {
 	let message = "❌ <b>Voucher Processing Failed</b>\n\n";
@@ -1149,7 +1159,7 @@ async function sendErrorMessage(
 				"We encountered an unknown error while processing your voucher. Please try again or contact support.";
 	}
 
-	await notifyUser(ctx, user, message);
+	await notifyUser(ctx, user, message, client);
 }
 
 export const recordSystemError = internalMutation({

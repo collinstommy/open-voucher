@@ -242,6 +242,7 @@ async function handleImageUpload(
 		await ctx.runMutation(internal.vouchers.uploadVoucher, {
 			userId: user._id,
 			imageStorageId: storageId,
+			client: "telegram",
 		});
 	} catch (e) {
 		console.error(e);

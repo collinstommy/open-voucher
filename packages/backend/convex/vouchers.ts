@@ -5,9 +5,15 @@ import type { Id } from "./_generated/dataModel";
 import {
 	internalMutation,
 	internalQuery,
+	type MutationCtx,
 	type QueryCtx,
 } from "./_generated/server";
 import { userMutation, userQuery } from "./auth";
+import {
+	appClientValidator,
+	clientValidator,
+	type Client,
+} from "../src/lib/client";
 import { CLAIM_COSTS, UPLOAD_REWARDS } from "../src/lib/constants";
 import { applyCoinDelta } from "../src/lib/coinLedger";
 import { recalculateReportCounts } from "../src/lib/reportCounts";
@@ -47,46 +53,83 @@ export const getVoucherByBarcode = internalQuery({
 	},
 });
 
+export type UploadVoucherResult =
+	| { accepted: true }
+	| { accepted: false; reason: "daily_limit" };
+
+async function uploadVoucherForUser(
+	ctx: MutationCtx,
+	args: {
+		userId: Id<"users">;
+		imageStorageId: Id<"_storage">;
+		client: Client;
+	},
+): Promise<UploadVoucherResult> {
+	const { userId, imageStorageId, client } = args;
+	const user = await ctx.db.get(userId);
+	if (!user) {
+		throw new Error("User not found");
+	}
+	if (user.isBanned) {
+		throw new Error("You have been banned from this service");
+	}
+
+	const now = Date.now();
+	const oneDayAgo = now - 24 * 60 * 60 * 1000;
+	const MAX_DAILY_UPLOADS = 10;
+	const recentUploads = await ctx.db
+		.query("vouchers")
+		.withIndex("by_uploader_created", (q) =>
+			q.eq("uploaderId", userId).gt("createdAt", oneDayAgo),
+		)
+		.collect();
+
+	if (recentUploads.length >= MAX_DAILY_UPLOADS) {
+		await notifyUser(
+			ctx,
+			user,
+			"🚫 <b>Daily Upload Limit Reached</b>\n\nYou can only upload 10 vouchers per 24 hours. Please try again later.",
+			client,
+		);
+		return { accepted: false, reason: "daily_limit" };
+	}
+
+	await ctx.scheduler.runAfter(0, internal.ocr.processVoucherImage, {
+		userId,
+		imageStorageId,
+		client,
+	});
+
+	return { accepted: true };
+}
+
 export const uploadVoucher = internalMutation({
 	args: {
 		userId: v.id("users"),
 		imageStorageId: v.id("_storage"),
+		client: clientValidator,
 	},
-	handler: async (ctx, { userId, imageStorageId }) => {
-		const user = await ctx.db.get(userId);
-		if (!user) {
-			throw new Error("User not found");
-		}
-		if (user.isBanned) {
-			throw new Error("You have been banned from this service");
-		}
+	handler: async (ctx, args) => uploadVoucherForUser(ctx, args),
+});
 
-		const now = Date.now();
-		const oneDayAgo = now - 24 * 60 * 60 * 1000;
-		const MAX_DAILY_UPLOADS = 10;
-		const recentUploads = await ctx.db
-			.query("vouchers")
-			.withIndex("by_uploader_created", (q) =>
-				q.eq("uploaderId", userId).gt("createdAt", oneDayAgo),
-			)
-			.collect();
+/** Authenticated upload URL for app clients (Android/iOS/web). */
+export const generateUploadUrl = userMutation({
+	args: {},
+	handler: async (ctx, { userId: _userId }) =>
+		await ctx.storage.generateUploadUrl(),
+});
 
-		if (recentUploads.length >= MAX_DAILY_UPLOADS) {
-			await notifyUser(
-				ctx,
-				user,
-				"🚫 <b>Daily Upload Limit Reached</b>\n\nYou can only upload 10 vouchers per 24 hours. Please try again later.",
-			);
-			return null;
-		}
-
-		await ctx.scheduler.runAfter(0, internal.ocr.processVoucherImage, {
-			userId,
-			imageStorageId,
-		});
-
-		return null;
+/**
+ * App-client upload. `client` is android | ios | web only — the Telegram
+ * webhook is the sole path that passes client "telegram" into uploadVoucher.
+ */
+export const submitUpload = userMutation({
+	args: {
+		imageStorageId: v.id("_storage"),
+		client: appClientValidator,
 	},
+	handler: async (ctx, { userId, imageStorageId, client }) =>
+		uploadVoucherForUser(ctx, { userId, imageStorageId, client }),
 });
 
 export const requestVoucher = internalMutation({
