@@ -1,8 +1,3 @@
-/**
- * Linked-account uploads: Telegram+Google identity does not imply Telegram
- * delivery. Client is request-scoped — Android uploads must not DM Telegram.
- */
-
 import { convexTest } from "convex-test";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { api, internal } from "../../convex/_generated/api";
@@ -31,13 +26,22 @@ function setupFetchMock(opts: { geminiError?: boolean } = {}) {
 		"fetch",
 		vi.fn(async (url: string, options?: RequestInit) => {
 			if (url.includes("api.telegram.org") && url.includes("/sendMessage")) {
-				let body: any = {};
+				let body: { chat_id?: string; text?: string } = {};
 				if (options?.body instanceof FormData) {
-					body = Object.fromEntries(options.body as any);
+					body = {
+						chat_id: String(options.body.get("chat_id") ?? ""),
+						text: String(options.body.get("text") ?? ""),
+					};
 				} else if (typeof options?.body === "string") {
-					body = JSON.parse(options.body);
+					body = JSON.parse(options.body) as {
+						chat_id?: string;
+						text?: string;
+					};
 				}
-				sentMessages.push({ chatId: body.chat_id, text: body.text });
+				sentMessages.push({
+					chatId: body.chat_id ?? "",
+					text: body.text,
+				});
 				return {
 					ok: true,
 					json: async () => mockTelegramResponse(),

@@ -7,11 +7,6 @@ const AUDIENCE = "open-voucher";
 const KID = "open-voucher-key-1";
 export const JWT_EXPIRY = "30d";
 
-/**
- * Session JWT. `client` is an app-surface claim (android|ios|web), not
- * Telegram — the bot webhook never uses this token. Queries/mutations read it
- * from ctx.auth.getUserIdentity(); they cannot see HTTP headers.
- */
 export async function issueJwt(
 	userId: Id<"users">,
 	client?: AppClient,

@@ -1,10 +1,3 @@
-// Delivery gate for interactive action feedback. Call sites always notify;
-// this helper routes (or silences) based on the request-scoped client.
-// Telegram Bot API messages fire only when the action ran on the bot and
-// the account has a chatId. App clients (android/ios/web) observe Convex
-// queries for the same outcome — including linked accounts that also have
-// telegramChatId.
-
 import { internal } from "../../convex/_generated/api";
 import type { ActionCtx, MutationCtx } from "../../convex/_generated/server";
 import type { Client } from "./client";

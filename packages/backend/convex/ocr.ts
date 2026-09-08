@@ -832,7 +832,6 @@ export const processVoucherImage = internalAction({
 				console.log(`Voucher created: ${result.voucherId}`);
 			} else {
 				console.log(`Voucher rejected: ${result.reason}`);
-				// Error message is sent by storeVoucherFromOcr
 			}
 		} catch (error: any) {
 			console.error("OCR system error:", { userId, imageStorageId, error });

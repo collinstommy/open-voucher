@@ -109,17 +109,12 @@ export const uploadVoucher = internalMutation({
 	handler: async (ctx, args) => uploadVoucherForUser(ctx, args),
 });
 
-/** Authenticated upload URL for app clients (Android/iOS/web). */
 export const generateUploadUrl = userMutation({
 	args: {},
 	handler: async (ctx, { userId: _userId }) =>
 		await ctx.storage.generateUploadUrl(),
 });
 
-/**
- * App-client upload. Client comes from the session JWT (minted at login from
- * X-OpenVoucher-Client), not from mutation args — Telegram cannot spoof it.
- */
 export const submitUpload = userMutation({
 	args: {
 		imageStorageId: v.id("_storage"),
@@ -694,10 +689,7 @@ export const getMyAvailableUploads = userQuery({
 	},
 });
 
-/**
- * Recent OCR/validation failures for the signed-in user. App clients subscribe
- * to this instead of receiving a Telegram DM after submitUpload.
- */
+/** Recent OCR/validation failures for the signed-in user. */
 export const getMyFailedUploads = userQuery({
 	args: {},
 	handler: async (ctx, { userId }) => {

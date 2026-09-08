@@ -1,6 +1,3 @@
-// User-facing copy for upload validation/system failures. Telegram wraps this
-// in HTML at the notify call site; app clients read it from getMyFailedUploads.
-
 import dayjs from "dayjs";
 
 export type UploadFailureReason =
