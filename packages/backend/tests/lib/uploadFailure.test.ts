@@ -1,5 +1,8 @@
 import { describe, expect, test } from "vitest";
-import { uploadFailureBody } from "../../src/lib/uploadFailure";
+import {
+	parseUploadFailureReason,
+	uploadFailureBody,
+} from "../../src/lib/uploadFailure";
 
 describe("uploadFailureBody", () => {
 	test("maps known reasons without mentioning support", () => {
@@ -18,5 +21,12 @@ describe("uploadFailureBody", () => {
 	test("formats expiry dates for expired vouchers", () => {
 		expect(uploadFailureBody("EXPIRED", "2026-01-15")).toContain("15-01-2026");
 		expect(uploadFailureBody("EXPIRED")).toContain("unknown");
+	});
+});
+
+describe("parseUploadFailureReason", () => {
+	test("keeps known reasons and maps junk to UNKNOWN_ERROR", () => {
+		expect(parseUploadFailureReason("INVALID_TYPE")).toBe("INVALID_TYPE");
+		expect(parseUploadFailureReason("not-a-reason")).toBe("UNKNOWN_ERROR");
 	});
 });

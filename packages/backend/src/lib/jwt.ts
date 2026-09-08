@@ -9,19 +9,14 @@ export const JWT_EXPIRY = "30d";
 
 export async function issueJwt(
 	userId: Id<"users">,
-	client?: AppClient,
+	client: AppClient,
 ): Promise<string> {
 	const privateKeyPem = process.env.JWT_PRIVATE_KEY;
 	if (!privateKeyPem) throw new Error("JWT_PRIVATE_KEY not configured");
 
 	const privateKey = await jose.importPKCS8(privateKeyPem, "RS256");
 
-	const payload: Record<string, string> = {};
-	if (client !== undefined) {
-		payload.client = client;
-	}
-
-	return await new jose.SignJWT(payload)
+	return await new jose.SignJWT({ client })
 		.setProtectedHeader({ alg: "RS256", kid: KID })
 		.setSubject(userId)
 		.setIssuer(ISSUER)

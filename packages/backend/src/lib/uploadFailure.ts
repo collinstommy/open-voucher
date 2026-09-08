@@ -1,15 +1,32 @@
 import dayjs from "dayjs";
 
-export type UploadFailureReason =
-	| "EXPIRED"
-	| "TOO_LATE_TODAY"
-	| "COULD_NOT_READ_AMOUNT"
-	| "COULD_NOT_READ_BARCODE"
-	| "COULD_NOT_READ_EXPIRY_DATE"
-	| "INVALID_TYPE"
-	| "DUPLICATE_BARCODE"
-	| "SYSTEM_ERROR"
-	| "UNKNOWN_ERROR";
+export const UPLOAD_FAILURE_REASONS = [
+	"EXPIRED",
+	"TOO_LATE_TODAY",
+	"COULD_NOT_READ_AMOUNT",
+	"COULD_NOT_READ_BARCODE",
+	"COULD_NOT_READ_EXPIRY_DATE",
+	"INVALID_TYPE",
+	"DUPLICATE_BARCODE",
+	"SYSTEM_ERROR",
+	"UNKNOWN_ERROR",
+] as const;
+
+export type UploadFailureReason = (typeof UPLOAD_FAILURE_REASONS)[number];
+
+const UPLOAD_FAILURE_REASON_SET: ReadonlySet<string> = new Set(
+	UPLOAD_FAILURE_REASONS,
+);
+
+export function isUploadFailureReason(
+	value: string,
+): value is UploadFailureReason {
+	return UPLOAD_FAILURE_REASON_SET.has(value);
+}
+
+export function parseUploadFailureReason(value: string): UploadFailureReason {
+	return isUploadFailureReason(value) ? value : "UNKNOWN_ERROR";
+}
 
 function formatExpiry(expiryDate?: number | string): string {
 	if (expiryDate === undefined) return "unknown";
@@ -19,7 +36,7 @@ function formatExpiry(expiryDate?: number | string): string {
 }
 
 export function uploadFailureBody(
-	reason: string,
+	reason: UploadFailureReason,
 	expiryDate?: number | string,
 ): string {
 	switch (reason) {
@@ -39,7 +56,12 @@ export function uploadFailureBody(
 			return "This voucher does not appear to be a valid €5, €10, or €20 Dunnes voucher. We only accept these specific general spend vouchers.";
 		case "DUPLICATE_BARCODE":
 			return "This voucher has already been uploaded by someone. Each voucher can only be uploaded once.";
-		default:
+		case "SYSTEM_ERROR":
+		case "UNKNOWN_ERROR":
 			return "We encountered an error while processing your voucher. Please try again.";
+		default: {
+			const _exhaustive: never = reason;
+			return _exhaustive;
+		}
 	}
 }

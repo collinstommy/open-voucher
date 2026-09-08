@@ -9,12 +9,20 @@ import {
 	type QueryCtx,
 } from "./_generated/server";
 import { userMutation, userQuery } from "./auth";
-import { clientValidator, type Client } from "../src/lib/client";
+import {
+	clientValidator,
+	deliversViaTelegram,
+	requireAppClient,
+	type Client,
+} from "../src/lib/client";
 import { CLAIM_COSTS, UPLOAD_REWARDS } from "../src/lib/constants";
 import { applyCoinDelta } from "../src/lib/coinLedger";
 import { recalculateReportCounts } from "../src/lib/reportCounts";
 import { notifyUser } from "../src/lib/notify";
-import { uploadFailureBody } from "../src/lib/uploadFailure";
+import {
+	parseUploadFailureReason,
+	uploadFailureBody,
+} from "../src/lib/uploadFailure";
 
 function getVoucherExpiryCalendarDay(expiryDate: number): string {
 	const date = new Date(expiryDate);
@@ -82,12 +90,14 @@ async function uploadVoucherForUser(
 		.collect();
 
 	if (recentUploads.length >= MAX_DAILY_UPLOADS) {
-		await notifyUser(
-			ctx,
-			user,
-			"🚫 <b>Daily Upload Limit Reached</b>\n\nYou can only upload 10 vouchers per 24 hours. Please try again later.",
-			client,
-		);
+		if (deliversViaTelegram(client)) {
+			await notifyUser(
+				ctx,
+				user,
+				"🚫 <b>Daily Upload Limit Reached</b>\n\nYou can only upload 10 vouchers per 24 hours. Please try again later.",
+				client,
+			);
+		}
 		return { accepted: false, reason: "daily_limit" };
 	}
 
@@ -119,11 +129,12 @@ export const submitUpload = userMutation({
 	args: {
 		imageStorageId: v.id("_storage"),
 	},
-	handler: async (ctx, { userId, imageStorageId, client }) => {
-		if (client === undefined) {
-			throw new Error("Missing app client claim");
-		}
-		return uploadVoucherForUser(ctx, { userId, imageStorageId, client });
+	handler: async (ctx, { userId, imageStorageId }) => {
+		return uploadVoucherForUser(ctx, {
+			userId,
+			imageStorageId,
+			client: requireAppClient(ctx.client),
+		});
 	},
 });
 
@@ -704,7 +715,10 @@ export const getMyFailedUploads = userQuery({
 			createdAt: row._creationTime,
 			failureType: row.failureType,
 			failureReason: row.failureReason,
-			message: uploadFailureBody(row.failureReason, row.extractedExpiryDate),
+			message: uploadFailureBody(
+				parseUploadFailureReason(row.failureReason),
+				row.extractedExpiryDate,
+			),
 		}));
 	},
 });

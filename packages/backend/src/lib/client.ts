@@ -8,24 +8,33 @@ export type Client = (typeof CLIENTS)[number];
 export const APP_CLIENTS = ["android", "ios", "web"] as const;
 export type AppClient = (typeof APP_CLIENTS)[number];
 
+const APP_CLIENT_SET: ReadonlySet<string> = new Set(APP_CLIENTS);
+
 export function isAppClient(value: unknown): value is AppClient {
-	return value === "android" || value === "ios" || value === "web";
+	return typeof value === "string" && APP_CLIENT_SET.has(value);
 }
 
 export function parseAppClientClaim(value: unknown): AppClient | undefined {
 	return isAppClient(value) ? value : undefined;
 }
 
+export function requireAppClient(client: AppClient | undefined): AppClient {
+	if (client === undefined) {
+		throw new Error("Missing app client claim");
+	}
+	return client;
+}
+
 /**
  * HTTP actions (auth endpoints) can read headers; queries/mutations cannot.
- * Unknown values are errors so a typo does not silently drop the claim.
+ * Missing or unknown values are errors so a typo does not silently drop the claim.
  */
 export function parseAppClientHeader(
 	headers: Headers,
-): { ok: true; client: AppClient | undefined } | { ok: false } {
+): { ok: true; client: AppClient } | { ok: false } {
 	const raw = headers.get(APP_CLIENT_HEADER);
 	if (raw === null || raw.trim() === "") {
-		return { ok: true, client: undefined };
+		return { ok: false };
 	}
 	if (isAppClient(raw)) {
 		return { ok: true, client: raw };
@@ -35,12 +44,6 @@ export function parseAppClientHeader(
 
 export const clientValidator = v.union(
 	v.literal("telegram"),
-	v.literal("android"),
-	v.literal("ios"),
-	v.literal("web"),
-);
-
-export const appClientValidator = v.union(
 	v.literal("android"),
 	v.literal("ios"),
 	v.literal("web"),

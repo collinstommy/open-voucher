@@ -1,11 +1,18 @@
 import { v } from "convex/values";
 import dayjs from "dayjs";
 import { applyCoinDelta } from "../src/lib/coinLedger";
-import { clientValidator, type Client } from "../src/lib/client";
+import {
+	clientValidator,
+	deliversViaTelegram,
+	type Client,
+} from "../src/lib/client";
 import { UPLOAD_REWARDS } from "../src/lib/constants";
 import { callGeminiApi } from "../src/lib/gemini";
 import { notifyUser } from "../src/lib/notify";
-import { uploadFailureBody } from "../src/lib/uploadFailure";
+import {
+	type UploadFailureReason,
+	uploadFailureBody,
+} from "../src/lib/uploadFailure";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import {
@@ -845,7 +852,7 @@ export const processVoucherImage = internalAction({
 			});
 
 			const user = await ctx.runQuery(internal.users.getUserById, { userId });
-			if (user) {
+			if (user && deliversViaTelegram(client)) {
 				await notifyUser(
 					ctx,
 					user,
@@ -858,21 +865,11 @@ export const processVoucherImage = internalAction({
 });
 
 // --- store.ts ---
-type VoucherOcrFailureReason =
-	| "EXPIRED"
-	| "TOO_LATE_TODAY"
-	| "COULD_NOT_READ_AMOUNT"
-	| "COULD_NOT_READ_BARCODE"
-	| "COULD_NOT_READ_EXPIRY_DATE"
-	| "INVALID_TYPE"
-	| "DUPLICATE_BARCODE"
-	| "UNKNOWN_ERROR";
-
 async function recordFailedUpload(
 	ctx: MutationCtx,
 	userId: Id<"users">,
 	imageStorageId: Id<"_storage">,
-	reason: VoucherOcrFailureReason,
+	reason: UploadFailureReason,
 	ocrData: {
 		rawResponse: string;
 		type?: string;
@@ -1098,12 +1095,14 @@ export const storeVoucherFromOcr = internalMutation({
 			uploadCount: (user.uploadCount || 0) + 1,
 		});
 
-		await notifyUser(
-			ctx,
-			user,
-			`✅ <b>Voucher Accepted!</b>\n\nThanks for sharing a €${type} voucher.\nCoins earned: +${reward}\nNew balance: ${newBalance}`,
-			client,
-		);
+		if (deliversViaTelegram(client)) {
+			await notifyUser(
+				ctx,
+				user,
+				`✅ <b>Voucher Accepted!</b>\n\nThanks for sharing a €${type} voucher.\nCoins earned: +${reward}\nNew balance: ${newBalance}`,
+				client,
+			);
+		}
 
 		console.log(
 			`Voucher created: ${voucherId} (type=${type}, barcode=${barcode})`,
@@ -1116,10 +1115,13 @@ export const storeVoucherFromOcr = internalMutation({
 async function sendErrorMessage(
 	ctx: MutationCtx,
 	user: { telegramChatId?: string },
-	reason: VoucherOcrFailureReason,
+	reason: UploadFailureReason,
 	client: Client,
 	expiryDate?: number,
 ) {
+	if (!deliversViaTelegram(client)) {
+		return;
+	}
 	await notifyUser(
 		ctx,
 		user,

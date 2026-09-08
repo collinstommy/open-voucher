@@ -31,14 +31,8 @@ import {
 	consumeRateLimit,
 } from "../src/lib/rateLimit";
 
-export async function getCurrentUserId(
-	ctx: QueryCtx | MutationCtx,
-): Promise<Id<"users">> {
-	const identity = await ctx.auth.getUserIdentity();
-	if (!identity) {
-		throw new Error("Unauthorized: not authenticated");
-	}
-	return identity.subject as Id<"users">;
+function customClaim(identity: object, key: string): unknown {
+	return (identity as Record<string, unknown>)[key];
 }
 
 export async function getAuthContext(
@@ -50,7 +44,7 @@ export async function getAuthContext(
 	}
 	return {
 		userId: identity.subject as Id<"users">,
-		client: parseAppClientClaim((identity as { client?: unknown }).client),
+		client: parseAppClientClaim(customClaim(identity, "client")),
 	};
 }
 
@@ -112,7 +106,7 @@ export const getUserForDevAuth = internalMutation({
 export const userQuery = customQuery(query, {
 	args: {},
 	input: async (ctx) => {
-		const userId = await getCurrentUserId(ctx);
+		const { userId } = await getAuthContext(ctx);
 		return { ctx: {}, args: { userId } };
 	},
 });
@@ -121,7 +115,7 @@ export const userMutation = customMutation(mutation, {
 	args: {},
 	input: async (ctx) => {
 		const { userId, client } = await getAuthContext(ctx);
-		return { ctx: {}, args: { userId, client } };
+		return { ctx: { client }, args: { userId } };
 	},
 });
 

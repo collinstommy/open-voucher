@@ -113,15 +113,15 @@ function AuthTester() {
 	const [log, setLog] = useState<LogEntry[]>([]);
 	const buttonRef = useRef<HTMLDivElement>(null);
 	const live = screen === "logged-in" && jwt !== null;
-	const currentUser = useQuery(
-		api.users.getCurrentUser,
-		live ? {} : "skip",
-	);
+	const currentUser = useQuery(api.users.getCurrentUser, live ? {} : "skip");
 	const uploads = useQuery(
 		api.vouchers.getMyAvailableUploads,
 		live ? {} : "skip",
 	);
-	const claims = useQuery(api.vouchers.getMyClaimedVouchers, live ? {} : "skip");
+	const claims = useQuery(
+		api.vouchers.getMyClaimedVouchers,
+		live ? {} : "skip",
+	);
 	const logId = useRef(0);
 	// Latest credential handler, so the GIS effect can re-render the button after
 	// reset without re-initializing Google Identity Services on every render.
@@ -144,7 +144,10 @@ function AuthTester() {
 		try {
 			const response = await fetch(`${SITE_URL}/api/google-auth`, {
 				method: "POST",
-				headers: { "Content-Type": "application/json" },
+				headers: {
+					"Content-Type": "application/json",
+					"X-OpenVoucher-Client": "web",
+				},
 				body: JSON.stringify(body),
 			});
 			const text = await response.text();
@@ -424,9 +427,9 @@ function AuthTester() {
 						)}
 						<div className="space-y-3 rounded-md border border-zinc-800 p-3">
 							<p className="text-zinc-400">
-								Link or merge a Telegram account. Send /link in the dev bot, then
-								redeem the code here. This also exercises the conflict responses for
-								already-linked accounts.
+								Link or merge a Telegram account. Send /link in the dev bot,
+								then redeem the code here. This also exercises the conflict
+								responses for already-linked accounts.
 							</p>
 							<div className="flex gap-2">
 								<Input

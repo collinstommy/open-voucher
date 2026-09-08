@@ -33,6 +33,20 @@ function getCorsHeaders(request: Request): Record<string, string> {
 	};
 }
 
+function requireAppClientHeader(
+	request: Request,
+	corsHeaders: Record<string, string>,
+): AppClient | Response {
+	const parsed = parseAppClientHeader(request.headers);
+	if (!parsed.ok) {
+		return new Response(JSON.stringify({ error: "invalid_client" }), {
+			status: 400,
+			headers: corsHeaders,
+		});
+	}
+	return parsed.client;
+}
+
 /** JSON response with the user's telegramChatId normalized to null for the wire. */
 function authUserJson(user: GoogleAuthUser) {
 	return { ...user, telegramChatId: user.telegramChatId ?? null };
@@ -52,7 +66,7 @@ async function handleGoogleAuth(
 	ctx: ActionCtx,
 	corsHeaders: Record<string, string>,
 	body: { idToken?: unknown; linkCode?: unknown; intent?: unknown },
-	client: AppClient | undefined,
+	client: AppClient,
 ): Promise<Response> {
 	const idToken = typeof body.idToken === "string" ? body.idToken : undefined;
 	if (!idToken) {
@@ -162,7 +176,7 @@ async function handleGoogleAuth(
 async function handleDevAuth(
 	ctx: ActionCtx,
 	corsHeaders: Record<string, string>,
-	client: AppClient | undefined,
+	client: AppClient,
 ) {
 	if (process.env.ENVIRONMENT !== "development") {
 		return new Response(
@@ -199,12 +213,9 @@ http.route({
 			"Content-Type": "application/json",
 		};
 		try {
-			const parsedClient = parseAppClientHeader(request.headers);
-			if (!parsedClient.ok) {
-				return new Response(JSON.stringify({ error: "invalid_client" }), {
-					status: 400,
-					headers: corsHeaders,
-				});
+			const client = requireAppClientHeader(request, corsHeaders);
+			if (typeof client !== "string") {
+				return client;
 			}
 
 			const { initData } = (await request.json()) as { initData?: string };
@@ -247,7 +258,7 @@ http.route({
 				);
 			}
 
-			const jwt = await issueJwt(user._id, parsedClient.client);
+			const jwt = await issueJwt(user._id, client);
 
 			return new Response(JSON.stringify({ user, jwt }), {
 				status: 200,
@@ -284,14 +295,11 @@ http.route({
 			"Content-Type": "application/json",
 		};
 		try {
-			const parsedClient = parseAppClientHeader(request.headers);
-			if (!parsedClient.ok) {
-				return new Response(JSON.stringify({ error: "invalid_client" }), {
-					status: 400,
-					headers: corsHeaders,
-				});
+			const client = requireAppClientHeader(request, corsHeaders);
+			if (typeof client !== "string") {
+				return client;
 			}
-			return await handleDevAuth(ctx, corsHeaders, parsedClient.client);
+			return await handleDevAuth(ctx, corsHeaders, client);
 		} catch (error) {
 			const message =
 				error instanceof Error ? error.message : "Dev auth failed";
@@ -323,19 +331,16 @@ http.route({
 			"Content-Type": "application/json",
 		};
 		try {
-			const parsedClient = parseAppClientHeader(request.headers);
-			if (!parsedClient.ok) {
-				return new Response(JSON.stringify({ error: "invalid_client" }), {
-					status: 400,
-					headers: corsHeaders,
-				});
+			const client = requireAppClientHeader(request, corsHeaders);
+			if (typeof client !== "string") {
+				return client;
 			}
 			const body = await request.json();
 			return await handleGoogleAuth(
 				ctx,
 				corsHeaders,
 				typeof body === "object" && body !== null ? body : {},
-				parsedClient.client,
+				client,
 			);
 		} catch (error) {
 			if (error instanceof SyntaxError) {
