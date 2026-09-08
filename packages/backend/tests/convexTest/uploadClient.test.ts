@@ -271,4 +271,60 @@ describe("Upload client delivery", () => {
 		expect(typeof url).toBe("string");
 		expect(url.length).toBeGreaterThan(0);
 	});
+
+	test("Android OCR failure is visible on getMyFailedUploads", async () => {
+		setupFetchMock({ geminiError: true });
+		const t = convexTest(schema, modules);
+		const chatId = "android-failed-query-1";
+		const userId = await insertLinkedUser(t, chatId);
+
+		const imageStorageId = await t.run(async (ctx) =>
+			ctx.storage.store(new Blob(["fake-image"])),
+		);
+		sentMessages = [];
+
+		await t.mutation(internal.vouchers.uploadVoucher, {
+			userId,
+			imageStorageId,
+			client: "android",
+		});
+		await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+		expect(sentMessages).toHaveLength(0);
+
+		const asUser = t.withIdentity({ subject: userId });
+		const failures = await asUser.query(api.vouchers.getMyFailedUploads, {});
+		expect(failures).toHaveLength(1);
+		expect(failures[0].failureReason).toBe("SYSTEM_ERROR");
+		expect(failures[0].message).toContain("Please try again");
+		expect(failures[0].message.toLowerCase()).not.toContain("support");
+	});
+
+	test("Android validation failure is visible on getMyFailedUploads", async () => {
+		setupFetchMock();
+		const t = convexTest(schema, modules);
+		const userId = await insertLinkedUser(t, "android-invalid-1");
+		const imageStorageId = await t.run(async (ctx) =>
+			ctx.storage.store(new Blob(["fake-image"])),
+		);
+
+		await t.mutation(internal.ocr.storeVoucherFromOcr, {
+			userId,
+			imageStorageId,
+			client: "android",
+			type: "0",
+			expiryDate: "2026-12-01",
+			barcode: "999",
+			rawResponse: "{}",
+		});
+		await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+		expect(sentMessages).toHaveLength(0);
+
+		const asUser = t.withIdentity({ subject: userId });
+		const failures = await asUser.query(api.vouchers.getMyFailedUploads, {});
+		expect(failures).toHaveLength(1);
+		expect(failures[0].failureReason).toBe("INVALID_TYPE");
+		expect(failures[0].message).toContain("€5, €10, or €20");
+	});
 });

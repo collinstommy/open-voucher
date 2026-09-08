@@ -18,6 +18,7 @@ import { CLAIM_COSTS, UPLOAD_REWARDS } from "../src/lib/constants";
 import { applyCoinDelta } from "../src/lib/coinLedger";
 import { recalculateReportCounts } from "../src/lib/reportCounts";
 import { notifyUser } from "../src/lib/notify";
+import { uploadFailureBody } from "../src/lib/uploadFailure";
 
 function getVoucherExpiryCalendarDay(expiryDate: number): string {
 	const date = new Date(expiryDate);
@@ -691,6 +692,29 @@ export const getMyAvailableUploads = userQuery({
 				coinValue: UPLOAD_REWARDS[v.type] ?? 0,
 			})),
 		);
+	},
+});
+
+/**
+ * Recent OCR/validation failures for the signed-in user. App clients subscribe
+ * to this instead of receiving a Telegram DM after submitUpload.
+ */
+export const getMyFailedUploads = userQuery({
+	args: {},
+	handler: async (ctx, { userId }) => {
+		const rows = await ctx.db
+			.query("failedUploads")
+			.withIndex("by_userId", (q) => q.eq("userId", userId))
+			.order("desc")
+			.take(20);
+
+		return rows.map((row) => ({
+			_id: row._id,
+			createdAt: row._creationTime,
+			failureType: row.failureType,
+			failureReason: row.failureReason,
+			message: uploadFailureBody(row.failureReason, row.extractedExpiryDate),
+		}));
 	},
 });
 

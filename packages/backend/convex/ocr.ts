@@ -5,6 +5,7 @@ import { clientValidator, type Client } from "../src/lib/client";
 import { UPLOAD_REWARDS } from "../src/lib/constants";
 import { callGeminiApi } from "../src/lib/gemini";
 import { notifyUser } from "../src/lib/notify";
+import { uploadFailureTelegramHtml } from "../src/lib/uploadFailure";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import {
@@ -849,7 +850,7 @@ export const processVoucherImage = internalAction({
 				await notifyUser(
 					ctx,
 					user,
-					"❌ <b>Voucher Processing Failed</b>\n\nWe encountered an error while processing your voucher. Please try again.",
+					uploadFailureTelegramHtml("SYSTEM_ERROR"),
 					client,
 				);
 			}
@@ -1120,46 +1121,12 @@ async function sendErrorMessage(
 	client: Client,
 	expiryDate?: number,
 ) {
-	let message = "❌ <b>Voucher Processing Failed</b>\n\n";
-
-	switch (reason) {
-		case "COULD_NOT_READ_AMOUNT":
-			message += `We couldn't determine the voucher amount (e.g., €5, €10, €20). Please make sure the value is clear in the photo.`;
-			break;
-		case "COULD_NOT_READ_EXPIRY_DATE":
-			message += `We couldn't determine the expiry date. Please make sure it's clear in the photo.`;
-			break;
-		case "COULD_NOT_READ_BARCODE":
-			message += `We couldn't read the barcode. Please ensure it's fully visible and clear.`;
-			break;
-		case "EXPIRED": {
-			const dateStr = expiryDate
-				? dayjs(expiryDate).format("DD-MM-YYYY")
-				: "unknown";
-			message += `This voucher expired on ${dateStr}.`;
-			break;
-		}
-		case "TOO_LATE_TODAY": {
-			const todayDateStr = expiryDate
-				? dayjs(expiryDate).format("DD-MM-YYYY")
-				: "today";
-			message += `This voucher expires ${todayDateStr}, but it's after 9 PM. Vouchers expiring today can only be uploaded before 9 PM.`;
-			break;
-		}
-		case "INVALID_TYPE":
-			message +=
-				"This voucher does not appear to be a valid €5, €10, or €20 Dunnes voucher. We only accept these specific general spend vouchers.";
-			break;
-		case "DUPLICATE_BARCODE":
-			message +=
-				"This voucher has already been uploaded by someone. Each voucher can only be uploaded once.";
-			break;
-		default:
-			message +=
-				"We encountered an unknown error while processing your voucher. Please try again or contact support.";
-	}
-
-	await notifyUser(ctx, user, message, client);
+	await notifyUser(
+		ctx,
+		user,
+		uploadFailureTelegramHtml(reason, expiryDate),
+		client,
+	);
 }
 
 export const recordSystemError = internalMutation({

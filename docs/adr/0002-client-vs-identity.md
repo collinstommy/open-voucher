@@ -22,6 +22,6 @@ Do not infer client from Google vs Telegram auth. Do not persist client on the u
 
 ## Upload voucher
 
-`internal.vouchers.uploadVoucher` takes `client` and passes it to `processVoucherImage` → `storeVoucherFromOcr`. Daily-limit, success, and failure all call `notifyUser(..., client)`. Android/web/iOS get no Telegram send; they call `submitUpload` and watch `getMyAvailableUploads` (and later failed-upload queries or push).
+`internal.vouchers.uploadVoucher` takes `client` and passes it to `processVoucherImage` → `storeVoucherFromOcr`. Daily-limit, success, and failure all call `notifyUser(..., client)`. Android/web/iOS get no Telegram send; they call `submitUpload` and watch `getMyAvailableUploads` plus `getMyFailedUploads`.
 
 Unsolicited messages (reminders, report-the-uploader) are a separate channel decision and are unchanged by this.
