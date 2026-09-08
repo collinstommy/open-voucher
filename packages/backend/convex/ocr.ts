@@ -5,7 +5,7 @@ import { clientValidator, type Client } from "../src/lib/client";
 import { UPLOAD_REWARDS } from "../src/lib/constants";
 import { callGeminiApi } from "../src/lib/gemini";
 import { notifyUser } from "../src/lib/notify";
-import { uploadFailureTelegramHtml } from "../src/lib/uploadFailure";
+import { uploadFailureBody } from "../src/lib/uploadFailure";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import {
@@ -850,7 +850,7 @@ export const processVoucherImage = internalAction({
 				await notifyUser(
 					ctx,
 					user,
-					uploadFailureTelegramHtml("SYSTEM_ERROR"),
+					`❌ <b>Voucher Processing Failed</b>\n\n${uploadFailureBody("SYSTEM_ERROR")}`,
 					client,
 				);
 			}
@@ -1124,7 +1124,7 @@ async function sendErrorMessage(
 	await notifyUser(
 		ctx,
 		user,
-		uploadFailureTelegramHtml(reason, expiryDate),
+		`❌ <b>Voucher Processing Failed</b>\n\n${uploadFailureBody(reason, expiryDate)}`,
 		client,
 	);
 }

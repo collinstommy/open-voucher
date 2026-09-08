@@ -1,5 +1,5 @@
 // User-facing copy for upload validation/system failures. Telegram wraps this
-// in HTML; app clients read the same body from getMyFailedUploads.
+// in HTML at the notify call site; app clients read it from getMyFailedUploads.
 
 import dayjs from "dayjs";
 
@@ -45,11 +45,4 @@ export function uploadFailureBody(
 		default:
 			return "We encountered an error while processing your voucher. Please try again.";
 	}
-}
-
-export function uploadFailureTelegramHtml(
-	reason: string,
-	expiryDate?: number | string,
-): string {
-	return `❌ <b>Voucher Processing Failed</b>\n\n${uploadFailureBody(reason, expiryDate)}`;
 }
