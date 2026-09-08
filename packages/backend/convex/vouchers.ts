@@ -9,11 +9,7 @@ import {
 	type QueryCtx,
 } from "./_generated/server";
 import { userMutation, userQuery } from "./auth";
-import {
-	appClientValidator,
-	clientValidator,
-	type Client,
-} from "../src/lib/client";
+import { clientValidator, type Client } from "../src/lib/client";
 import { CLAIM_COSTS, UPLOAD_REWARDS } from "../src/lib/constants";
 import { applyCoinDelta } from "../src/lib/coinLedger";
 import { recalculateReportCounts } from "../src/lib/reportCounts";
@@ -121,16 +117,19 @@ export const generateUploadUrl = userMutation({
 });
 
 /**
- * App-client upload. `client` is android | ios | web only — the Telegram
- * webhook is the sole path that passes client "telegram" into uploadVoucher.
+ * App-client upload. Client comes from the session JWT (minted at login from
+ * X-OpenVoucher-Client), not from mutation args — Telegram cannot spoof it.
  */
 export const submitUpload = userMutation({
 	args: {
 		imageStorageId: v.id("_storage"),
-		client: appClientValidator,
 	},
-	handler: async (ctx, { userId, imageStorageId, client }) =>
-		uploadVoucherForUser(ctx, { userId, imageStorageId, client }),
+	handler: async (ctx, { userId, imageStorageId, client }) => {
+		if (client === undefined) {
+			throw new Error("Missing app client claim");
+		}
+		return uploadVoucherForUser(ctx, { userId, imageStorageId, client });
+	},
 });
 
 export const requestVoucher = internalMutation({

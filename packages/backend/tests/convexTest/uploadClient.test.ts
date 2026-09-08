@@ -221,14 +221,21 @@ describe("Upload client delivery", () => {
 		await expect(
 			t.mutation(api.vouchers.submitUpload, {
 				imageStorageId,
-				client: "android",
 			}),
 		).rejects.toThrow("Unauthorized");
 
-		const asUser = t.withIdentity({ subject: userId });
-		const result = await asUser.mutation(api.vouchers.submitUpload, {
-			imageStorageId,
+		await expect(
+			t
+				.withIdentity({ subject: userId })
+				.mutation(api.vouchers.submitUpload, { imageStorageId }),
+		).rejects.toThrow("Missing app client claim");
+
+		const asAndroid = t.withIdentity({
+			subject: userId,
 			client: "android",
+		});
+		const result = await asAndroid.mutation(api.vouchers.submitUpload, {
+			imageStorageId,
 		});
 		expect(result).toEqual({ accepted: true });
 
@@ -241,7 +248,7 @@ describe("Upload client delivery", () => {
 		expect(vouchers).toHaveLength(1);
 	});
 
-	test("submitUpload rejects telegram as a client", async () => {
+	test("submitUpload ignores a telegram identity claim", async () => {
 		setupFetchMock();
 		const t = convexTest(schema, modules);
 		const userId = await insertLinkedUser(t, "no-spoof-1");
@@ -249,14 +256,15 @@ describe("Upload client delivery", () => {
 			ctx.storage.store(new Blob(["fake-image"])),
 		);
 
-		const asUser = t.withIdentity({ subject: userId });
+		const asTelegram = t.withIdentity({
+			subject: userId,
+			client: "telegram",
+		});
 		await expect(
-			asUser.mutation(api.vouchers.submitUpload, {
+			asTelegram.mutation(api.vouchers.submitUpload, {
 				imageStorageId,
-				// @ts-expect-error telegram is not an app client
-				client: "telegram",
 			}),
-		).rejects.toThrow();
+		).rejects.toThrow("Missing app client claim");
 	});
 
 	test("generateUploadUrl requires auth", async () => {

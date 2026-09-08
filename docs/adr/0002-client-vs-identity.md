@@ -14,7 +14,9 @@ Auth method cannot identify the client. A linked account has both. The JWT subje
 
 1. **Identity** (who) stays on the user: `telegramChatId` + `authIdentities`.
 2. **Client** (where this request came from) is a request-scoped argument: `telegram | android | ios | web`.
-3. The entry point sets it. The Telegram webhook hardcodes `"telegram"`. App mutations (`submitUpload`) accept only `android | ios | web`, so a client cannot spoof the bot notification channel.
+3. The entry point sets it without putting it on every mutation:
+   - The Telegram webhook hardcodes `"telegram"`.
+   - App clients send `X-OpenVoucher-Client` on the **auth HTTP action** (`/api/google-auth`, `/api/telegram-auth`). That header is minted onto the session JWT. `userMutation` reads `identity.client` into ctx/args — the same customFunction middleware already used for `userId`. Queries/mutations cannot see arbitrary HTTP headers (Convex does not plan to expose them).
 4. Thread `client` through async work (the OCR scheduler) so success, validation failure, and system error still know the origin.
 5. `notifyUser` is the delivery gate: Telegram messages only when `client === "telegram"` and a chatId exists. App clients observe Convex queries for the same outcome.
 
@@ -22,6 +24,6 @@ Do not infer client from Google vs Telegram auth. Do not persist client on the u
 
 ## Upload voucher
 
-`internal.vouchers.uploadVoucher` takes `client` and passes it to `processVoucherImage` → `storeVoucherFromOcr`. Daily-limit, success, and failure all call `notifyUser(..., client)`. Android/web/iOS get no Telegram send; they call `submitUpload` and watch `getMyAvailableUploads` plus `getMyFailedUploads`.
+`internal.vouchers.uploadVoucher` takes `client` and passes it to `processVoucherImage` → `storeVoucherFromOcr`. Daily-limit, success, and failure all call `notifyUser(..., client)`. Android/web/iOS get no Telegram send; they call `submitUpload` (client from the JWT) and watch `getMyAvailableUploads` plus `getMyFailedUploads`.
 
 Unsolicited messages (reminders, report-the-uploader) are a separate channel decision and are unchanged by this.

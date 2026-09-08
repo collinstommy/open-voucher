@@ -13,6 +13,7 @@ import {
 	customQuery,
 } from "convex-helpers/server/customFunctions";
 import type { GoogleClaims } from "../src/lib/googleAuth";
+import { parseAppClientClaim, type AppClient } from "../src/lib/client";
 import {
 	findGoogleIdentity,
 	getGoogleIdentityForUser,
@@ -38,6 +39,19 @@ export async function getCurrentUserId(
 		throw new Error("Unauthorized: not authenticated");
 	}
 	return identity.subject as Id<"users">;
+}
+
+export async function getAuthContext(
+	ctx: QueryCtx | MutationCtx,
+): Promise<{ userId: Id<"users">; client: AppClient | undefined }> {
+	const identity = await ctx.auth.getUserIdentity();
+	if (!identity) {
+		throw new Error("Unauthorized: not authenticated");
+	}
+	return {
+		userId: identity.subject as Id<"users">,
+		client: parseAppClientClaim((identity as { client?: unknown }).client),
+	};
 }
 
 /**
@@ -84,9 +98,7 @@ export const getUserForDevAuth = internalMutation({
 
 		const user = await ctx.db
 			.query("users")
-			.withIndex("by_chat_id", (q) =>
-				q.eq("telegramChatId", telegramChatId),
-			)
+			.withIndex("by_chat_id", (q) => q.eq("telegramChatId", telegramChatId))
 			.first();
 
 		if (!user) {
@@ -108,8 +120,8 @@ export const userQuery = customQuery(query, {
 export const userMutation = customMutation(mutation, {
 	args: {},
 	input: async (ctx) => {
-		const userId = await getCurrentUserId(ctx);
-		return { ctx: {}, args: { userId } };
+		const { userId, client } = await getAuthContext(ctx);
+		return { ctx: {}, args: { userId, client } };
 	},
 });
 
