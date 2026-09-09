@@ -116,12 +116,21 @@ describe("Upload client delivery", () => {
 			ctx.storage.store(new Blob(["fake-image"])),
 		);
 
-		const result = await t.mutation(internal.vouchers.uploadVoucher, {
-			userId,
-			imageStorageId,
+		const asAndroid = t.withIdentity({
+			subject: userId,
 			client: "android",
 		});
-		expect(result).toEqual({ accepted: true });
+		const result = await asAndroid.mutation(api.vouchers.submitUpload, {
+			imageStorageId,
+		});
+		expect(result.accepted).toBe(true);
+		if (!result.accepted) throw new Error("expected accepted");
+
+		const inFlight = await asAndroid.query(api.vouchers.getUpload, {
+			uploadId: result.uploadId,
+		});
+		expect(inFlight?.status).toBe("processing");
+
 		await t.finishAllScheduledFunctions(vi.runAllTimers);
 
 		const vouchers = await t.run(async (ctx) =>
@@ -129,6 +138,11 @@ describe("Upload client delivery", () => {
 		);
 		expect(vouchers).toHaveLength(1);
 		expect(sentMessages).toHaveLength(0);
+
+		const upload = await asAndroid.query(api.vouchers.getUpload, {
+			uploadId: result.uploadId,
+		});
+		expect(upload?.status).toBe("succeeded");
 	});
 
 	test("linked account uploading from Telegram still gets a Bot API message", async () => {
@@ -143,7 +157,6 @@ describe("Upload client delivery", () => {
 		await t.mutation(internal.vouchers.uploadVoucher, {
 			userId,
 			imageStorageId,
-			client: "telegram",
 		});
 		await t.finishAllScheduledFunctions(vi.runAllTimers);
 
@@ -170,10 +183,12 @@ describe("Upload client delivery", () => {
 			ctx.storage.store(new Blob(["fake-image"])),
 		);
 
-		const result = await t.mutation(internal.vouchers.uploadVoucher, {
-			userId,
-			imageStorageId,
+		const asAndroid = t.withIdentity({
+			subject: userId,
 			client: "android",
+		});
+		const result = await asAndroid.mutation(api.vouchers.submitUpload, {
+			imageStorageId,
 		});
 		expect(result).toEqual({ accepted: false, reason: "daily_limit" });
 		await t.finishAllScheduledFunctions(vi.runAllTimers);
@@ -207,9 +222,15 @@ describe("Upload client delivery", () => {
 		const result = await asAndroid.mutation(api.vouchers.submitUpload, {
 			imageStorageId,
 		});
-		expect(result).toEqual({ accepted: true });
+		expect(result.accepted).toBe(true);
+		if (!result.accepted) throw new Error("expected accepted");
 		await t.finishAllScheduledFunctions(vi.runAllTimers);
 		expect(sentMessages).toHaveLength(0);
+
+		const upload = await asAndroid.query(api.vouchers.getUpload, {
+			uploadId: result.uploadId,
+		});
+		expect(upload?.status).toBe("succeeded");
 	});
 
 	test("submitUpload ignores a telegram identity claim", async () => {
@@ -231,7 +252,7 @@ describe("Upload client delivery", () => {
 		).rejects.toThrow("Missing app client claim");
 	});
 
-	test("Android OCR failure is visible on getMyFailedUploads", async () => {
+	test("Android OCR failure does not send Telegram and patches the upload", async () => {
 		setupFetchMock({ geminiError: true });
 		const t = convexTest(schema, modules);
 		const userId = await insertLinkedUser(t, "android-failed-query-1");
@@ -239,20 +260,25 @@ describe("Upload client delivery", () => {
 			ctx.storage.store(new Blob(["fake-image"])),
 		);
 
-		await t.mutation(internal.vouchers.uploadVoucher, {
-			userId,
-			imageStorageId,
+		const asAndroid = t.withIdentity({
+			subject: userId,
 			client: "android",
 		});
+		const result = await asAndroid.mutation(api.vouchers.submitUpload, {
+			imageStorageId,
+		});
+		expect(result.accepted).toBe(true);
+		if (!result.accepted) throw new Error("expected accepted");
 		await t.finishAllScheduledFunctions(vi.runAllTimers);
 
 		expect(sentMessages).toHaveLength(0);
 
-		const asUser = t.withIdentity({ subject: userId });
-		const failures = await asUser.query(api.vouchers.getMyFailedUploads, {});
-		expect(failures).toHaveLength(1);
-		expect(failures[0].failureReason).toBe("SYSTEM_ERROR");
-		expect(failures[0].message).toContain("Please try again");
-		expect(failures[0].message.toLowerCase()).not.toContain("support");
+		const upload = await asAndroid.query(api.vouchers.getUpload, {
+			uploadId: result.uploadId,
+		});
+		expect(upload?.status).toBe("failed");
+		if (upload?.status !== "failed") throw new Error("expected failed");
+		expect(upload.failureReason).toBe("SYSTEM_ERROR");
+		expect(upload.message).toContain("Please try again");
 	});
 });

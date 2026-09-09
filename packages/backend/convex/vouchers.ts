@@ -9,16 +9,10 @@ import {
 	type QueryCtx,
 } from "./_generated/server";
 import { userMutation, userQuery } from "./auth";
-import {
-	clientValidator,
-	deliversViaTelegram,
-	requireAppClient,
-	type Client,
-} from "../src/lib/client";
+import { requireAppClient } from "../src/lib/client";
 import { CLAIM_COSTS, UPLOAD_REWARDS } from "../src/lib/constants";
 import { applyCoinDelta } from "../src/lib/coinLedger";
 import { recalculateReportCounts } from "../src/lib/reportCounts";
-import { notifyUser } from "../src/lib/notify";
 import {
 	parseUploadFailureReason,
 	uploadFailureBody,
@@ -58,19 +52,18 @@ export const getVoucherByBarcode = internalQuery({
 	},
 });
 
-export type UploadVoucherResult =
-	| { accepted: true }
+export type AcceptUploadResult =
+	| { accepted: true; uploadId: Id<"uploads"> }
 	| { accepted: false; reason: "daily_limit" };
 
-async function uploadVoucherForUser(
+async function acceptUpload(
 	ctx: MutationCtx,
 	args: {
 		userId: Id<"users">;
 		imageStorageId: Id<"_storage">;
-		client: Client;
 	},
-): Promise<UploadVoucherResult> {
-	const { userId, imageStorageId, client } = args;
+): Promise<AcceptUploadResult> {
+	const { userId, imageStorageId } = args;
 	const user = await ctx.db.get(userId);
 	if (!user) {
 		throw new Error("User not found");
@@ -90,33 +83,37 @@ async function uploadVoucherForUser(
 		.collect();
 
 	if (recentUploads.length >= MAX_DAILY_UPLOADS) {
-		if (deliversViaTelegram(client)) {
-			await notifyUser(
-				ctx,
-				user,
-				"🚫 <b>Daily Upload Limit Reached</b>\n\nYou can only upload 10 vouchers per 24 hours. Please try again later.",
-				client,
-			);
-		}
 		return { accepted: false, reason: "daily_limit" };
 	}
 
-	await ctx.scheduler.runAfter(0, internal.ocr.processVoucherImage, {
+	const uploadId = await ctx.db.insert("uploads", {
 		userId,
 		imageStorageId,
-		client,
+		status: "processing",
 	});
-
-	return { accepted: true };
+	return { accepted: true, uploadId };
 }
 
 export const uploadVoucher = internalMutation({
 	args: {
 		userId: v.id("users"),
 		imageStorageId: v.id("_storage"),
-		client: clientValidator,
 	},
-	handler: async (ctx, args) => uploadVoucherForUser(ctx, args),
+	handler: async (ctx, args) => {
+		const result = await acceptUpload(ctx, args);
+		if (result.accepted) {
+			await ctx.scheduler.runAfter(
+				0,
+				internal.ocr.processTelegramVoucherImage,
+				{
+					userId: args.userId,
+					imageStorageId: args.imageStorageId,
+					uploadId: result.uploadId,
+				},
+			);
+		}
+		return result;
+	},
 });
 
 export const generateUploadUrl = userMutation({
@@ -130,11 +127,47 @@ export const submitUpload = userMutation({
 		imageStorageId: v.id("_storage"),
 	},
 	handler: async (ctx, { userId, imageStorageId }) => {
-		return uploadVoucherForUser(ctx, {
-			userId,
-			imageStorageId,
-			client: requireAppClient(ctx.client),
-		});
+		requireAppClient(ctx.client);
+		const result = await acceptUpload(ctx, { userId, imageStorageId });
+		if (result.accepted) {
+			await ctx.scheduler.runAfter(0, internal.ocr.processVoucherImage, {
+				userId,
+				imageStorageId,
+				uploadId: result.uploadId,
+			});
+		}
+		return result;
+	},
+});
+
+export const getUpload = userQuery({
+	args: {
+		uploadId: v.id("uploads"),
+	},
+	handler: async (ctx, { userId, uploadId }) => {
+		const row = await ctx.db.get(uploadId);
+		if (!row || row.userId !== userId) {
+			return null;
+		}
+		if (row.status === "processing") {
+			return { status: "processing" as const, _id: row._id };
+		}
+		if (row.status === "succeeded") {
+			return {
+				status: "succeeded" as const,
+				_id: row._id,
+				voucherId: row.voucherId,
+			};
+		}
+		const failureReason = parseUploadFailureReason(
+			row.failureReason ?? "UNKNOWN_ERROR",
+		);
+		return {
+			status: "failed" as const,
+			_id: row._id,
+			failureReason,
+			message: row.message ?? uploadFailureBody(failureReason),
+		};
 	},
 });
 
@@ -697,29 +730,6 @@ export const getMyAvailableUploads = userQuery({
 				coinValue: UPLOAD_REWARDS[v.type] ?? 0,
 			})),
 		);
-	},
-});
-
-/** Recent OCR/validation failures for the signed-in user. */
-export const getMyFailedUploads = userQuery({
-	args: {},
-	handler: async (ctx, { userId }) => {
-		const rows = await ctx.db
-			.query("failedUploads")
-			.withIndex("by_userId", (q) => q.eq("userId", userId))
-			.order("desc")
-			.take(20);
-
-		return rows.map((row) => ({
-			_id: row._id,
-			createdAt: row._creationTime,
-			failureType: row.failureType,
-			failureReason: row.failureReason,
-			message: uploadFailureBody(
-				parseUploadFailureReason(row.failureReason),
-				row.extractedExpiryDate,
-			),
-		}));
 	},
 });
 

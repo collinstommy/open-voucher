@@ -1,9 +1,4 @@
-import { v } from "convex/values";
-
 export const APP_CLIENT_HEADER = "X-OpenVoucher-Client";
-
-export const CLIENTS = ["telegram", "android", "ios", "web"] as const;
-export type Client = (typeof CLIENTS)[number];
 
 export const APP_CLIENTS = ["android", "ios", "web"] as const;
 export type AppClient = (typeof APP_CLIENTS)[number];
@@ -40,15 +35,4 @@ export function parseAppClientHeader(
 		return { ok: true, client: raw };
 	}
 	return { ok: false };
-}
-
-export const clientValidator = v.union(
-	v.literal("telegram"),
-	v.literal("android"),
-	v.literal("ios"),
-	v.literal("web"),
-);
-
-export function deliversViaTelegram(client: Client): boolean {
-	return client === "telegram";
 }

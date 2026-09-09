@@ -229,7 +229,6 @@ describe("Failed Uploads", () => {
 			await t.mutation(internal.vouchers.uploadVoucher, {
 				userId,
 				imageStorageId,
-				client: "telegram",
 			});
 
 			await t.finishAllScheduledFunctions(vi.runAllTimers);
@@ -275,7 +274,6 @@ describe("Failed Uploads", () => {
 			await t.mutation(internal.vouchers.uploadVoucher, {
 				userId,
 				imageStorageId,
-				client: "telegram",
 			});
 
 			await t.finishAllScheduledFunctions(vi.runAllTimers);
@@ -312,7 +310,6 @@ describe("Failed Uploads", () => {
 			await t.mutation(internal.vouchers.uploadVoucher, {
 				userId,
 				imageStorageId,
-				client: "telegram",
 			});
 
 			await t.finishAllScheduledFunctions(vi.runAllTimers);
@@ -352,7 +349,6 @@ describe("Failed Uploads", () => {
 			await t.mutation(internal.vouchers.uploadVoucher, {
 				userId,
 				imageStorageId,
-				client: "telegram",
 			});
 
 			await t.finishAllScheduledFunctions(vi.runAllTimers);
@@ -394,7 +390,6 @@ describe("Failed Uploads", () => {
 			await t.mutation(internal.vouchers.uploadVoucher, {
 				userId,
 				imageStorageId,
-				client: "telegram",
 			});
 
 			await t.finishAllScheduledFunctions(vi.runAllTimers);
@@ -430,7 +425,6 @@ describe("Failed Uploads", () => {
 			await t.mutation(internal.vouchers.uploadVoucher, {
 				userId,
 				imageStorageId,
-				client: "telegram",
 			});
 
 			await t.finishAllScheduledFunctions(vi.runAllTimers);
@@ -479,7 +473,6 @@ describe("Failed Uploads", () => {
 			await t.mutation(internal.vouchers.uploadVoucher, {
 				userId,
 				imageStorageId,
-				client: "telegram",
 			});
 
 			await t.finishAllScheduledFunctions(vi.runAllTimers);
@@ -525,7 +518,6 @@ describe("Failed Uploads", () => {
 			await t.mutation(internal.vouchers.uploadVoucher, {
 				userId,
 				imageStorageId,
-				client: "telegram",
 			});
 
 			await t.finishAllScheduledFunctions(vi.runAllTimers);
@@ -572,7 +564,6 @@ describe("Failed Uploads", () => {
 			await t.mutation(internal.vouchers.uploadVoucher, {
 				userId,
 				imageStorageId,
-				client: "telegram",
 			});
 
 			await t.finishAllScheduledFunctions(vi.runAllTimers);
@@ -604,7 +595,6 @@ describe("Failed Uploads", () => {
 			await t.mutation(internal.vouchers.uploadVoucher, {
 				userId,
 				imageStorageId,
-				client: "telegram",
 			});
 
 			await t.finishAllScheduledFunctions(vi.runAllTimers);
@@ -640,7 +630,6 @@ describe("Failed Uploads", () => {
 			await t.mutation(internal.vouchers.uploadVoucher, {
 				userId,
 				imageStorageId,
-				client: "telegram",
 			});
 
 			await t.finishAllScheduledFunctions(vi.runAllTimers);
@@ -661,7 +650,6 @@ describe("Failed Uploads", () => {
 			await t.mutation(internal.vouchers.uploadVoucher, {
 				userId,
 				imageStorageId: imageStorageId2,
-				client: "telegram",
 			});
 
 			await t.finishAllScheduledFunctions(vi.runAllTimers);
@@ -688,7 +676,6 @@ describe("Failed Uploads", () => {
 			await t.mutation(internal.vouchers.uploadVoucher, {
 				userId,
 				imageStorageId,
-				client: "telegram",
 			});
 
 			await t.finishAllScheduledFunctions(vi.runAllTimers);
@@ -721,7 +708,6 @@ describe("Failed Uploads", () => {
 			await t.mutation(internal.vouchers.uploadVoucher, {
 				userId,
 				imageStorageId,
-				client: "telegram",
 			});
 
 			await t.finishAllScheduledFunctions(vi.runAllTimers);

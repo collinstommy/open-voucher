@@ -466,7 +466,6 @@ describe("Ban Flow", () => {
 			t.mutation(internal.vouchers.uploadVoucher, {
 				userId: uploaderId,
 				imageStorageId: newImageStorageId,
-				client: "telegram",
 			}),
 		).rejects.toThrow("You have been banned from this service");
 

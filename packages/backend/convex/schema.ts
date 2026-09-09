@@ -180,6 +180,20 @@ export default defineSchema({
 	})
 		.index("by_userId", ["userId"])
 		.index("by_image_storage", ["imageStorageId"]),
+
+	uploads: defineTable({
+		userId: v.id("users"),
+		imageStorageId: v.id("_storage"),
+		status: v.union(
+			v.literal("processing"),
+			v.literal("succeeded"),
+			v.literal("failed"),
+		),
+		voucherId: v.optional(v.id("vouchers")),
+		failureReason: v.optional(v.string()),
+		message: v.optional(v.string()),
+	}).index("by_userId", ["userId"]),
+
 	feedback: defineTable({
 		userId: v.id("users"),
 		text: v.string(),

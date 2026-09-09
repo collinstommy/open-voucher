@@ -13,17 +13,17 @@ Auth method cannot identify the client. A linked account has both. The JWT subje
 ## Decision
 
 1. **Identity** (who) stays on the user: `telegramChatId` + `authIdentities`.
-2. **Client** (where this request came from) is a request-scoped argument: `telegram | android | ios | web`.
-3. The entry point sets it without putting it on every mutation:
-   - The Telegram webhook hardcodes `"telegram"`.
-   - App clients send `X-OpenVoucher-Client` on auth HTTP (`/api/google-auth`, `/api/telegram-auth`, `/api/dev-auth`). Missing or unknown values are `400 invalid_client`. That header is minted onto the session JWT as a required `client` claim. `userMutation` reads `identity.client` onto `ctx`. Queries/mutations cannot see arbitrary HTTP headers (Convex does not plan to expose them).
-4. Thread `client` through async work (the OCR scheduler) so success, validation failure, and system error still know the origin.
-5. Telegram HTML is built only when `client === "telegram"`. `notifyUser` still refuses to send unless that client and a chatId exist. App clients observe Convex queries for the same outcome.
+2. **Client** (where this request came from) is a request-scoped argument at the entry door only: `telegram | android | ios | web`.
+3. The entry point sets it without putting it on OCR:
+   - The Telegram webhook is the bot. `internal.vouchers.uploadVoucher` schedules `processTelegramVoucherImage`. Daily limit is returned to the webhook, which sends the Bot API message.
+   - App clients send `X-OpenVoucher-Client` on auth HTTP (`/api/google-auth`, `/api/telegram-auth`, `/api/dev-auth`). Missing or unknown values are `400 invalid_client`. That header is minted onto the session JWT as a required `client` claim. `submitUpload` calls `requireAppClient(ctx.client)` and schedules `processVoucherImage` (no Telegram send).
+4. `acceptUpload` inserts an `uploads` row (`processing`) and returns `uploadId`. OCR patches that row to `succeeded` or `failed`. Android `useQuery`s `getUpload({ uploadId })`.
+5. `notifyUser` sends when called, if a chat id exists. It does not take `client`. `storeVoucherFromOcr` does not notify.
 
-Do not infer client from Google vs Telegram auth. Do not persist client on the user.
+Do not infer client from Google vs Telegram auth. Do not persist client on the user or on `uploads`.
 
 ## Upload voucher
 
-`internal.vouchers.uploadVoucher` takes `client` and passes it to `processVoucherImage` → `storeVoucherFromOcr`. Daily-limit, success, and failure notify Telegram from those mutations when the client is telegram (scheduled send stays in the same transaction as the write). Android/web/iOS get no Telegram send; they call `submitUpload` (`ctx.client` from the JWT) and watch `getMyAvailableUploads` plus `getMyFailedUploads`.
+Shared domain: `acceptUpload` then `processVoucherImage` → `storeVoucherFromOcr`. Telegram-only wrapper `processTelegramVoucherImage` turns the result into a Bot API message. Daily limit never creates an upload row.
 
 Unsolicited messages (reminders, report-the-uploader) are a separate channel decision and are unchanged by this.

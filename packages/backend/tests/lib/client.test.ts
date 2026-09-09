@@ -1,20 +1,10 @@
 import { describe, expect, test } from "vitest";
 import {
 	APP_CLIENT_HEADER,
-	deliversViaTelegram,
 	parseAppClientClaim,
 	parseAppClientHeader,
 	requireAppClient,
 } from "../../src/lib/client";
-
-describe("deliversViaTelegram", () => {
-	test("only the telegram client delivers Bot API messages", () => {
-		expect(deliversViaTelegram("telegram")).toBe(true);
-		expect(deliversViaTelegram("android")).toBe(false);
-		expect(deliversViaTelegram("ios")).toBe(false);
-		expect(deliversViaTelegram("web")).toBe(false);
-	});
-});
 
 describe("parseAppClientClaim", () => {
 	test("accepts app clients and rejects telegram", () => {
