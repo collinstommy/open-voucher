@@ -4,6 +4,10 @@ import { applyCoinDelta } from "../src/lib/coinLedger";
 import { UPLOAD_REWARDS } from "../src/lib/constants";
 import { callGeminiApi } from "../src/lib/gemini";
 import { notifyUser } from "../src/lib/notify";
+import {
+	type UploadFailureReason,
+	uploadFailureBody,
+} from "../src/lib/uploadFailure";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import {
@@ -769,17 +773,35 @@ function usePlaceholderOcr(): boolean {
 	return process.env.OCR_BYPASS === "1";
 }
 
+type ProcessVoucherResult =
+	| {
+			success: true;
+			voucherId: Id<"vouchers">;
+			type: string;
+			reward: number;
+			newBalance: number;
+	  }
+	| {
+			success: false;
+			reason: UploadFailureReason;
+			expiryDate?: number;
+	  };
+
 async function storePlaceholderVoucher(
 	ctx: ActionCtx,
-	userId: Id<"users">,
-	imageStorageId: Id<"_storage">,
-) {
+	args: {
+		userId: Id<"users">;
+		imageStorageId: Id<"_storage">;
+		uploadId: Id<"uploads">;
+	},
+): Promise<ProcessVoucherResult> {
 	const result = await ctx.runMutation(internal.ocr.storeVoucherFromOcr, {
-		userId,
-		imageStorageId,
+		userId: args.userId,
+		imageStorageId: args.imageStorageId,
+		uploadId: args.uploadId,
 		type: "10",
 		expiryDate: dayjs().add(14, "day").format("YYYY-MM-DD"),
-		barcode: `DEV-${imageStorageId}`,
+		barcode: `DEV-${args.imageStorageId}`,
 		isThreePlus: false,
 		rawResponse: "dev-ocr-bypass",
 	});
@@ -788,85 +810,121 @@ async function storePlaceholderVoucher(
 			? `Dev OCR bypass: voucher created ${result.voucherId}`
 			: `Dev OCR bypass: voucher rejected ${result.reason}`,
 	);
+	return result;
+}
+
+const processVoucherArgs = {
+	userId: v.id("users"),
+	imageStorageId: v.id("_storage"),
+	uploadId: v.id("uploads"),
+};
+
+async function runProcessVoucherImage(
+	ctx: ActionCtx,
+	args: {
+		userId: Id<"users">;
+		imageStorageId: Id<"_storage">;
+		uploadId: Id<"uploads">;
+	},
+): Promise<ProcessVoucherResult> {
+	const { userId, imageStorageId, uploadId } = args;
+
+	// Dev bypass: only when explicitly enabled (OCR_BYPASS=1) on a development
+	// deployment. Never key this off a missing API key alone — prod must fail
+	// loudly instead of storing placeholder vouchers.
+	if (usePlaceholderOcr()) {
+		return await storePlaceholderVoucher(ctx, args);
+	}
+
+	try {
+		const extracted = await ctx.runAction(internal.ocr.extractFromImage, {
+			imageStorageId,
+		});
+
+		return await ctx.runMutation(internal.ocr.storeVoucherFromOcr, {
+			userId,
+			imageStorageId,
+			uploadId,
+			type: String(extracted.type),
+			validFrom: extracted.validFrom || undefined,
+			expiryDate: extracted.expiryDate || undefined,
+			barcode: extracted.barcode || undefined,
+			isThreePlus: extracted.isThreePlus,
+			rawResponse: extracted.rawResponse,
+		});
+	} catch (error: any) {
+		console.error("OCR system error:", { userId, imageStorageId, error });
+
+		const errorMessage = error?.message || String(error);
+
+		await ctx.runMutation(internal.ocr.recordSystemError, {
+			userId,
+			imageStorageId,
+			uploadId,
+			errorMessage: errorMessage.substring(0, 1000),
+		});
+
+		return { success: false, reason: "SYSTEM_ERROR" };
+	}
+}
+
+function telegramHtmlFromProcessResult(result: ProcessVoucherResult): string {
+	if (result.success) {
+		return `✅ <b>Voucher Accepted!</b>\n\nThanks for sharing a €${result.type} voucher.\nCoins earned: +${result.reward}\nNew balance: ${result.newBalance}`;
+	}
+	return `❌ <b>Voucher Processing Failed</b>\n\n${uploadFailureBody(result.reason, result.expiryDate)}`;
 }
 
 export const processVoucherImage = internalAction({
-	args: {
-		userId: v.id("users"),
-		imageStorageId: v.id("_storage"),
-	},
+	args: processVoucherArgs,
+	handler: runProcessVoucherImage,
+});
+
+export const processTelegramVoucherImage = internalAction({
+	args: processVoucherArgs,
 	handler: async (ctx, args) => {
-		const { userId, imageStorageId } = args;
-
-		// Dev bypass: only when explicitly enabled (OCR_BYPASS=1) on a development
-		// deployment. Never key this off a missing API key alone — prod must fail
-		// loudly instead of storing placeholder vouchers.
-		if (usePlaceholderOcr()) {
-			await storePlaceholderVoucher(ctx, userId, imageStorageId);
-			return;
+		const result = await runProcessVoucherImage(ctx, args);
+		const user = await ctx.runQuery(internal.users.getUserById, {
+			userId: args.userId,
+		});
+		if (user) {
+			await notifyUser(ctx, user, telegramHtmlFromProcessResult(result));
 		}
-
-		try {
-			const extracted = await ctx.runAction(internal.ocr.extractFromImage, {
-				imageStorageId,
-			});
-
-			const result = await ctx.runMutation(internal.ocr.storeVoucherFromOcr, {
-				userId,
-				imageStorageId,
-				type: String(extracted.type),
-				validFrom: extracted.validFrom || undefined,
-				expiryDate: extracted.expiryDate || undefined,
-				barcode: extracted.barcode || undefined,
-				isThreePlus: extracted.isThreePlus,
-				rawResponse: extracted.rawResponse,
-			});
-
-			if (result.success) {
-				console.log(`Voucher created: ${result.voucherId}`);
-			} else {
-				console.log(`Voucher rejected: ${result.reason}`);
-				// Error message is sent by storeVoucherFromOcr
-			}
-		} catch (error: any) {
-			console.error("OCR system error:", { userId, imageStorageId, error });
-
-			const errorMessage = error?.message || String(error);
-
-			await ctx.runMutation(internal.ocr.recordSystemError, {
-				userId,
-				imageStorageId,
-				errorMessage: errorMessage.substring(0, 1000),
-			});
-
-			const user = await ctx.runQuery(internal.users.getUserById, { userId });
-			if (user) {
-				await notifyUser(
-					ctx,
-					user,
-					"❌ <b>Voucher Processing Failed</b>\n\nWe encountered an error while processing your voucher. Please try again.",
-				);
-			}
-		}
+		return result;
 	},
 });
 
 // --- store.ts ---
-type VoucherOcrFailureReason =
-	| "EXPIRED"
-	| "TOO_LATE_TODAY"
-	| "COULD_NOT_READ_AMOUNT"
-	| "COULD_NOT_READ_BARCODE"
-	| "COULD_NOT_READ_EXPIRY_DATE"
-	| "INVALID_TYPE"
-	| "DUPLICATE_BARCODE"
-	| "UNKNOWN_ERROR";
+async function markUploadSucceeded(
+	ctx: MutationCtx,
+	uploadId: Id<"uploads">,
+	voucherId: Id<"vouchers">,
+) {
+	await ctx.db.patch(uploadId, {
+		status: "succeeded",
+		voucherId,
+	});
+}
+
+async function markUploadFailed(
+	ctx: MutationCtx,
+	uploadId: Id<"uploads">,
+	reason: UploadFailureReason,
+	expiryDate?: number,
+) {
+	await ctx.db.patch(uploadId, {
+		status: "failed",
+		failureReason: reason,
+		message: uploadFailureBody(reason, expiryDate),
+	});
+}
 
 async function recordFailedUpload(
 	ctx: MutationCtx,
+	uploadId: Id<"uploads">,
 	userId: Id<"users">,
 	imageStorageId: Id<"_storage">,
-	reason: VoucherOcrFailureReason,
+	reason: UploadFailureReason,
 	ocrData: {
 		rawResponse: string;
 		type?: string;
@@ -874,6 +932,7 @@ async function recordFailedUpload(
 		expiryDate?: string;
 		validFrom?: string;
 	},
+	expiryDateMs?: number,
 ) {
 	await ctx.db.insert("failedUploads", {
 		userId,
@@ -886,12 +945,14 @@ async function recordFailedUpload(
 		extractedExpiryDate: ocrData.expiryDate,
 		extractedValidFrom: ocrData.validFrom,
 	});
+	await markUploadFailed(ctx, uploadId, reason, expiryDateMs);
 }
 
 export const storeVoucherFromOcr = internalMutation({
 	args: {
 		userId: v.id("users"),
 		imageStorageId: v.id("_storage"),
+		uploadId: v.id("uploads"),
 		type: v.string(),
 		validFrom: v.optional(v.string()),
 		expiryDate: v.optional(v.string()),
@@ -899,10 +960,11 @@ export const storeVoucherFromOcr = internalMutation({
 		isThreePlus: v.optional(v.boolean()),
 		rawResponse: v.string(),
 	},
-	handler: async (ctx, args) => {
+	handler: async (ctx, args): Promise<ProcessVoucherResult> => {
 		const {
 			userId,
 			imageStorageId,
+			uploadId,
 			type,
 			validFrom,
 			expiryDate,
@@ -955,14 +1017,20 @@ export const storeVoucherFromOcr = internalMutation({
 
 		// 1. Check type validity first
 		if (!isValidType) {
-			await recordFailedUpload(ctx, userId, imageStorageId, "INVALID_TYPE", {
-				rawResponse,
-				type,
-				barcode,
-				expiryDate,
-				validFrom,
-			});
-			await sendErrorMessage(ctx, user, "INVALID_TYPE");
+			await recordFailedUpload(
+				ctx,
+				uploadId,
+				userId,
+				imageStorageId,
+				"INVALID_TYPE",
+				{
+					rawResponse,
+					type,
+					barcode,
+					expiryDate,
+					validFrom,
+				},
+			);
 			return { success: false, reason: "INVALID_TYPE" };
 		}
 
@@ -970,6 +1038,7 @@ export const storeVoucherFromOcr = internalMutation({
 		if (!isExpiryDateValid) {
 			await recordFailedUpload(
 				ctx,
+				uploadId,
 				userId,
 				imageStorageId,
 				"COULD_NOT_READ_EXPIRY_DATE",
@@ -981,31 +1050,44 @@ export const storeVoucherFromOcr = internalMutation({
 					validFrom,
 				},
 			);
-			await sendErrorMessage(ctx, user, "COULD_NOT_READ_EXPIRY_DATE");
 			return { success: false, reason: "COULD_NOT_READ_EXPIRY_DATE" };
 		}
 
 		if (isAlreadyExpired) {
-			await recordFailedUpload(ctx, userId, imageStorageId, "EXPIRED", {
-				rawResponse,
-				type,
-				barcode,
-				expiryDate,
-				validFrom,
-			});
-			await sendErrorMessage(ctx, user, "EXPIRED", expiryDateMs);
+			await recordFailedUpload(
+				ctx,
+				uploadId,
+				userId,
+				imageStorageId,
+				"EXPIRED",
+				{
+					rawResponse,
+					type,
+					barcode,
+					expiryDate,
+					validFrom,
+				},
+				expiryDateMs,
+			);
 			return { success: false, reason: "EXPIRED", expiryDate: expiryDateMs };
 		}
 
 		if (isTooLateToday) {
-			await recordFailedUpload(ctx, userId, imageStorageId, "TOO_LATE_TODAY", {
-				rawResponse,
-				type,
-				barcode,
-				expiryDate,
-				validFrom,
-			});
-			await sendErrorMessage(ctx, user, "TOO_LATE_TODAY", expiryDateMs);
+			await recordFailedUpload(
+				ctx,
+				uploadId,
+				userId,
+				imageStorageId,
+				"TOO_LATE_TODAY",
+				{
+					rawResponse,
+					type,
+					barcode,
+					expiryDate,
+					validFrom,
+				},
+				expiryDateMs,
+			);
 			return {
 				success: false,
 				reason: "TOO_LATE_TODAY",
@@ -1016,6 +1098,7 @@ export const storeVoucherFromOcr = internalMutation({
 		if (!barcode) {
 			await recordFailedUpload(
 				ctx,
+				uploadId,
 				userId,
 				imageStorageId,
 				"COULD_NOT_READ_BARCODE",
@@ -1027,7 +1110,6 @@ export const storeVoucherFromOcr = internalMutation({
 					validFrom,
 				},
 			);
-			await sendErrorMessage(ctx, user, "COULD_NOT_READ_BARCODE");
 			return { success: false, reason: "COULD_NOT_READ_BARCODE" };
 		}
 
@@ -1039,6 +1121,7 @@ export const storeVoucherFromOcr = internalMutation({
 		if (existing) {
 			await recordFailedUpload(
 				ctx,
+				uploadId,
 				userId,
 				imageStorageId,
 				"DUPLICATE_BARCODE",
@@ -1050,7 +1133,6 @@ export const storeVoucherFromOcr = internalMutation({
 					validFrom,
 				},
 			);
-			await sendErrorMessage(ctx, user, "DUPLICATE_BARCODE");
 			return { success: false, reason: "DUPLICATE_BARCODE" };
 		}
 
@@ -1090,72 +1172,21 @@ export const storeVoucherFromOcr = internalMutation({
 			uploadCount: (user.uploadCount || 0) + 1,
 		});
 
-		await notifyUser(
-			ctx,
-			user,
-			`✅ <b>Voucher Accepted!</b>\n\nThanks for sharing a €${type} voucher.\nCoins earned: +${reward}\nNew balance: ${newBalance}`,
-		);
+		await markUploadSucceeded(ctx, uploadId, voucherId);
 
 		console.log(
 			`Voucher created: ${voucherId} (type=${type}, barcode=${barcode})`,
 		);
 
-		return { success: true, voucherId };
+		return { success: true, voucherId, type, reward, newBalance };
 	},
 });
-
-async function sendErrorMessage(
-	ctx: MutationCtx,
-	user: { telegramChatId?: string },
-	reason: VoucherOcrFailureReason,
-	expiryDate?: number,
-) {
-	let message = "❌ <b>Voucher Processing Failed</b>\n\n";
-
-	switch (reason) {
-		case "COULD_NOT_READ_AMOUNT":
-			message += `We couldn't determine the voucher amount (e.g., €5, €10, €20). Please make sure the value is clear in the photo.`;
-			break;
-		case "COULD_NOT_READ_EXPIRY_DATE":
-			message += `We couldn't determine the expiry date. Please make sure it's clear in the photo.`;
-			break;
-		case "COULD_NOT_READ_BARCODE":
-			message += `We couldn't read the barcode. Please ensure it's fully visible and clear.`;
-			break;
-		case "EXPIRED": {
-			const dateStr = expiryDate
-				? dayjs(expiryDate).format("DD-MM-YYYY")
-				: "unknown";
-			message += `This voucher expired on ${dateStr}.`;
-			break;
-		}
-		case "TOO_LATE_TODAY": {
-			const todayDateStr = expiryDate
-				? dayjs(expiryDate).format("DD-MM-YYYY")
-				: "today";
-			message += `This voucher expires ${todayDateStr}, but it's after 9 PM. Vouchers expiring today can only be uploaded before 9 PM.`;
-			break;
-		}
-		case "INVALID_TYPE":
-			message +=
-				"This voucher does not appear to be a valid €5, €10, or €20 Dunnes voucher. We only accept these specific general spend vouchers.";
-			break;
-		case "DUPLICATE_BARCODE":
-			message +=
-				"This voucher has already been uploaded by someone. Each voucher can only be uploaded once.";
-			break;
-		default:
-			message +=
-				"We encountered an unknown error while processing your voucher. Please try again or contact support.";
-	}
-
-	await notifyUser(ctx, user, message);
-}
 
 export const recordSystemError = internalMutation({
 	args: {
 		userId: v.id("users"),
 		imageStorageId: v.id("_storage"),
+		uploadId: v.id("uploads"),
 		errorMessage: v.string(),
 	},
 	handler: async (ctx, args) => {
@@ -1166,5 +1197,6 @@ export const recordSystemError = internalMutation({
 			failureReason: "SYSTEM_ERROR",
 			errorMessage: args.errorMessage,
 		});
+		await markUploadFailed(ctx, args.uploadId, "SYSTEM_ERROR");
 	},
 });

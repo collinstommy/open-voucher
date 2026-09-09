@@ -74,7 +74,9 @@ async function growTelegramUser(chatId: number) {
 	);
 	user = await pollUntil(async () => {
 		const refreshed = await env.getUserByChatId(String(chatId));
-		return refreshed && refreshed.telegramState === undefined ? refreshed : null;
+		return refreshed && refreshed.telegramState === undefined
+			? refreshed
+			: null;
 	});
 	if (!user) throw new Error(`Tutorial never cleared for chat ${chatId}`);
 	return user;
@@ -101,6 +103,36 @@ async function issueLinkCode(chatId: number): Promise<string> {
 }
 
 describe("E2E: POST /api/google-auth", () => {
+	test("unknown X-OpenVoucher-Client is 400 invalid_client", async () => {
+		const sub = freshGoogleSub();
+		const res = await env.postGoogleAuth(
+			{
+				idToken: await env.signGoogleIdToken({
+					sub,
+					email: `${sub}@example.com`,
+				}),
+			},
+			{ client: "telegram" },
+		);
+		expect(res.status).toBe(400);
+		expect(await res.json()).toEqual({ error: "invalid_client" });
+	}, 45_000);
+
+	test("missing X-OpenVoucher-Client is 400 invalid_client", async () => {
+		const sub = freshGoogleSub();
+		const res = await env.postGoogleAuth(
+			{
+				idToken: await env.signGoogleIdToken({
+					sub,
+					email: `${sub}@example.com`,
+				}),
+			},
+			{ client: null },
+		);
+		expect(res.status).toBe(400);
+		expect(await res.json()).toEqual({ error: "invalid_client" });
+	}, 45_000);
+
 	test("bare lookup of an unknown sub returns known:false and creates nothing", async () => {
 		const sub = freshGoogleSub();
 		const res = await env.postGoogleAuth({
@@ -143,6 +175,7 @@ describe("E2E: POST /api/google-auth", () => {
 		// Session JWT: real signature check against the E2E key, sub = user id.
 		const payload = await env.verifyIssuedJwt(body.jwt);
 		expect(payload.sub).toBe(body.user._id);
+		expect(payload.client).toBe("android");
 
 		const identity = await env.getAuthIdentity(sub);
 		expect(String(identity?.userId)).toBe(body.user._id);

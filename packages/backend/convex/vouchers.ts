@@ -5,13 +5,18 @@ import type { Id } from "./_generated/dataModel";
 import {
 	internalMutation,
 	internalQuery,
+	type MutationCtx,
 	type QueryCtx,
 } from "./_generated/server";
 import { userMutation, userQuery } from "./auth";
+import { requireAppClient } from "../src/lib/client";
 import { CLAIM_COSTS, UPLOAD_REWARDS } from "../src/lib/constants";
 import { applyCoinDelta } from "../src/lib/coinLedger";
 import { recalculateReportCounts } from "../src/lib/reportCounts";
-import { notifyUser } from "../src/lib/notify";
+import {
+	parseUploadFailureReason,
+	uploadFailureBody,
+} from "../src/lib/uploadFailure";
 
 function getVoucherExpiryCalendarDay(expiryDate: number): string {
 	const date = new Date(expiryDate);
@@ -47,45 +52,122 @@ export const getVoucherByBarcode = internalQuery({
 	},
 });
 
+export type AcceptUploadResult =
+	| { accepted: true; uploadId: Id<"uploads"> }
+	| { accepted: false; reason: "daily_limit" };
+
+async function acceptUpload(
+	ctx: MutationCtx,
+	args: {
+		userId: Id<"users">;
+		imageStorageId: Id<"_storage">;
+	},
+): Promise<AcceptUploadResult> {
+	const { userId, imageStorageId } = args;
+	const user = await ctx.db.get(userId);
+	if (!user) {
+		throw new Error("User not found");
+	}
+	if (user.isBanned) {
+		throw new Error("You have been banned from this service");
+	}
+
+	const now = Date.now();
+	const oneDayAgo = now - 24 * 60 * 60 * 1000;
+	const MAX_DAILY_UPLOADS = 10;
+	const recentUploads = await ctx.db
+		.query("vouchers")
+		.withIndex("by_uploader_created", (q) =>
+			q.eq("uploaderId", userId).gt("createdAt", oneDayAgo),
+		)
+		.collect();
+
+	if (recentUploads.length >= MAX_DAILY_UPLOADS) {
+		return { accepted: false, reason: "daily_limit" };
+	}
+
+	const uploadId = await ctx.db.insert("uploads", {
+		userId,
+		imageStorageId,
+		status: "processing",
+	});
+	return { accepted: true, uploadId };
+}
+
 export const uploadVoucher = internalMutation({
 	args: {
 		userId: v.id("users"),
 		imageStorageId: v.id("_storage"),
 	},
-	handler: async (ctx, { userId, imageStorageId }) => {
-		const user = await ctx.db.get(userId);
-		if (!user) {
-			throw new Error("User not found");
-		}
-		if (user.isBanned) {
-			throw new Error("You have been banned from this service");
-		}
-
-		const now = Date.now();
-		const oneDayAgo = now - 24 * 60 * 60 * 1000;
-		const MAX_DAILY_UPLOADS = 10;
-		const recentUploads = await ctx.db
-			.query("vouchers")
-			.withIndex("by_uploader_created", (q) =>
-				q.eq("uploaderId", userId).gt("createdAt", oneDayAgo),
-			)
-			.collect();
-
-		if (recentUploads.length >= MAX_DAILY_UPLOADS) {
-			await notifyUser(
-				ctx,
-				user,
-				"🚫 <b>Daily Upload Limit Reached</b>\n\nYou can only upload 10 vouchers per 24 hours. Please try again later.",
+	handler: async (ctx, args) => {
+		const result = await acceptUpload(ctx, args);
+		if (result.accepted) {
+			await ctx.scheduler.runAfter(
+				0,
+				internal.ocr.processTelegramVoucherImage,
+				{
+					userId: args.userId,
+					imageStorageId: args.imageStorageId,
+					uploadId: result.uploadId,
+				},
 			);
+		}
+		return result;
+	},
+});
+
+export const generateUploadUrl = userMutation({
+	args: {},
+	handler: async (ctx, { userId: _userId }) =>
+		await ctx.storage.generateUploadUrl(),
+});
+
+export const submitUpload = userMutation({
+	args: {
+		imageStorageId: v.id("_storage"),
+	},
+	handler: async (ctx, { userId, imageStorageId }) => {
+		requireAppClient(ctx.client);
+		const result = await acceptUpload(ctx, { userId, imageStorageId });
+		if (result.accepted) {
+			await ctx.scheduler.runAfter(0, internal.ocr.processVoucherImage, {
+				userId,
+				imageStorageId,
+				uploadId: result.uploadId,
+			});
+		}
+		return result;
+	},
+});
+
+export const getUpload = userQuery({
+	args: {
+		uploadId: v.id("uploads"),
+	},
+	handler: async (ctx, { userId, uploadId }) => {
+		const row = await ctx.db.get(uploadId);
+		if (!row || row.userId !== userId) {
 			return null;
 		}
-
-		await ctx.scheduler.runAfter(0, internal.ocr.processVoucherImage, {
-			userId,
-			imageStorageId,
-		});
-
-		return null;
+		if (row.status === "processing") {
+			return { status: "processing" as const, _id: row._id };
+		}
+		if (row.status === "succeeded") {
+			return {
+				status: "succeeded" as const,
+				_id: row._id,
+				voucherId: row.voucherId,
+			};
+		}
+		const failureReason = parseUploadFailureReason(
+			row.failureReason ?? "UNKNOWN_ERROR",
+		);
+		return {
+			status: "failed" as const,
+			_id: row._id,
+			failureReason,
+			message: row.message ?? uploadFailureBody(failureReason),
+		};
 	},
 });
 

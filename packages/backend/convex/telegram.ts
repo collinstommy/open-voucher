@@ -239,10 +239,16 @@ async function handleImageUpload(
 			});
 		}
 
-		await ctx.runMutation(internal.vouchers.uploadVoucher, {
+		const result = await ctx.runMutation(internal.vouchers.uploadVoucher, {
 			userId: user._id,
 			imageStorageId: storageId,
 		});
+		if (!result.accepted) {
+			await sendTelegramMessage(
+				chatId,
+				"🚫 <b>Daily Upload Limit Reached</b>\n\nYou can only upload 10 vouchers per 24 hours. Please try again later.",
+			);
+		}
 	} catch (e) {
 		console.error(e);
 		await sendTelegramMessage(chatId, "❌ Failed to process image.");

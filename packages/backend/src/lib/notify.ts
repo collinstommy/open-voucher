@@ -1,8 +1,3 @@
-// Telegram notification guard for the optional-chatId world: users created via
-// Google sign-in have no telegramChatId and must never be sent Bot API
-// messages. Call sites schedule through this helper instead of checking the
-// chatId themselves; chatless users silently produce no send.
-
 import { internal } from "../../convex/_generated/api";
 import type { ActionCtx, MutationCtx } from "../../convex/_generated/server";
 

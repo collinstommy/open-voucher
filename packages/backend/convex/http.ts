@@ -4,6 +4,11 @@ import { internal } from "./_generated/api";
 import { verifyTelegramInitData } from "../src/lib/telegramAuth";
 import { issueJwt } from "../src/lib/jwt";
 import { verifyGoogleIdToken } from "../src/lib/googleAuth";
+import {
+	APP_CLIENT_HEADER,
+	parseAppClientHeader,
+	type AppClient,
+} from "../src/lib/client";
 import type { GoogleAuthUser } from "./auth";
 
 const http = httpRouter();
@@ -24,8 +29,22 @@ function getCorsHeaders(request: Request): Record<string, string> {
 	return {
 		"Access-Control-Allow-Origin": allowedOrigin,
 		"Access-Control-Allow-Methods": "POST, OPTIONS",
-		"Access-Control-Allow-Headers": "Content-Type",
+		"Access-Control-Allow-Headers": `Content-Type, ${APP_CLIENT_HEADER}`,
 	};
+}
+
+function requireAppClientHeader(
+	request: Request,
+	corsHeaders: Record<string, string>,
+): AppClient | Response {
+	const parsed = parseAppClientHeader(request.headers);
+	if (!parsed.ok) {
+		return new Response(JSON.stringify({ error: "invalid_client" }), {
+			status: 400,
+			headers: corsHeaders,
+		});
+	}
+	return parsed.client;
 }
 
 /** JSON response with the user's telegramChatId normalized to null for the wire. */
@@ -47,6 +66,7 @@ async function handleGoogleAuth(
 	ctx: ActionCtx,
 	corsHeaders: Record<string, string>,
 	body: { idToken?: unknown; linkCode?: unknown; intent?: unknown },
+	client: AppClient,
 ): Promise<Response> {
 	const idToken = typeof body.idToken === "string" ? body.idToken : undefined;
 	if (!idToken) {
@@ -59,10 +79,13 @@ async function handleGoogleAuth(
 	const clientId = process.env.GOOGLE_ANDROID_CLIENT_ID;
 	if (!clientId) {
 		console.error("GOOGLE_ANDROID_CLIENT_ID is not set");
-		return new Response(JSON.stringify({ error: "Server configuration error" }), {
-			status: 500,
-			headers: corsHeaders,
-		});
+		return new Response(
+			JSON.stringify({ error: "Server configuration error" }),
+			{
+				status: 500,
+				headers: corsHeaders,
+			},
+		);
 	}
 
 	const verified = await verifyGoogleIdToken(idToken, { clientId });
@@ -73,9 +96,12 @@ async function handleGoogleAuth(
 		});
 	}
 
-	const rateLimit = await ctx.runMutation(internal.auth.checkGoogleAuthRateLimit, {
-		sub: verified.sub,
-	});
+	const rateLimit = await ctx.runMutation(
+		internal.auth.checkGoogleAuthRateLimit,
+		{
+			sub: verified.sub,
+		},
+	);
 	if (!rateLimit.allowed) {
 		return new Response(JSON.stringify({ error: "rate_limited" }), {
 			status: 429,
@@ -107,7 +133,7 @@ async function handleGoogleAuth(
 				headers: corsHeaders,
 			});
 		}
-		const jwt = await issueJwt(result.user._id);
+		const jwt = await issueJwt(result.user._id, client);
 		return new Response(
 			JSON.stringify({
 				user: authUserJson(result.user),
@@ -136,7 +162,7 @@ async function handleGoogleAuth(
 		});
 	}
 
-	const jwt = await issueJwt(resolved.user._id);
+	const jwt = await issueJwt(resolved.user._id, client);
 	return new Response(
 		JSON.stringify({
 			user: authUserJson(resolved.user),
@@ -150,6 +176,7 @@ async function handleGoogleAuth(
 async function handleDevAuth(
 	ctx: ActionCtx,
 	corsHeaders: Record<string, string>,
+	client: AppClient,
 ) {
 	if (process.env.ENVIRONMENT !== "development") {
 		return new Response(
@@ -169,7 +196,7 @@ async function handleDevAuth(
 		);
 	}
 
-	const jwt = await issueJwt(user._id);
+	const jwt = await issueJwt(user._id, client);
 
 	return new Response(JSON.stringify({ user, jwt }), {
 		status: 200,
@@ -186,12 +213,17 @@ http.route({
 			"Content-Type": "application/json",
 		};
 		try {
+			const client = requireAppClientHeader(request, corsHeaders);
+			if (typeof client !== "string") {
+				return client;
+			}
+
 			const { initData } = (await request.json()) as { initData?: string };
 			if (!initData) {
-				return new Response(
-					JSON.stringify({ error: "Missing initData" }),
-					{ status: 400, headers: corsHeaders },
-				);
+				return new Response(JSON.stringify({ error: "Missing initData" }), {
+					status: 400,
+					headers: corsHeaders,
+				});
 			}
 
 			const botToken = process.env.TELEGRAM_BOT_TOKEN;
@@ -204,19 +236,18 @@ http.route({
 
 			const verifyResult = await verifyTelegramInitData(initData, botToken);
 			if (!verifyResult.success) {
-				return new Response(
-					JSON.stringify({ error: verifyResult.error }),
-					{ status: verifyResult.status, headers: corsHeaders },
-				);
+				return new Response(JSON.stringify({ error: verifyResult.error }), {
+					status: verifyResult.status,
+					headers: corsHeaders,
+				});
 			}
 
 			const telegramUser = verifyResult.user;
 			const telegramChatId = String(telegramUser.id);
 
-			const user = await ctx.runMutation(
-				internal.auth.getUserForTelegramAuth,
-				{ telegramChatId },
-			);
+			const user = await ctx.runMutation(internal.auth.getUserForTelegramAuth, {
+				telegramChatId,
+			});
 
 			if (!user) {
 				return new Response(
@@ -227,7 +258,7 @@ http.route({
 				);
 			}
 
-			const jwt = await issueJwt(user._id);
+			const jwt = await issueJwt(user._id, client);
 
 			return new Response(JSON.stringify({ user, jwt }), {
 				status: 200,
@@ -264,7 +295,11 @@ http.route({
 			"Content-Type": "application/json",
 		};
 		try {
-			return await handleDevAuth(ctx, corsHeaders);
+			const client = requireAppClientHeader(request, corsHeaders);
+			if (typeof client !== "string") {
+				return client;
+			}
+			return await handleDevAuth(ctx, corsHeaders, client);
 		} catch (error) {
 			const message =
 				error instanceof Error ? error.message : "Dev auth failed";
@@ -296,11 +331,16 @@ http.route({
 			"Content-Type": "application/json",
 		};
 		try {
+			const client = requireAppClientHeader(request, corsHeaders);
+			if (typeof client !== "string") {
+				return client;
+			}
 			const body = await request.json();
 			return await handleGoogleAuth(
 				ctx,
 				corsHeaders,
 				typeof body === "object" && body !== null ? body : {},
+				client,
 			);
 		} catch (error) {
 			if (error instanceof SyntaxError) {

@@ -608,10 +608,19 @@ describe("OCR Flow with Mocked Gemini", () => {
 			});
 		});
 
+		const uploadId = await t.run(async (ctx) =>
+			ctx.db.insert("uploads", {
+				userId,
+				imageStorageId,
+				status: "processing",
+			}),
+		);
+
 		// Simulate OCR completing with valid result
 		await t.mutation(internal.ocr.storeVoucherFromOcr, {
 			userId,
 			imageStorageId,
+			uploadId,
 			type: "10",
 			expiryDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
 			validFrom: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
@@ -666,9 +675,18 @@ describe("OCR Flow with Mocked Gemini", () => {
 		const pastDate = new Date(
 			Date.now() - 7 * 24 * 60 * 60 * 1000,
 		).toISOString();
+		const uploadId = await t.run(async (ctx) =>
+			ctx.db.insert("uploads", {
+				userId,
+				imageStorageId,
+				status: "processing",
+			}),
+		);
+
 		await t.mutation(internal.ocr.storeVoucherFromOcr, {
 			userId,
 			imageStorageId,
+			uploadId,
 			type: "10",
 			expiryDate: pastDate,
 			barcode: "1234567890",

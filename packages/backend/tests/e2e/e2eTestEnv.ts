@@ -62,11 +62,14 @@ export interface E2EEnv {
 	/** Verify a backend-issued session JWT (signature + iss/aud claims). */
 	verifyIssuedJwt(token: string): Promise<{ sub?: string } & jose.JWTPayload>;
 	/** POST /api/google-auth over real HTTP. */
-	postGoogleAuth(body: {
-		idToken: string;
-		linkCode?: string;
-		intent?: string;
-	}): Promise<Response>;
+	postGoogleAuth(
+		body: {
+			idToken: string;
+			linkCode?: string;
+			intent?: string;
+		},
+		options?: { client?: string | null },
+	): Promise<Response>;
 	seedVoucher(args?: {
 		type?: "5" | "10" | "20";
 		expiryInDays?: number;
@@ -269,10 +272,16 @@ async function start(): Promise<E2EEnv> {
 		async verifyIssuedJwt(token) {
 			return await verifySessionJwt(jwtKeys.publicKey, token);
 		},
-		async postGoogleAuth(body) {
+		async postGoogleAuth(body, options) {
+			const headers: Record<string, string> = {
+				"Content-Type": "application/json",
+			};
+			if (options?.client !== null) {
+				headers["X-OpenVoucher-Client"] = options?.client ?? "android";
+			}
 			return await fetch(`${siteUrl}/api/google-auth`, {
 				method: "POST",
-				headers: { "Content-Type": "application/json" },
+				headers,
 				body: JSON.stringify(body),
 			});
 		},

@@ -41,22 +41,29 @@ export async function fetchJwt(): Promise<string> {
 	if (existing) clearStoredJwt();
 
 	if (window.location.hostname === "localhost") {
-		const res = await fetch(`${getSiteUrl()}/api/dev-auth`, { method: "POST" });
+		const res = await fetch(`${getSiteUrl()}/api/dev-auth`, {
+			method: "POST",
+			headers: { "X-OpenVoucher-Client": "web" },
+		});
 		const data = await res.json();
 		if (!res.ok) throw new Error(data.error ?? "Dev auth failed");
 		writeStoredJwt(data.jwt);
 		return data.jwt;
 	}
 
-	const tg = (window as Window & { Telegram?: { WebApp?: { initData?: string } } })
-		.Telegram?.WebApp;
+	const tg = (
+		window as Window & { Telegram?: { WebApp?: { initData?: string } } }
+	).Telegram?.WebApp;
 	if (!tg?.initData) {
 		throw new Error("Open this page in Telegram");
 	}
 
 	const res = await fetch(`${getSiteUrl()}/api/telegram-auth`, {
 		method: "POST",
-		headers: { "Content-Type": "application/json" },
+		headers: {
+			"Content-Type": "application/json",
+			"X-OpenVoucher-Client": "web",
+		},
 		body: JSON.stringify({ initData: tg.initData }),
 	});
 	const data = await res.json();
