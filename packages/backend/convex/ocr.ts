@@ -868,13 +868,6 @@ async function runProcessVoucherImage(
 	}
 }
 
-function telegramHtmlFromProcessResult(result: ProcessVoucherResult): string {
-	if (result.success) {
-		return `✅ <b>Voucher Accepted!</b>\n\nThanks for sharing a €${result.type} voucher.\nCoins earned: +${result.reward}\nNew balance: ${result.newBalance}`;
-	}
-	return `❌ <b>Voucher Processing Failed</b>\n\n${uploadFailureBody(result.reason, result.expiryDate)}`;
-}
-
 export const processVoucherImage = internalAction({
 	args: processVoucherArgs,
 	handler: runProcessVoucherImage,
@@ -888,7 +881,10 @@ export const processTelegramVoucherImage = internalAction({
 			userId: args.userId,
 		});
 		if (user) {
-			await notifyUser(ctx, user, telegramHtmlFromProcessResult(result));
+			const message = result.success
+				? `✅ <b>Voucher Accepted!</b>\n\nThanks for sharing a €${result.type} voucher.\nCoins earned: +${result.reward}\nNew balance: ${result.newBalance}`
+				: `❌ <b>Voucher Processing Failed</b>\n\n${uploadFailureBody(result.reason, result.expiryDate)}`;
+			await notifyUser(ctx, user, message);
 		}
 		return result;
 	},
