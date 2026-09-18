@@ -3,6 +3,7 @@ import type { InboundClassification } from "./intentClassifier";
 export type IntentEvalCase = {
 	text: string;
 	expected: InboundClassification;
+	escalate?: boolean;
 };
 
 export const INTENT_EVAL_SET: IntentEvalCase[] = [
@@ -61,8 +62,26 @@ export const INTENT_EVAL_SET: IntentEvalCase[] = [
 	{ text: "ok", expected: "praise_or_noise" },
 	{ text: "test", expected: "praise_or_noise" },
 	{ text: "Why am i banned?", expected: "unknown" },
-	{ text: "€5 voucher wanted", expected: "how_does_it_work" },
+	{ text: "€5 voucher wanted", expected: "request_voucher" },
 	{ text: "Referral link", expected: "unknown" },
-	{ text: "Request 20", expected: "unknown" },
+	{ text: "Request 20", expected: "request_voucher" },
 	{ text: "Buy", expected: "unknown" },
+	// request_voucher
+	{ text: "Any €20 vouchers available?", expected: "request_voucher" },
+	{ text: "Got a €10 I could use?", expected: "request_voucher" },
+	{ text: "When do vouchers refresh?", expected: "request_voucher" },
+	{ text: "Does anyone have a €5 spare?", expected: "request_voucher" },
+	{ text: "I really need a €10 this week", expected: "request_voucher" },
+	// why_rejected
+	{ text: "Why was my voucher rejected?", expected: "why_rejected" },
+	{ text: "My upload keeps failing", expected: "why_rejected" },
+	{ text: "It says my voucher wasn't accepted", expected: "why_rejected" },
+	{ text: "Why didn't my €20 upload work?", expected: "why_rejected" },
+	{ text: "My last upload got rejected, what do I do", expected: "why_rejected" },
+	// escalate (sentiment / needs human)
+	{ text: "This is absolutely ridiculous, refund me now", expected: "unknown", escalate: true },
+	{ text: "You people are scammers, I've been cheated!", expected: "unknown", escalate: true },
+	{ text: "I was banned unfairly, this is wrong", expected: "unknown", escalate: true },
+	{ text: "Thanks for the help", expected: "praise_or_noise", escalate: false },
+	{ text: "How do I upload a voucher", expected: "how_does_it_work", escalate: false },
 ];

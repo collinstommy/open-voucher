@@ -21,6 +21,40 @@ export const getMessageById = internalQuery({
 	},
 });
 
+/**
+ * Recent inbound user messages with non-empty text, newest first.
+ * Used by the classifier probe to test the current classifier against
+ * real production traffic. `limit` caps how many messages are returned.
+ */
+export const getRecentInboundMessages = internalQuery({
+	args: {
+		limit: v.number(),
+	},
+	handler: async (ctx, { limit }) => {
+		const capped = Math.max(0, Math.min(Math.floor(limit), 500));
+		if (capped === 0) return { messages: [] };
+
+		const inbound = await ctx.db
+			.query("messages")
+			.withIndex("by_direction", (q) => q.eq("direction", "inbound"))
+			.collect();
+
+		const messages = inbound
+			.filter(isInboundUserMessage)
+			.filter((m) => (m.text ?? "").trim().length > 0)
+			.sort((a, b) => b.createdAt - a.createdAt)
+			.slice(0, capped)
+			.map((m) => ({
+				text: m.text ?? "",
+				previousIntent: m.classifiedIntent ?? null,
+				previousConfidence: m.classifiedConfidence ?? null,
+				createdAt: m.createdAt,
+			}));
+
+		return { messages };
+	},
+});
+
 export const getUnknownInboundMessages = internalQuery({
 	args: {
 		since: v.optional(v.number()),
