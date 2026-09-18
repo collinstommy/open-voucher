@@ -55,6 +55,18 @@ const WEB_APP_REPLIES: Record<
 		text: "See our limits in <b>FAQ</b>.",
 		webAppUrl: buildUrl("/faq?item=are-there-any-limits"),
 	},
+	request_voucher: {
+		kind: "web_app",
+		text: "Vouchers are listed as community members share them. Check what's available now.",
+		webAppUrl: buildUrl("/availability"),
+		buttonText: "📱 See Available Vouchers",
+	},
+	why_rejected: {
+		kind: "web_app",
+		text: "Your upload may have been rejected if the voucher was already used, expired, or not a valid €5/€10/€20 Dunnes voucher. See details in My Uploads.",
+		webAppUrl: buildUrl("/my-uploads"),
+		buttonText: "📱 Open My Uploads",
+	},
 };
 
 export function replyForClassification(
