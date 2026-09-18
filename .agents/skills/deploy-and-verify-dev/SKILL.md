@@ -1,6 +1,6 @@
 ---
-name: open-voucher-convex-dev
-description: Verify Convex backend changes against the dev deployment before deploying — deploy mechanics, stale-deployment diagnosis, and how to run locally.
+name: deploy-and-verify-dev
+description: Verify Convex backend changes against the dev deployment before deploying — deploy mechanics, stale-deployment diagnosis, and local run.
 ---
 
 ## Purpose
@@ -10,7 +10,6 @@ Verify that a Convex backend change works against the **dev** deployment before 
 - `bun` installed (root `bun install` first)
 - Convex CLI available (`npx convex` or `bunx convex`)
 - Doppler configured with the `open-voucher` project (dev/prd configs)
-- Repo at `/home/tom/toms_code/open-voucher`
 
 ## Local dev
 
@@ -51,11 +50,6 @@ Run this in the background and watch for the readiness line:
 
 ### Critical pitfall: plain `convex deploy` targets PROD
 When `CONVEX_DEPLOYMENT` is set in `.env.local`, running `npx convex deploy` (no flags) prompts to push to the **production** deployment (`whimsical-kudu-895`). In a non-interactive terminal it fails rather than hanging, but do not attempt it. The dev path is `npx convex dev`.
-
-## Admin tokens are per-deployment
-A token minted against dev is rejected by prod with `Unauthorized: Invalid session token`, and vice versa. When running functions with a token, match the deployment flag to where the token came from:
-- Dev token → **omit** `--prod` (dev is the default).
-- Prod token → include `--prod`.
 
 ## Diagnosing a stale deployment
 
