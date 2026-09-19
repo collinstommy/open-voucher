@@ -30,10 +30,6 @@ const UPLOAD_CLAIM_FAQ: FaqItem[] = [
 						loading="lazy"
 					/>
 				</div>
-				<p className="text-xs text-slate-400">
-					The paperclip icon is circled in red above — tap it, choose your
-					screenshot, and the bot will process it.
-				</p>
 			</>
 		),
 	},
