@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<title>Upload attempts and the client leak</title>
+	<style>
+		:root {
+			--bg: #14110c;
+			--paper: #1c1812;
+			--ink: #f3ead8;
+			--muted: #9a8f7a;
+			--line: #3a3228;
+			--client: #d4783a;
+			--client-dim: #3d2414;
+			--write: #6aa56a;
+			--write-dim: #1d2e1d;
+			--domain: #c9b37a;
+			--domain-dim: #2e2918;
+			--kill: #c45c5c;
+			--code: #100e0b;
+			--font: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+			--sans: "Avenir Next", "Segoe UI", system-ui, sans-serif;
+			--mono: "IBM Plex Mono", "Source Code Pro", ui-monospace, monospace;
+		}
+		* { box-sizing: border-box; }
+		body {
+			margin: 0;
+			background: var(--bg);
+			color: var(--ink);
+			font-family: var(--font);
+			font-size: 1.05rem;
+			line-height: 1.55;
+		}
+		header {
+			padding: 2.5rem 1.5rem 1.5rem;
+			border-bottom: 1px solid var(--line);
+			max-width: 58rem;
+			margin: 0 auto;
+		}
+		header p.kicker {
+			font-family: var(--sans);
+			font-size: 0.72rem;
+			letter-spacing: 0.16em;
+			text-transform: uppercase;
+			color: var(--client);
+			margin: 0 0 0.6rem;
+		}
+		h1 {
+			font-size: 2.1rem;
+			line-height: 1.15;
+			margin: 0 0 0.75rem;
+			font-weight: 600;
+		}
+		.lede {
+			color: var(--muted);
+			max-width: 40rem;
+			margin: 0;
+			font-size: 1.05rem;
+		}
+		main {
+			max-width: 58rem;
+			margin: 0 auto;
+			padding: 1.5rem 1.5rem 5rem;
+		}
+		h2 {
+			font-size: 1.35rem;
+			margin: 2.75rem 0 0.85rem;
+			padding-top: 0.5rem;
+			font-weight: 600;
+		}
+		h3 {
+			font-family: var(--sans);
+			font-size: 0.8rem;
+			letter-spacing: 0.08em;
+			text-transform: uppercase;
+			color: var(--domain);
+			margin: 1.8rem 0 0.6rem;
+			font-weight: 600;
+		}
+		p { margin: 0.7rem 0; }
+		code, .mono { font-family: var(--mono); font-size: 0.86em; }
+		a { color: var(--client); }
+		.note {
+			border-left: 3px solid var(--client);
+			padding: 0.2rem 0 0.2rem 1rem;
+			color: var(--muted);
+			margin: 1rem 0 1.4rem;
+		}
+		.grid2 {
+			display: grid;
+			grid-template-columns: 1fr 1fr;
+			gap: 1rem;
+			margin: 1rem 0 1.5rem;
+		}
+		@media (max-width: 720px) {
+			.grid2 { grid-template-columns: 1fr; }
+		}
+		.panel {
+			background: var(--paper);
+			border: 1px solid var(--line);
+			padding: 1rem 1.1rem;
+		}
+		.panel h3 { margin-top: 0; }
+		.legend {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 1rem 1.4rem;
+			font-family: var(--sans);
+			font-size: 0.78rem;
+			color: var(--muted);
+			margin: 0.5rem 0 1rem;
+		}
+		.swatch {
+			display: inline-block;
+			width: 0.7rem;
+			height: 0.7rem;
+			margin-right: 0.35rem;
+			vertical-align: -0.05rem;
+		}
+		.flow {
+			display: flex;
+			flex-direction: column;
+			gap: 0.45rem;
+			font-family: var(--sans);
+			font-size: 0.82rem;
+		}
+		.box {
+			border: 1px solid var(--line);
+			padding: 0.55rem 0.7rem;
+			background: var(--code);
+		}
+		.box.client { border-color: var(--client); background: var(--client-dim); }
+		.box.write { border-color: var(--write); background: var(--write-dim); }
+		.box.domain { border-color: var(--domain); background: var(--domain-dim); }
+		.box.kill { border-color: var(--kill); color: #e8b4b4; }
+		.arrow {
+			color: var(--muted);
+			padding-left: 0.7rem;
+			font-size: 0.75rem;
+		}
+		.split {
+			display: grid;
+			grid-template-columns: 1fr auto 1fr;
+			gap: 0.5rem;
+			align-items: start;
+		}
+		.split .or {
+			font-family: var(--sans);
+			font-size: 0.7rem;
+			color: var(--muted);
+			align-self: center;
+			writing-mode: vertical-rl;
+			text-transform: uppercase;
+			letter-spacing: 0.12em;
+		}
+		@media (max-width: 720px) {
+			.split { grid-template-columns: 1fr; }
+			.split .or { writing-mode: horizontal-tb; text-align: center; }
+		}
+		table {
+			width: 100%;
+			border-collapse: collapse;
+			font-family: var(--sans);
+			font-size: 0.85rem;
+			margin: 1rem 0 1.5rem;
+		}
+		th, td {
+			text-align: left;
+			border-bottom: 1px solid var(--line);
+			padding: 0.55rem 0.5rem;
+			vertical-align: top;
+		}
+		th { color: var(--muted); font-weight: 600; font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase; }
+		td.keep { color: var(--write); }
+		td.drop { color: var(--kill); }
+		pre {
+			background: var(--code);
+			border: 1px solid var(--line);
+			padding: 0.9rem 1rem;
+			overflow-x: auto;
+			font-family: var(--mono);
+			font-size: 0.78rem;
+			line-height: 1.45;
+			margin: 0.6rem 0 1.2rem;
+		}
+		pre .add { color: #8fd18f; }
+		pre .del { color: #e08a8a; }
+		pre .ctx { color: var(--muted); }
+		pre .com { color: #7a6f5c; }
+		.tag {
+			font-family: var(--sans);
+			font-size: 0.68rem;
+			letter-spacing: 0.08em;
+			text-transform: uppercase;
+			border: 1px solid currentColor;
+			padding: 0.1rem 0.35rem;
+			margin-right: 0.35rem;
+		}
+		.toc {
+			font-family: var(--sans);
+			font-size: 0.88rem;
+			color: var(--muted);
+			columns: 2;
+			gap: 1.5rem;
+			margin: 1rem 0 0;
+		}
+		.toc a { color: var(--ink); text-decoration: none; border-bottom: 1px solid var(--line); }
+		.toc a:hover { color: var(--client); }
+		ol.toc-list { margin: 0; padding-left: 1.2rem; }
+		.rings {
+			display: grid;
+			grid-template-columns: repeat(4, 1fr);
+			gap: 0.5rem;
+			margin: 1rem 0;
+			font-family: var(--sans);
+			font-size: 0.78rem;
+		}
+		.ring {
+			border: 1px solid var(--line);
+			padding: 0.75rem 0.8rem;
+			min-height: 7.5rem;
+		}
+		.ring strong {
+			display: block;
+			font-size: 0.72rem;
+			letter-spacing: 0.08em;
+			text-transform: uppercase;
+			margin-bottom: 0.4rem;
+		}
+		.ring.r1 { border-color: var(--client); }
+		.ring.r2 { border-color: var(--write); }
+		.ring.r3 { border-color: var(--domain); }
+		.ring.r4 { border-color: var(--line); color: var(--muted); }
+		@media (max-width: 720px) {
+			.rings { grid-template-columns: 1fr 1fr; }
+			.toc { columns: 1; }
+		}
+		ul.plain { padding-left: 1.2rem; }
+		footer {
+			max-width: 58rem;
+			margin: 0 auto;
+			padding: 0 1.5rem 3rem;
+			color: var(--muted);
+			font-family: var(--sans);
+			font-size: 0.8rem;
+		}
+	</style>
+</head>
+<body>
+	<header>
+		<p class="kicker">Open voucher · design note · not implemented</p>
+		<h1>Stop threading <code>client</code> through OCR. Track the attempt instead.</h1>
+		<p class="lede">
+			Android needs upload, spinner, then success or fail. That is a row in
+			<code>uploads</code>. Telegram still needs a Bot API message. That is a
+			Telegram-only wrapper around the same write. Neither job belongs inside
+			<code>storeVoucherFromOcr</code>.
+		</p>
+		<nav class="toc">
+			<ol class="toc-list">
+				<li><a href="#example">One photo, two doors</a></li>
+				<li><a href="#now">What the code does now</a></li>
+				<li><a href="#rings">Blast radius</a></li>
+				<li><a href="#after">Proposed flow</a></li>
+				<li><a href="#writes">Who writes <code>uploads</code></a></li>
+				<li><a href="#schema">Table shape</a></li>
+				<li><a href="#diffs">Code diffs</a></li>
+				<li><a href="#android">Android subscribe</a></li>
+				<li><a href="#out">Out of scope</a></li>
+			</ol>
+		</nav>
+	</header>
+
+	<main>
+		<h2 id="example">One photo, two doors</h2>
+		<p>
+			Same linked account. Telegram chat id and a Google identity. The person
+			uploads a voucher photo. The domain write is identical: accept or reject
+			the image, maybe create a voucher, maybe credit coins. Delivery is not.
+		</p>
+		<div class="grid2">
+			<div class="panel">
+				<h3>Telegram</h3>
+				<p>
+					Webhook already said “Processing…”. When OCR finishes, send a Bot
+					API message. The HTTP request that started this is gone, so the
+					send has to live in the scheduled action the bot queued.
+				</p>
+			</div>
+			<div class="panel">
+				<h3>Android</h3>
+				<p>
+					<code>submitUpload</code> returns immediately with
+					<code>{ accepted: true, uploadId }</code>. The app
+					<code>useQuery</code>s that one document. Spinner while
+					<code>processing</code>. Then the same document becomes
+					<code>succeeded</code> or <code>failed</code>.
+				</p>
+			</div>
+		</div>
+		<p class="note">
+			Daily limit never creates an upload row. It is a synchronous return from
+			the mutation. Telegram’s webhook sends the limit copy. Android shows it
+			from the mutation result.
+		</p>
+
+		<h2 id="now">What the code does now</h2>
+		<p>
+			<code>client</code> is minted at login, stuffed onto the JWT, injected
+			by <code>userMutation</code>, passed into
+			<code>uploadVoucherForUser</code>, scheduled into
+			<code>processVoucherImage</code>, and checked again inside
+			<code>storeVoucherFromOcr</code> and <code>notifyUser</code>. OCR is
+			domain code wearing a Telegram adapter.
+		</p>
+		<div class="legend">
+			<span><i class="swatch" style="background:var(--client)"></i>carries <code>client</code></span>
+			<span><i class="swatch" style="background:var(--kill)"></i>notifies Telegram</span>
+			<span><i class="swatch" style="background:var(--domain)"></i>domain write</span>
+		</div>
+		<div class="flow">
+			<div class="box client">http.ts · parse <code>X-OpenVoucher-Client</code> · <code>issueJwt(userId, client)</code></div>
+			<div class="arrow">↓ JWT claim</div>
+			<div class="box client">auth.ts · <code>userMutation</code> puts <code>client</code> on ctx</div>
+			<div class="arrow">↓ also telegram.ts hardcodes <code>client: "telegram"</code></div>
+			<div class="box client">vouchers.ts · <code>uploadVoucherForUser(..., client)</code> · daily-limit <code>notifyUser</code></div>
+			<div class="arrow">↓ <code>scheduler.runAfter(0, processVoucherImage, { client })</code></div>
+			<div class="box client">ocr.ts · <code>processVoucherImage</code> args include <code>client</code></div>
+			<div class="arrow">↓</div>
+			<div class="box client kill">ocr.ts · <code>storeVoucherFromOcr</code> · <code>if (deliversViaTelegram(client)) notifyUser(...)</code></div>
+		</div>
+		<p>
+			The scheduled function id from <code>runAfter</code> cannot drive the
+			spinner. Validation failure still completes the action as success. You
+			need an application row that exists before OCR starts.
+		</p>
+
+		<h2 id="rings">Blast radius</h2>
+		<p>
+			Keep <code>client</code> at the two entry doors. Kill it everywhere
+			OCR runs. <code>uploads</code> is not a client field. It is the
+			attempt.
+		</p>
+		<div class="rings">
+			<div class="ring r1">
+				<strong>Keep · client</strong>
+				<code>http.ts</code> header parse and JWT mint.<br />
+				<code>submitUpload</code> calls <code>requireAppClient(ctx.client)</code>
+				so a telegram claim cannot use the app mutation.<br />
+				<code>telegram.ts</code> knows it is the bot because it is the webhook.
+				It schedules the Telegram OCR action. It never passes a
+				<code>Client</code> value into store.
+			</div>
+			<div class="ring r2">
+				<strong>Keep · uploads writes</strong>
+				Shared helper inserts <code>processing</code>.<br />
+				<code>storeVoucherFromOcr</code> patches <code>succeeded</code> or
+				<code>failed</code>.<br />
+				<code>recordSystemError</code> patches <code>failed</code>.<br />
+				No <code>client</code> column.
+			</div>
+			<div class="ring r3">
+				<strong>Keep · domain, no client</strong>
+				<code>acceptUpload</code>: ban, daily limit, insert row.<br />
+				<code>extractFromImage</code>.<br />
+				<code>storeVoucherFromOcr</code>: validate, voucher, coins,
+				<code>failedUploads</code> admin dump.
+			</div>
+			<div class="ring r4">
+				<strong>Drop</strong>
+				<code>client</code> on <code>uploadVoucher</code>,
+				<code>processVoucherImage</code>, <code>storeVoucherFromOcr</code>.<br />
+				<code>deliversViaTelegram</code> in those files.<br />
+				<code>notifyUser(..., client)</code>. If you called it, send.
+			</div>
+		</div>
+		<table>
+			<thead>
+				<tr><th>Symbol</th><th>Today</th><th>After</th></tr>
+			</thead>
+			<tbody>
+				<tr>
+					<td><code>http.ts</code> auth actions</td>
+					<td class="keep">Reads header, mints JWT <code>client</code></td>
+					<td class="keep">Unchanged. This is the app door.</td>
+				</tr>
+				<tr>
+					<td><code>userMutation</code> / <code>ctx.client</code></td>
+					<td>Injected into every authenticated mutation</td>
+					<td>Only <code>submitUpload</code> should read it. Other mutations ignore it. Splitting <code>appMutation</code> can wait.</td>
+				</tr>
+				<tr>
+					<td><code>telegram.ts</code> <code>handleImageUpload</code></td>
+					<td class="drop">Passes <code>client: "telegram"</code> into the shared mutation</td>
+					<td class="keep">Calls <code>uploadVoucher</code> with no client. On <code>daily_limit</code>, sends the limit message itself. Mutation schedules <code>processTelegramVoucherImage</code>.</td>
+				</tr>
+				<tr>
+					<td><code>uploadVoucherForUser</code></td>
+					<td class="drop">Takes <code>client</code>, notifies, schedules OCR with <code>client</code></td>
+					<td class="keep">Becomes <code>acceptUpload</code>. Returns a result. Two thin mutations pick which action to schedule so the schedule is atomic with the insert.</td>
+				</tr>
+				<tr>
+					<td><code>processVoucherImage</code></td>
+					<td class="drop"><code>client</code> in args</td>
+					<td class="keep">Takes <code>uploadId</code>. No notify.</td>
+				</tr>
+				<tr>
+					<td><code>storeVoucherFromOcr</code></td>
+					<td class="drop"><code>client</code> + <code>notifyUser</code></td>
+					<td class="keep">Patches <code>uploads</code>. Returns a result. No Telegram.</td>
+				</tr>
+				<tr>
+					<td><code>processTelegramVoucherImage</code></td>
+					<td>Does not exist</td>
+					<td class="keep">Runs the same OCR action, then <code>notifyUser(ctx, user, html)</code> from the result. This is the only OCR-time Telegram send.</td>
+				</tr>
+				<tr>
+					<td><code>notifyUser</code></td>
+					<td class="drop">Takes <code>client</code>, re-checks <code>deliversViaTelegram</code></td>
+					<td class="keep">Takes user + text. No chat id, return. Callers are Telegram-only.</td>
+				</tr>
+				<tr>
+					<td><code>failedUploads</code></td>
+					<td class="keep">Admin OCR dump</td>
+					<td class="keep">Unchanged. Not the Android spinner.</td>
+				</tr>
+			</tbody>
+		</table>
+
+		<h2 id="after">Proposed flow</h2>
+		<p>
+			Schedule from the mutation, not from the Telegram action after the
+			mutation returns. Convex only guarantees the scheduled function if the
+			mutation commits. That is why there are two thin mutations instead of
+			one helper that returns and lets the HTTP caller schedule.
+		</p>
+		<div class="legend">
+			<span><i class="swatch" style="background:var(--client)"></i>client awareness</span>
+			<span><i class="swatch" style="background:var(--write)"></i>writes <code>uploads</code></span>
+			<span><i class="swatch" style="background:var(--domain)"></i>shared domain</span>
+		</div>
+		<div class="split">
+			<div class="flow">
+				<div class="box client">Android · JWT <code>client: android</code></div>
+				<div class="arrow">↓ generateUploadUrl, POST bytes</div>
+				<div class="box client">submitUpload · requireAppClient(ctx.client)</div>
+				<div class="arrow">↓ no client past this line</div>
+				<div class="box write">acceptUpload · insert processing · return uploadId</div>
+				<div class="arrow">↓ schedule processVoucherImage { uploadId }</div>
+				<div class="box domain">extractFromImage → storeVoucherFromOcr</div>
+				<div class="arrow">↓</div>
+				<div class="box write">patch uploads succeeded | failed</div>
+				<div class="arrow">↓ Android useQuery(getUpload, { uploadId })</div>
+			</div>
+			<div class="or">or</div>
+			<div class="flow">
+				<div class="box client">Telegram webhook · already the bot</div>
+				<div class="arrow">↓ send “Processing…”</div>
+				<div class="box client">uploadVoucher · no client arg</div>
+				<div class="arrow">↓ daily_limit: mutation returns, webhook sends</div>
+				<div class="box write">acceptUpload · insert processing</div>
+				<div class="arrow">↓ schedule processTelegramVoucherImage { uploadId }</div>
+				<div class="box domain">same extract + store</div>
+				<div class="arrow">↓</div>
+				<div class="box write">patch uploads</div>
+				<div class="arrow">↓ then notifyUser(html from result)</div>
+			</div>
+		</div>
+		<p>
+			<code>client</code> never appears in <code>ocr.ts</code>. The Telegram
+			wrapper is the blast-radius wall. Android never calls
+			<code>notifyUser</code>.
+		</p>
+
+		<h2 id="writes">Who writes <code>uploads</code></h2>
+		<table>
+			<thead>
+				<tr><th>When</th><th>Writer</th><th>Row</th></tr>
+			</thead>
+			<tbody>
+				<tr>
+					<td>Mutation accepts the image</td>
+					<td><code>acceptUpload</code> in <code>vouchers.ts</code></td>
+					<td><code>{ status: "processing", userId, imageStorageId }</code>. Returns <code>uploadId</code>.</td>
+				</tr>
+				<tr>
+					<td>OCR validates and stores a voucher</td>
+					<td><code>storeVoucherFromOcr</code></td>
+					<td>Patch <code>succeeded</code> + <code>voucherId</code>.</td>
+				</tr>
+				<tr>
+					<td>OCR validation reject</td>
+					<td><code>storeVoucherFromOcr</code></td>
+					<td>Patch <code>failed</code> + <code>failureReason</code>. Still insert <code>failedUploads</code> for admin.</td>
+				</tr>
+				<tr>
+					<td>Gemini / extract throws</td>
+					<td><code>recordSystemError</code></td>
+					<td>Patch <code>failed</code> + <code>SYSTEM_ERROR</code>. Insert <code>failedUploads</code> as today.</td>
+				</tr>
+				<tr>
+					<td>Daily limit</td>
+					<td>Nobody</td>
+					<td>No row. <code>{ accepted: false, reason: "daily_limit" }</code>.</td>
+				</tr>
+			</tbody>
+		</table>
+		<p>
+			Pass <code>uploadId</code> through the scheduler, not
+			<code>client</code>. The attempt is the correlation id.
+		</p>
+
+		<h2 id="schema">Table shape</h2>
+		<p>
+			A union, not a bag of optionals. Convex stores one table. The TypeScript
+			result type is the contract the app matches on.
+		</p>
+<pre>{
+	uploads: defineTable({
+		userId: v.id("users"),
+		imageStorageId: v.id("_storage"),
+		status: v.union(
+			v.literal("processing"),
+			v.literal("succeeded"),
+			v.literal("failed"),
+		),
+		voucherId: v.optional(v.id("vouchers")),
+		failureReason: v.optional(v.string()),
+	}).index("by_userId", ["userId"]),
+}</pre>
+		<p>
+			Public query <code>getUpload({ uploadId })</code> is a
+			<code>userQuery</code>: owner only, returns the row plus a user-facing
+			message derived with <code>uploadFailureBody</code>. Do not list
+			<code>failedUploads</code> on the upload screen.
+		</p>
+
+		<h2 id="diffs">Code diffs</h2>
+
+		<h3>vouchers.ts · split accept from notify</h3>
+<pre><span class="del">- async function uploadVoucherForUser(ctx, { userId, imageStorageId, client }) {
+-   // ban, daily limit
+-   if (recentUploads.length >= MAX) {
+-     if (deliversViaTelegram(client)) {
+-       await notifyUser(ctx, user, dailyLimitHtml, client);
+-     }
+-     return { accepted: false, reason: "daily_limit" };
+-   }
+-   await ctx.scheduler.runAfter(0, internal.ocr.processVoucherImage, {
+-     userId, imageStorageId, client,
+-   });
+-   return { accepted: true };
+- }</span>
+
+<span class="add">+ type AcceptUploadResult =
++   | { accepted: true; uploadId: Id&lt;"uploads"&gt; }
++   | { accepted: false; reason: "daily_limit" };
++
++ async function acceptUpload(ctx, { userId, imageStorageId }): Promise&lt;AcceptUploadResult&gt; {
++   // ban, daily limit. no notify.
++   if (recentUploads.length >= MAX) {
++     return { accepted: false, reason: "daily_limit" };
++   }
++   const uploadId = await ctx.db.insert("uploads", {
++     userId,
++     imageStorageId,
++     status: "processing",
++   });
++   return { accepted: true, uploadId };
++ }
++
++ export const uploadVoucher = internalMutation({
++   args: { userId: v.id("users"), imageStorageId: v.id("_storage") },
++   handler: async (ctx, args) => {
++     const result = await acceptUpload(ctx, args);
++     if (result.accepted) {
++       await ctx.scheduler.runAfter(0, internal.ocr.processTelegramVoucherImage, {
++         userId: args.userId,
++         imageStorageId: args.imageStorageId,
++         uploadId: result.uploadId,
++       });
++     }
++     return result;
++   },
++ });
++
++ export const submitUpload = userMutation({
++   args: { imageStorageId: v.id("_storage") },
++   handler: async (ctx, { userId, imageStorageId }) => {
++     requireAppClient(ctx.client); // door only. not passed on.
++     const result = await acceptUpload(ctx, { userId, imageStorageId });
++     if (result.accepted) {
++       await ctx.scheduler.runAfter(0, internal.ocr.processVoucherImage, {
++         userId,
++         imageStorageId,
++         uploadId: result.uploadId,
++       });
++     }
++     return result;
++   },
++ });</span></pre>
+
+		<h3>telegram.ts · webhook owns daily-limit copy</h3>
+<pre><span class="del">- await ctx.runMutation(internal.vouchers.uploadVoucher, {
+-   userId: user._id,
+-   imageStorageId: storageId,
+-   client: "telegram",
+- });</span>
+<span class="add">+ const result = await ctx.runMutation(internal.vouchers.uploadVoucher, {
++   userId: user._id,
++   imageStorageId: storageId,
++ });
++ if (!result.accepted) {
++   await sendTelegramMessage(chatId, dailyLimitHtml);
++ }</span></pre>
+
+		<h3>ocr.ts · store returns, wrapper notifies</h3>
+<pre><span class="del">- export const processVoucherImage = internalAction({
+-   args: { userId, imageStorageId, client: clientValidator },
+-   handler: async (ctx, { userId, imageStorageId, client }) => {
+-     const result = await ctx.runMutation(internal.ocr.storeVoucherFromOcr, {
+-       userId, imageStorageId, client, ...extracted,
+-     });
+-     // notify lives inside storeVoucherFromOcr
+-   },
+- });</span>
+
+<span class="add">+ export const processVoucherImage = internalAction({
++   args: { userId, imageStorageId, uploadId: v.id("uploads") },
++   handler: async (ctx, args) => {
++     // extract, then store. store patches uploads. no notify.
++     return await ctx.runMutation(internal.ocr.storeVoucherFromOcr, {
++       ...extracted, ...args, // uploadId, not client
++     });
++   },
++ });
++
++ export const processTelegramVoucherImage = internalAction({
++   args: { userId, imageStorageId, uploadId: v.id("uploads") },
++   handler: async (ctx, args) => {
++     const result = await ctx.runAction(internal.ocr.processVoucherImage, args);
++     const user = await ctx.runQuery(internal.users.getUserById, { userId: args.userId });
++     if (user) await notifyUser(ctx, user, telegramHtml(result));
++   },
++ });</span></pre>
+
+		<h3>notify.ts · drop the second gate</h3>
+<pre><span class="del">- export async function notifyUser(ctx, user, text, client: Client) {
+-   if (!deliversViaTelegram(client) || user.telegramChatId === undefined) return;
+-   await ctx.scheduler.runAfter(0, internal.telegram.sendMessageAction, { ... });
+- }</span>
+<span class="add">+ export async function notifyUser(ctx, user, text) {
++   if (user.telegramChatId === undefined) return;
++   await ctx.scheduler.runAfter(0, internal.telegram.sendMessageAction, {
++     chatId: user.telegramChatId,
++     text,
++   });
++ }</span></pre>
+
+		<h2 id="android">Android subscribe</h2>
+<pre>const result = await mutation(api.vouchers.submitUpload, { imageStorageId });
+if (!result.accepted) {
+	show("Daily limit"); // no query
+	return;
+}
+const upload = useQuery(api.vouchers.getUpload, { uploadId: result.uploadId });
+if (upload === undefined) return &lt;Spinner /&gt;; // convex loading
+if (upload.status === "processing") return &lt;Spinner /&gt;;
+if (upload.status === "succeeded") return &lt;Accepted voucherId={upload.voucherId} /&gt;;
+return &lt;Failed reason={upload.failureReason} message={upload.message} /&gt;;</pre>
+		<p>
+			That is the whole app UX. No list of historical failures on this
+			screen. <code>getMyAvailableUploads</code> stays the library of kept
+			vouchers.
+		</p>
+
+		<h2 id="out">Out of scope</h2>
+		<ul class="plain">
+			<li><code>@convex-dev/workflow</code>. One Gemini call does not need it. Add later if retries become the problem.</li>
+			<li>Putting <code>client</code> on <code>uploads</code>. Delivery is the wrapper, not the row.</li>
+			<li>Merging <code>failedUploads</code> into <code>uploads</code>. Admin still wants raw OCR fields. The attempt row stays small.</li>
+			<li>Rewriting <code>userMutation</code> into <code>appMutation</code>. Real, later. <code>requireAppClient</code> at <code>submitUpload</code> is enough for this change.</li>
+			<li>Unsolicited Telegram (reminders, report-the-uploader). Unchanged.</li>
+		</ul>
+		<p>
+			Files this would touch:
+			<code>schema.ts</code>,
+			<code>vouchers.ts</code>,
+			<code>ocr.ts</code>,
+			<code>telegram.ts</code>,
+			<code>notify.ts</code>,
+			<code>src/lib/client.ts</code> (maybe delete <code>deliversViaTelegram</code>),
+			upload tests, ADR <code>0002</code>.
+		</p>
+	</main>
+	<footer>
+		Proposed. Not a commit. Review this page, then say to implement.
+	</footer>
+</body>
+</html>
