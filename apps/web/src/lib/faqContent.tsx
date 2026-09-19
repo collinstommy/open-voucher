@@ -11,7 +11,31 @@ const UPLOAD_CLAIM_FAQ: FaqItem[] = [
 	{
 		id: "how-to-upload",
 		q: "How do I upload a voucher?",
-		a: "Send a screenshot of your voucher to the bot in Telegram. Make sure the barcode is clearly visible. Paper vouchers and app screenshots are accepted.",
+		a: (
+			<>
+				<p className="mb-3">
+					Send a screenshot of your voucher to the bot in Telegram. Make sure
+					the barcode is clearly visible. Paper vouchers and app screenshots
+					are accepted.
+				</p>
+				<p className="mb-2">
+					Tap the <strong>paperclip</strong> (📎) button in the message bar to
+					attach a photo of your voucher:
+				</p>
+				<div className="rounded-xl overflow-hidden border border-slate-200 mb-2">
+					<img
+						src="/help/upload-attachment.jpg"
+						alt="The paperclip attachment button in the Open Voucher chat"
+						className="w-full h-auto block"
+						loading="lazy"
+					/>
+				</div>
+				<p className="text-xs text-slate-400">
+					The paperclip icon is circled in red above — tap it, choose your
+					screenshot, and the bot will process it.
+				</p>
+			</>
+		),
 	},
 	{
 		id: "how-to-claim",
