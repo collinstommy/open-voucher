@@ -1,12 +1,25 @@
 import type { Deployment } from "@/components/EnvironmentDropdown";
 
-export const CONVEX_URLS: Record<Deployment, string> = {
+const cloudConvexUrls: Record<Deployment, string> = {
 	dev: "https://fastidious-okapi-116.convex.cloud",
 	prod: "https://whimsical-kudu-895.convex.cloud",
 };
 
-// Convex HTTP actions
-export const CONVEX_SITE_URLS: Record<Deployment, string> = {
+const cloudSiteUrls: Record<Deployment, string> = {
 	dev: "https://fastidious-okapi-116.convex.site",
 	prod: "https://whimsical-kudu-895.convex.site",
+};
+
+/** Optional localhost override (apps/web/.env.local) to a machine-local Convex. */
+const envConvexUrl = import.meta.env.VITE_CONVEX_URL as string | undefined;
+const envSiteUrl = import.meta.env.VITE_CONVEX_SITE_URL as string | undefined;
+
+export const CONVEX_URLS: Record<Deployment, string> = {
+	dev: envConvexUrl || cloudConvexUrls.dev,
+	prod: cloudConvexUrls.prod,
+};
+
+export const CONVEX_SITE_URLS: Record<Deployment, string> = {
+	dev: envSiteUrl || cloudSiteUrls.dev,
+	prod: cloudSiteUrls.prod,
 };

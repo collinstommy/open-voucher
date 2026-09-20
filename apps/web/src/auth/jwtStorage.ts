@@ -22,12 +22,14 @@ function getSiteUrl() {
 	return CONVEX_SITE_URLS[getDeployment()] ?? CONVEX_SITE_URLS.prod;
 }
 
-/** Localhost uses the Vite proxy so the browser is not subject to live CORS. */
+/** Localhost: Vite proxy, or VITE_CONVEX_SITE_URL when talking to a local backend. */
 export function getDevAuthUrl() {
 	if (
 		typeof window !== "undefined" &&
 		window.location.hostname === "localhost"
 	) {
+		const site = import.meta.env.VITE_CONVEX_SITE_URL as string | undefined;
+		if (site) return `${site}/api/dev-auth`;
 		return "/convex-site/api/dev-auth";
 	}
 	return `${getSiteUrl()}/api/dev-auth`;
