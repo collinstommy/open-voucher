@@ -10,7 +10,6 @@ const cloudSiteUrls: Record<Deployment, string> = {
 	prod: "https://whimsical-kudu-895.convex.site",
 };
 
-/** Optional localhost override (apps/web/.env.local) to a machine-local Convex. */
 const envConvexUrl = import.meta.env.VITE_CONVEX_URL as string | undefined;
 const envSiteUrl = import.meta.env.VITE_CONVEX_SITE_URL as string | undefined;
 

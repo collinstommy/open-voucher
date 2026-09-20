@@ -1,7 +1,3 @@
-// Throwaway web voucher-upload tester. Drives live #82 APIs
-// (generateUploadUrl → POST storage → submitUpload → getUpload).
-// Park or delete once the app absorbs this flow.
-
 import { api } from "@open-voucher/backend/convex/_generated/api";
 import type { Id } from "@open-voucher/backend/convex/_generated/dataModel";
 import { createFileRoute, notFound } from "@tanstack/react-router";

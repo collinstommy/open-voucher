@@ -22,7 +22,6 @@ function getSiteUrl() {
 	return CONVEX_SITE_URLS[getDeployment()] ?? CONVEX_SITE_URLS.prod;
 }
 
-/** Localhost: Vite proxy, or VITE_CONVEX_SITE_URL when talking to a local backend. */
 export function getDevAuthUrl() {
 	if (
 		typeof window !== "undefined" &&
