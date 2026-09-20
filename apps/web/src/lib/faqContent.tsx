@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { DISCORD_URL, openDiscordLink } from "@/lib/openDiscordLink";
 
 export type FaqItem = {
 	id: string;
@@ -10,7 +11,27 @@ const UPLOAD_CLAIM_FAQ: FaqItem[] = [
 	{
 		id: "how-to-upload",
 		q: "How do I upload a voucher?",
-		a: "Send a screenshot of your voucher to the bot in Telegram. Make sure the barcode is clearly visible. Paper vouchers and app screenshots are accepted.",
+		a: (
+			<>
+				<p className="mb-3">
+					Send a screenshot of your voucher to the bot in Telegram. Make sure
+					the barcode is clearly visible. Paper vouchers and app screenshots
+					are accepted.
+				</p>
+				<p className="mb-2">
+					Tap the <strong>paperclip</strong> (📎) button in the message bar to
+					attach a photo of your voucher:
+				</p>
+				<div className="rounded-xl overflow-hidden border border-slate-200 mb-2">
+					<img
+						src="/help/upload-attachment.jpg"
+						alt="The paperclip attachment button in the Open Voucher chat"
+						className="w-full h-auto block"
+						loading="lazy"
+					/>
+				</div>
+			</>
+		),
 	},
 	{
 		id: "how-to-claim",
@@ -106,4 +127,28 @@ export const LANDING_FAQ_ITEMS: FaqItem[] = [
 export const APP_FAQ_ITEMS: FaqItem[] = [
 	...UPLOAD_CLAIM_FAQ,
 	...LANDING_FAQ_ITEMS,
+	{
+		id: "discord",
+		q: "How do I join the community?",
+		a: (
+			<>
+				<p>
+					Ask questions, report problems, and chat with other members in our{" "}
+					<a
+						href={DISCORD_URL}
+						target="_blank"
+						rel="noopener noreferrer"
+						onClick={(e) => {
+							e.preventDefault();
+							openDiscordLink();
+						}}
+						className="text-blue-600 underline"
+					>
+						Discord server
+					</a>
+					.
+				</p>
+			</>
+		),
+	},
 ];

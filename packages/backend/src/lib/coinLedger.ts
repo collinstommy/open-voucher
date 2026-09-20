@@ -15,6 +15,8 @@ export type TransactionType =
 	| "uploader_refund"
 	| "uploader_denied"
 	| "admin_expiry_deduction"
+	| "admin_manual_deduction"
+	| "admin_report_deduction"
 	| "claim_reversed"
 	| "self_invalidated"
 	| "claim_returned"
@@ -44,11 +46,16 @@ export async function applyCoinDelta(
 	const minCoins = args.minCoins ?? MIN_COINS;
 	const newBalance = Math.max(minCoins, user.coins + args.delta);
 
+	// Record the balance change that actually happened, so the ledger
+	// always sums to the user's balance even when the delta is clamped
+	// at MIN_COINS.
+	const effectiveDelta = newBalance - user.coins;
+
 	await ctx.db.patch(args.userId, { coins: newBalance });
 	await ctx.db.insert("transactions", {
 		userId: args.userId,
 		type: args.type,
-		amount: args.delta,
+		amount: effectiveDelta,
 		voucherId: args.voucherId,
 		createdAt: Date.now(),
 	});

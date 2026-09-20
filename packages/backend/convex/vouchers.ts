@@ -10,6 +10,7 @@ import {
 import { userMutation, userQuery } from "./auth";
 import { CLAIM_COSTS, UPLOAD_REWARDS } from "../src/lib/constants";
 import { applyCoinDelta } from "../src/lib/coinLedger";
+import { recalculateReportCounts } from "../src/lib/reportCounts";
 
 function getVoucherExpiryCalendarDay(expiryDate: number): string {
 	const date = new Date(expiryDate);
@@ -351,17 +352,11 @@ export const reportVoucher = internalMutation({
 				createdAt: Date.now(),
 			});
 
-			await ctx.db.patch(user._id, {
-				claimReportCount: (user.claimReportCount || 0) + 1,
-				lastReportAt: now,
-			});
+			await ctx.db.patch(user._id, { lastReportAt: now });
+			await recalculateReportCounts(ctx, [user._id, voucher.uploaderId]);
 
 			const uploader = await ctx.db.get(voucher.uploaderId);
-			if (uploader && voucher.type !== "0") {
-				await ctx.db.patch(voucher.uploaderId, {
-					uploadReportCount: (uploader.uploadReportCount || 0) + 1,
-				});
-
+			if (uploader) {
 				// Send message to uploader asking if they used the voucher
 				await ctx.scheduler.runAfter(
 					0,
@@ -797,6 +792,10 @@ export const confirmUploaderUsedVoucher = internalMutation({
 
 		if (report) {
 			await ctx.db.delete(report._id);
+			await recalculateReportCounts(ctx, [
+				report.reporterId,
+				report.uploaderId,
+			]);
 		}
 	},
 });

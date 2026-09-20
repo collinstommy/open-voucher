@@ -1,4 +1,5 @@
 import { v } from "convex/values";
+import { applyCoinDelta } from "../src/lib/coinLedger";
 import { adminMutation, adminQuery } from "./adminGuards";
 import { internalMutation, internalQuery } from "./_generated/server";
 
@@ -31,8 +32,25 @@ export const banUser = adminMutation({
 		await ctx.db.patch(userId, {
 			isBanned: true,
 			bannedAt: Date.now(),
-			flaggedForReviewAt: undefined,
 		});
+		return { success: true };
+	},
+});
+
+export const flagForReview = adminMutation({
+	args: {
+		userId: v.id("users"),
+	},
+	handler: async (ctx, { userId }) => {
+		const user = await ctx.db.get(userId);
+		if (!user) {
+			throw new Error("User not found");
+		}
+
+		if (!user.flaggedForReviewAt) {
+			await ctx.db.patch(userId, { flaggedForReviewAt: Date.now() });
+		}
+
 		return { success: true };
 	},
 });
@@ -45,7 +63,6 @@ export const unbanUser = adminMutation({
 		await ctx.db.patch(userId, {
 			isBanned: false,
 			bannedAt: undefined,
-			flaggedForReviewAt: undefined,
 		});
 		return { success: true };
 	},
@@ -64,19 +81,33 @@ export const getFlaggedUsers = adminQuery({
 			)
 			.collect();
 
-		return users
-			.sort((a, b) => (b.flaggedForReviewAt || 0) - (a.flaggedForReviewAt || 0))
-			.map((user) => ({
-				_id: user._id,
-				telegramChatId: user.telegramChatId,
-				username: user.username,
-				firstName: user.firstName,
-				flaggedForReviewAt: user.flaggedForReviewAt,
-				uploadCount: user.uploadCount || 0,
-				claimCount: user.claimCount || 0,
-				uploadReportCount: user.uploadReportCount || 0,
-				claimReportCount: user.claimReportCount || 0,
-			}));
+		return await Promise.all(
+			users
+				.sort(
+					(a, b) => (b.flaggedForReviewAt || 0) - (a.flaggedForReviewAt || 0),
+				)
+				.map(async (user) => ({
+					_id: user._id,
+					telegramChatId: user.telegramChatId,
+					username: user.username,
+					firstName: user.firstName,
+					flaggedForReviewAt: user.flaggedForReviewAt,
+					uploadCount: user.uploadCount || 0,
+					claimCount: user.claimCount || 0,
+					uploadReportCount: user.uploadReportCount || 0,
+					claimReportCount: user.claimReportCount || 0,
+					adminMessageCount: (
+						await ctx.db
+							.query("messages")
+							.withIndex("by_admin_message", (q) =>
+								q
+									.eq("isAdminMessage", true)
+									.eq("telegramChatId", user.telegramChatId),
+							)
+							.collect()
+					).length,
+				})),
+		);
 	},
 });
 
@@ -90,6 +121,37 @@ export const dismissFlag = adminMutation({
 	},
 });
 
+export const deductUserCoins = adminMutation({
+	args: {
+		userId: v.id("users"),
+		amount: v.number(),
+		deductionType: v.union(
+			v.literal("admin_manual_deduction"),
+			v.literal("admin_report_deduction"),
+		),
+	},
+	handler: async (ctx, { userId, amount, deductionType }) => {
+		if (!Number.isInteger(amount) || amount <= 0) {
+			throw new Error("Amount must be a positive integer");
+		}
+
+		// Patches the user balance and inserts the ledger transaction in a
+		// single atomic mutation, so the deduction and its record cannot
+		// diverge. Throws if the user does not exist.
+		const { newBalance } = await applyCoinDelta(ctx, {
+			userId,
+			delta: -amount,
+			type: deductionType,
+		});
+
+		return {
+			success: true,
+			deductedAmount: amount,
+			newBalance,
+		};
+	},
+});
+
 export const getBannedUsers = adminQuery({
 	args: {},
 	handler: async (ctx) => {
@@ -98,15 +160,28 @@ export const getBannedUsers = adminQuery({
 			.filter((q) => q.eq(q.field("isBanned"), true))
 			.collect();
 
-		return bannedUsers
-			.sort((a, b) => (b.bannedAt || 0) - (a.bannedAt || 0))
-			.map((user) => ({
-				_id: user._id,
-				telegramChatId: user.telegramChatId,
-				username: user.username,
-				firstName: user.firstName,
-				bannedAt: user.bannedAt,
-			}));
+		return await Promise.all(
+			bannedUsers
+				.sort((a, b) => (b.bannedAt || 0) - (a.bannedAt || 0))
+				.map(async (user) => ({
+					_id: user._id,
+					telegramChatId: user.telegramChatId,
+					username: user.username,
+					firstName: user.firstName,
+					bannedAt: user.bannedAt,
+					flaggedForReviewAt: user.flaggedForReviewAt,
+					adminMessageCount: (
+						await ctx.db
+							.query("messages")
+							.withIndex("by_admin_message", (q) =>
+								q
+									.eq("isAdminMessage", true)
+									.eq("telegramChatId", user.telegramChatId),
+							)
+							.collect()
+					).length,
+				})),
+		);
 	},
 });
 

@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as UpdatesRouteImport } from './routes/updates'
 import { Route as TelegramRouteImport } from './routes/telegram'
 import { Route as AppRouteImport } from './routes/app'
 import { Route as AdminRouteImport } from './routes/admin'
@@ -32,6 +33,11 @@ import { Route as AdminAnalyticsRouteImport } from './routes/admin/analytics'
 import { Route as AdminUsersIndexRouteImport } from './routes/admin/users/index'
 import { Route as AdminUsersUserIdRouteImport } from './routes/admin/users/$userId'
 
+const UpdatesRoute = UpdatesRouteImport.update({
+  id: '/updates',
+  path: '/updates',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TelegramRoute = TelegramRouteImport.update({
   id: '/telegram',
   path: '/telegram',
@@ -148,6 +154,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AdminRouteWithChildren
   '/app': typeof AppRouteWithChildren
   '/telegram': typeof TelegramRoute
+  '/updates': typeof UpdatesRoute
   '/admin/analytics': typeof AdminAnalyticsRoute
   '/admin/banned': typeof AdminBannedRoute
   '/admin/evals': typeof AdminEvalsRoute
@@ -170,6 +177,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/telegram': typeof TelegramRoute
+  '/updates': typeof UpdatesRoute
   '/admin/analytics': typeof AdminAnalyticsRoute
   '/admin/banned': typeof AdminBannedRoute
   '/admin/evals': typeof AdminEvalsRoute
@@ -195,6 +203,7 @@ export interface FileRoutesById {
   '/admin': typeof AdminRouteWithChildren
   '/app': typeof AppRouteWithChildren
   '/telegram': typeof TelegramRoute
+  '/updates': typeof UpdatesRoute
   '/admin/analytics': typeof AdminAnalyticsRoute
   '/admin/banned': typeof AdminBannedRoute
   '/admin/evals': typeof AdminEvalsRoute
@@ -221,6 +230,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/app'
     | '/telegram'
+    | '/updates'
     | '/admin/analytics'
     | '/admin/banned'
     | '/admin/evals'
@@ -243,6 +253,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/telegram'
+    | '/updates'
     | '/admin/analytics'
     | '/admin/banned'
     | '/admin/evals'
@@ -267,6 +278,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/app'
     | '/telegram'
+    | '/updates'
     | '/admin/analytics'
     | '/admin/banned'
     | '/admin/evals'
@@ -292,10 +304,18 @@ export interface RootRouteChildren {
   AdminRoute: typeof AdminRouteWithChildren
   AppRoute: typeof AppRouteWithChildren
   TelegramRoute: typeof TelegramRoute
+  UpdatesRoute: typeof UpdatesRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/updates': {
+      id: '/updates'
+      path: '/updates'
+      fullPath: '/updates'
+      preLoaderRoute: typeof UpdatesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/telegram': {
       id: '/telegram'
       path: '/telegram'
@@ -510,6 +530,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminRoute: AdminRouteWithChildren,
   AppRoute: AppRouteWithChildren,
   TelegramRoute: TelegramRoute,
+  UpdatesRoute: UpdatesRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

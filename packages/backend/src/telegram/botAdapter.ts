@@ -8,6 +8,19 @@ export interface BotMessageOptions {
 	inline_keyboard?: InlineKeyboardButton[][];
 }
 
+// Base URL for the Telegram Bot API. Unset means the real API; tests and local
+// dev point this at a fake server (see tests/e2e/fakeBotApi.ts).
+export function telegramApiUrl(token: string, method: string): string {
+	const base = process.env.TELEGRAM_API_BASE ?? "https://api.telegram.org";
+	return `${base}/bot${token}/${method}`;
+}
+
+// File downloads use /file/bot<token>/<path>, not /bot<token>/<method>.
+export function telegramFileUrl(token: string, filePath: string): string {
+	const base = process.env.TELEGRAM_API_BASE ?? "https://api.telegram.org";
+	return `${base}/file/bot${token}/${filePath}`;
+}
+
 export interface BotAdapter {
 	sendMessage(
 		chatId: string,
@@ -49,7 +62,7 @@ async function sendTelegramMessage(
 		return;
 	}
 
-	const url = `https://api.telegram.org/bot${token}/sendMessage`;
+	const url = telegramApiUrl(token, "sendMessage");
 	try {
 		const body: Record<string, unknown> = {
 			chat_id: chatId,
@@ -80,7 +93,7 @@ async function answerTelegramCallback(callbackQueryId: string, text?: string) {
 		return;
 	}
 
-	const url = `https://api.telegram.org/bot${token}/answerCallbackQuery`;
+	const url = telegramApiUrl(token, "answerCallbackQuery");
 	try {
 		await fetch(url, {
 			method: "POST",
@@ -108,7 +121,7 @@ async function editTelegramMessageText(
 
 	const method = opts?.isPhoto ? "editMessageCaption" : "editMessageText";
 	const contentField = opts?.isPhoto ? "caption" : "text";
-	const url = `https://api.telegram.org/bot${token}/${method}`;
+	const url = telegramApiUrl(token, method);
 	try {
 		await fetch(url, {
 			method: "POST",
@@ -138,11 +151,15 @@ async function sendTelegramPhoto(
 	}
 
 	if (photoUrl === "image") {
-		await sendTelegramMessage(chatId, caption || "Sample image placeholder", opts);
+		await sendTelegramMessage(
+			chatId,
+			caption || "Sample image placeholder",
+			opts,
+		);
 		return;
 	}
 
-	const url = `https://api.telegram.org/bot${token}/sendPhoto`;
+	const url = telegramApiUrl(token, "sendPhoto");
 	try {
 		const imageRes = await fetch(photoUrl);
 		if (!imageRes.ok) {

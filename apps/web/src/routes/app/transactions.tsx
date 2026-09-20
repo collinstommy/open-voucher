@@ -21,6 +21,12 @@ function formatType(type: string): string {
 			return "Refund";
 		case "uploader_denied":
 			return "Upload Denied";
+		case "admin_expiry_deduction":
+			return "Deduction (Voucher Expired)";
+		case "admin_manual_deduction":
+			return "Admin Deduction";
+		case "admin_report_deduction":
+			return "Deduction Due to Reports";
 		case "replacement_received":
 			return "Replacement Received";
 		default:

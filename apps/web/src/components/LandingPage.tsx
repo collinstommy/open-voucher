@@ -1,15 +1,17 @@
 import { useState } from "react";
-import LandingNav from "@/components/LandingNav";
+import LandingNav, { DiscordIcon } from "@/components/LandingNav";
 import { LANDING_FAQ_ITEMS } from "@/lib/faqContent";
+import UpdatesSection from "@/components/UpdatesSection";
+import { DISCORD_URL } from "@/lib/openDiscordLink";
 
 export default function LandingPage() {
 	return (
-		<div className="bg-gray-50 text-gray-800 flex flex-col min-h-screen font-[Inter]">
+		<div className="bg-gray-50 text-gray-800 flex flex-col min-h-screen font-sans">
 			<LandingNav />
 			<Hero />
 			<HowItWorks />
 			<CoinEconomy />
-			<Updates />
+			<UpdatesSection limit={3} />
 			<Support />
 			<FAQ />
 			<Footer />
@@ -217,44 +219,6 @@ function CoinEconomy()  {
 	);
 }
 
-function Updates() {
-	return (
-		<section className="py-16 bg-white border-t border-gray-200">
-			<div className="container mx-auto px-6">
-				<div className="max-w-3xl mx-auto">
-					<div className="text-center mb-12">
-						<h2
-							id="updates"
-							className="text-3xl font-bold text-gray-900"
-						>
-							What&apos;s New
-						</h2>
-						<p className="text-gray-500 mt-2">
-							Latest updates and features.
-						</p>
-					</div>
-
-					<div className="space-y-4">
-						<div className="bg-gray-50 rounded-xl border border-gray-200 p-6 hover:shadow-md transition-all">
-							<div className="text-sm text-gray-400 mb-2">
-								April 25, 2025
-							</div>
-							<h3 className="text-lg font-semibold text-gray-900 mb-2">
-								Added support for Three+ vouchers
-							</h3>
-							<p className="text-gray-600 leading-relaxed">
-								The bot now accepts <strong>Three+</strong> vouchers
-								(€5 off €25) from Three. You can upload and claim them
-								just like Dunnes vouchers.
-							</p>
-						</div>
-					</div>
-				</div>
-			</div>
-		</section>
-	);
-}
-
 function Support() {
 	return (
 		<section className="py-16 bg-gradient-to-br from-amber-500 to-orange-500">
@@ -352,10 +316,21 @@ function FAQItem({
 	);
 }
 
-function Footer() {
+export function Footer() {
 	return (
 		<footer className="mt-auto bg-gray-900 text-gray-400 py-12">
 			<div className="container mx-auto px-6 text-center">
+				<div className="mb-6">
+					<a
+						href={DISCORD_URL}
+						target="_blank"
+						rel="noopener noreferrer"
+						className="inline-flex items-center gap-2 text-gray-300 hover:text-white transition-colors text-sm font-medium"
+					>
+						<DiscordIcon />
+						Join our Discord
+					</a>
+				</div>
 				<div className="text-sm opacity-60">
 					<p>Not affiliated with Dunnes Stores.</p>
 				</div>

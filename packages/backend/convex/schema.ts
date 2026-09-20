@@ -118,6 +118,8 @@ export default defineSchema({
 			v.literal("uploader_refund"),
 			v.literal("uploader_denied"),
 			v.literal("admin_expiry_deduction"),
+			v.literal("admin_manual_deduction"),
+			v.literal("admin_report_deduction"),
 			v.literal("claim_reversed"),
 			v.literal("self_invalidated"),
 			v.literal("claim_returned"),

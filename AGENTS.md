@@ -6,9 +6,13 @@ Do not run `bun run deploy:all`, `bun run deploy:web`, `bun run deploy:web:dev`,
 
 Do not run `git commit` or `git push` unless the user explicitly asks you to, or you have their explicit go-ahead to save work. Show the diff and ask for confirmation first.
 
+
+
 # Project Overview
 
-This project, `open-voucher`, is a modern TypeScript monorepo built with Better-T-Stack. It combines React, TanStack Start, and Convex to provide a full-stack application development experience.
+## Plans 
+For plans and other technical docs see ~/brain/projects/open-voucher 
+
 
 ## Guidelines
 - IMPORTANT - never ever mention support. No user support exists.
@@ -53,6 +57,7 @@ The following `bun run` scripts are available from the root directory:
 *   `bun run dev:web`: Starts only the web frontend application in development mode.
 *   `bun run dev:server`: Starts only the Convex backend server in development mode.
 *   `bun run dev:setup`: Sets up and configures the Convex project.
+*   `bun run seed:dev`: Seeds the dev Convex database (`fastidious-okapi-116`) with 7 test vouchers.
 *   `bun run deploy:web`: Deploy production Cloudflare Worker.
 *   `bun run deploy:web:dev`: Deploy dev Cloudflare Worker (`dev.openvouchers.org`, always dev Convex).
 *   `bun run deploy:dev`: Deploy dev worker + register dev bot commands.

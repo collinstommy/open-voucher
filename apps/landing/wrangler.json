@@ -1,7 +1,0 @@
-{
-	"name": "openvouchers-site",
-	"compatibility_date": "2025-12-10",
-	"assets": {
-		"directory": "./public"
-	}
-}

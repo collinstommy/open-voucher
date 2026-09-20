@@ -36,6 +36,21 @@ const TAB_LABELS: Record<Tab, string> = {
 	messages: "Messages",
 };
 
+const DEDUCTION_TYPES = [
+	"admin_report_deduction",
+	"admin_manual_deduction",
+] as const;
+
+type DeductionType = (typeof DEDUCTION_TYPES)[number];
+
+const DEDUCTION_TYPE_LABELS: Record<DeductionType, string> = {
+	admin_manual_deduction: "Manual",
+	admin_report_deduction: "Reports",
+};
+
+const UPLOAD_WARNING_MESSAGE =
+	"Warning: Vouchers you uploaded have been reported as not working by several other community members. Please only upload unused, valid vouchers. Continued reports may result in a coin deduction or a permanent ban.";
+
 type ReportActivity = {
 	_id: string;
 	createdAt: number;
@@ -66,9 +81,24 @@ type UserTransaction = {
 };
 
 type ActivityItem =
-	| { kind: "transaction"; id: string; createdAt: number; transaction: UserTransaction }
-	| { kind: "report_filed"; id: string; createdAt: number; report: ReportActivity }
-	| { kind: "report_against"; id: string; createdAt: number; report: ReportActivity };
+	| {
+			kind: "transaction";
+			id: string;
+			createdAt: number;
+			transaction: UserTransaction;
+	  }
+	| {
+			kind: "report_filed";
+			id: string;
+			createdAt: number;
+			report: ReportActivity;
+	  }
+	| {
+			kind: "report_against";
+			id: string;
+			createdAt: number;
+			report: ReportActivity;
+	  };
 
 function buildActivityItems(
 	transactions: UserTransaction[],
@@ -124,6 +154,11 @@ function UserDetailPage() {
 	const convex = useConvex();
 	const queryClient = useQueryClient();
 	const [messageText, setMessageText] = useState("");
+	const [deductAmount, setDeductAmount] = useState("");
+	const [deductType, setDeductType] = useState<DeductionType>(
+		"admin_report_deduction",
+	);
+	const [deductError, setDeductError] = useState<string | null>(null);
 	const [activeTab, setActiveTab] = useState<Tab>("transactions");
 
 	const { data, isLoading, error } = useQuery(
@@ -136,6 +171,15 @@ function UserDetailPage() {
 	const banMutation = useMutation({
 		mutationFn: () =>
 			convex.mutation(api.adminUsers.banUser, {
+				token: token!,
+				userId: userId as Id<"users">,
+			}),
+		onSuccess: () => queryClient.invalidateQueries(),
+	});
+
+	const flagForReviewMutation = useMutation({
+		mutationFn: () =>
+			convex.mutation(api.adminUsers.flagForReview, {
 				token: token!,
 				userId: userId as Id<"users">,
 			}),
@@ -160,6 +204,41 @@ function UserDetailPage() {
 		onSuccess: () => queryClient.invalidateQueries(),
 	});
 
+	const deductCoinsMutation = useMutation({
+		mutationFn: ({
+			amount,
+			deductionType,
+		}: {
+			amount: number;
+			deductionType: DeductionType;
+		}) =>
+			convex.mutation(api.adminUsers.deductUserCoins, {
+				token: token!,
+				userId: userId as Id<"users">,
+				amount,
+				deductionType,
+			}),
+		onSuccess: () => {
+			setDeductAmount("");
+			setDeductError(null);
+			queryClient.invalidateQueries();
+		},
+	});
+
+	const handleDeductCoins = () => {
+		const amount = Number(deductAmount);
+		if (!Number.isInteger(amount) || amount <= 0) {
+			setDeductError("Amount must be a whole number greater than 0");
+			return;
+		}
+		const confirmed = window.confirm(
+			`Deduct ${amount} coin${amount === 1 ? "" : "s"} from ${user?.username || user?.firstName || user?.telegramChatId || "this user"}?\n\nDeduction type: ${DEDUCTION_TYPE_LABELS[deductType]}\nTheir current balance is ${user?.coins ?? "?"} coins.`,
+		);
+		if (confirmed) {
+			deductCoinsMutation.mutate({ amount, deductionType: deductType });
+		}
+	};
+
 	const sendMessageMutation = useMutation({
 		mutationFn: (text: string) =>
 			convex.mutation(api.messages.sendMessageToUser, {
@@ -172,6 +251,17 @@ function UserDetailPage() {
 			queryClient.invalidateQueries();
 		},
 	});
+
+	const handleSendWarning = () => {
+		if (!user || !token) return;
+
+		const confirmed = window.confirm(
+			`Send this warning to ${user.username || user.firstName || user.telegramChatId}?\n\n${UPLOAD_WARNING_MESSAGE}`,
+		);
+		if (confirmed) {
+			sendMessageMutation.mutate(UPLOAD_WARNING_MESSAGE);
+		}
+	};
 
 	const clearReportMutation = useMutation({
 		mutationFn: ({
@@ -216,15 +306,35 @@ function UserDetailPage() {
 	}
 
 	const user = data?.user;
+
+	const amountExceedsBalance =
+		deductAmount.trim() !== "" &&
+		Number(deductAmount) > (user?.coins ?? Infinity);
 	const stats = data?.stats;
-	const uploadedVouchers = [...(data?.uploadedVouchers ?? [])].sort((a, b) => b.createdAt - a.createdAt);
-	const claimedVouchers = [...(data?.claimedVouchers ?? [])].sort((a, b) => (b.claimedAt ?? 0) - (a.claimedAt ?? 0));
-	const failedUploads = [...(data?.failedUploads ?? [])].sort((a, b) => b._creationTime - a._creationTime);
-	const reportsFiledByUser = [...(data?.reportsFiledByUser ?? [])].sort((a, b) => b.createdAt - a.createdAt);
-	const reportsAgainstUploads = [...(data?.reportsAgainstUploads ?? [])].sort((a, b) => b.createdAt - a.createdAt);
-	const feedbackAndSupport = [...(data?.feedbackAndSupport ?? [])].sort((a, b) => b.createdAt - a.createdAt);
-	const adminMessages = [...(data?.adminMessages ?? [])].sort((a, b) => b.createdAt - a.createdAt);
-	const transactions = [...(data?.transactions ?? [])].sort((a, b) => b.createdAt - a.createdAt);
+	const uploadedVouchers = [...(data?.uploadedVouchers ?? [])].sort(
+		(a, b) => b.createdAt - a.createdAt,
+	);
+	const claimedVouchers = [...(data?.claimedVouchers ?? [])].sort(
+		(a, b) => (b.claimedAt ?? 0) - (a.claimedAt ?? 0),
+	);
+	const failedUploads = [...(data?.failedUploads ?? [])].sort(
+		(a, b) => b._creationTime - a._creationTime,
+	);
+	const reportsFiledByUser = [...(data?.reportsFiledByUser ?? [])].sort(
+		(a, b) => b.createdAt - a.createdAt,
+	);
+	const reportsAgainstUploads = [...(data?.reportsAgainstUploads ?? [])].sort(
+		(a, b) => b.createdAt - a.createdAt,
+	);
+	const feedbackAndSupport = [...(data?.feedbackAndSupport ?? [])].sort(
+		(a, b) => b.createdAt - a.createdAt,
+	);
+	const adminMessages = [...(data?.adminMessages ?? [])].sort(
+		(a, b) => b.createdAt - a.createdAt,
+	);
+	const transactions = [...(data?.transactions ?? [])].sort(
+		(a, b) => b.createdAt - a.createdAt,
+	);
 	const activityItems = buildActivityItems(
 		transactions,
 		reportsFiledByUser,
@@ -280,6 +390,26 @@ function UserDetailPage() {
 						</p>
 					</div>
 					<div className="flex gap-2">
+						{!user.flaggedForReviewAt && (
+							<Button
+								variant="outline"
+								onClick={() => flagForReviewMutation.mutate()}
+								disabled={flagForReviewMutation.isPending}
+							>
+								{flagForReviewMutation.isPending
+									? "Flagging..."
+									: "Flag for Review"}
+							</Button>
+						)}
+						{!user.isBanned && (
+							<Button
+								variant="outline"
+								onClick={handleSendWarning}
+								disabled={sendMessageMutation.isPending}
+							>
+								{sendMessageMutation.isPending ? "Sending..." : "Send warning"}
+							</Button>
+						)}
 						{user.flaggedForReviewAt && !user.isBanned && (
 							<Button
 								variant="outline"
@@ -321,9 +451,7 @@ function UserDetailPage() {
 					>
 						{TAB_LABELS[tab]}
 						{tabCounts[tab] > 0 && (
-							<span className="ml-1.5 opacity-70">
-								({tabCounts[tab]})
-							</span>
+							<span className="ml-1.5 opacity-70">({tabCounts[tab]})</span>
 						)}
 					</Button>
 				))}
@@ -340,7 +468,9 @@ function UserDetailPage() {
 						</div>
 						<div className="rounded-md border p-3">
 							<div className="mb-1 text-muted-foreground text-xs">Uploaded</div>
-							<div className="font-semibold text-xl">{stats?.uploadedCount}</div>
+							<div className="font-semibold text-xl">
+								{stats?.uploadedCount}
+							</div>
 						</div>
 						<div className="rounded-md border p-3">
 							<div className="mb-1 text-muted-foreground text-xs">Claimed</div>
@@ -362,6 +492,83 @@ function UserDetailPage() {
 								{stats?.reportsFiledCount}
 							</div>
 						</div>
+					</div>
+
+					{/* Deduct Coins */}
+					<div className="rounded-lg border p-4">
+						<div className="mb-3">
+							<h3 className="font-semibold">Deduct coins</h3>
+							<p className="text-muted-foreground text-sm">
+								Remove coins from this user's balance. A ledger transaction is
+								recorded automatically.
+							</p>
+						</div>
+						<div className="mb-3 flex flex-wrap gap-2">
+							{DEDUCTION_TYPES.map((type) => (
+								<Button
+									key={type}
+									variant={deductType === type ? "default" : "outline"}
+									size="sm"
+									onClick={() => setDeductType(type)}
+									disabled={deductCoinsMutation.isPending}
+								>
+									{DEDUCTION_TYPE_LABELS[type]}
+								</Button>
+							))}
+						</div>
+						<div className="flex flex-wrap items-end gap-2">
+							<div className="flex flex-col gap-1">
+								<label
+									htmlFor="deduct-amount"
+									className="text-muted-foreground text-xs"
+								>
+									Amount
+								</label>
+								<input
+									id="deduct-amount"
+									type="number"
+									min={1}
+									step={1}
+									value={deductAmount}
+									onChange={(e) => {
+										setDeductAmount(e.target.value);
+										setDeductError(null);
+									}}
+									placeholder="e.g. 10"
+									className="w-32 rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+									disabled={deductCoinsMutation.isPending}
+								/>
+							</div>
+							<Button
+								variant="destructive"
+								onClick={handleDeductCoins}
+								disabled={
+									deductCoinsMutation.isPending ||
+									!deductAmount.trim() ||
+									Number(deductAmount) <= 0 ||
+									amountExceedsBalance
+								}
+							>
+								{deductCoinsMutation.isPending
+									? "Deducting..."
+									: "Deduct coins"}
+							</Button>
+						</div>
+						{deductError && (
+							<p className="mt-2 text-sm text-red-500">{deductError}</p>
+						)}
+						{!deductError && amountExceedsBalance && (
+							<p className="mt-2 text-sm text-red-500">
+								Amount exceeds the user's balance of {user?.coins ?? 0} coin
+								{(user?.coins ?? 0) === 1 ? "" : "s"}
+							</p>
+						)}
+						{deductCoinsMutation.isError && (
+							<p className="mt-2 text-sm text-red-500">
+								{deductCoinsMutation.error?.message ||
+									"Failed to deduct coins. Please try again."}
+							</p>
+						)}
 					</div>
 
 					{/* Activity Table */}
@@ -401,11 +608,12 @@ function UserDetailPage() {
 																					? "bg-red-100 text-red-800"
 																					: tx.type === "admin_expiry_deduction"
 																						? "bg-rose-100 text-rose-800"
-																				: tx.type === "claim_reversed"
-																					? "bg-teal-100 text-teal-800"
-																					: tx.type === "replacement_received"
-																						? "bg-indigo-100 text-indigo-800"
-																						: "bg-amber-100 text-amber-800"
+																						: tx.type === "claim_reversed"
+																							? "bg-teal-100 text-teal-800"
+																							: tx.type ===
+																									"replacement_received"
+																								? "bg-indigo-100 text-indigo-800"
+																								: "bg-amber-100 text-amber-800"
 															}`}
 														>
 															{tx.type.replace(/_/g, " ")}
@@ -414,7 +622,9 @@ function UserDetailPage() {
 													<td className="p-3">
 														<span
 															className={
-																tx.amount > 0 ? "text-green-600" : "text-red-600"
+																tx.amount > 0
+																	? "text-green-600"
+																	: "text-red-600"
 															}
 														>
 															{tx.amount > 0 ? "+" : ""}
@@ -551,13 +761,17 @@ function UserDetailPage() {
 										</div>
 										{voucher.claimer && (
 											<div className="mt-2 text-sm">
-												<span className="text-muted-foreground">Claimed by: </span>
+												<span className="text-muted-foreground">
+													Claimed by:{" "}
+												</span>
 												<Link
 													to="/admin/users/$userId"
 													params={{ userId: voucher.claimer._id }}
 													className="text-blue-600 hover:underline"
 												>
-													{voucher.claimer.username || voucher.claimer.firstName || voucher.claimer.telegramChatId}
+													{voucher.claimer.username ||
+														voucher.claimer.firstName ||
+														voucher.claimer.telegramChatId}
 												</Link>
 											</div>
 										)}
@@ -567,7 +781,9 @@ function UserDetailPage() {
 													size="sm"
 													variant="destructive"
 													onClick={() =>
-														expireVoucherMutation.mutate(voucher._id as Id<"vouchers">)
+														expireVoucherMutation.mutate(
+															voucher._id as Id<"vouchers">,
+														)
 													}
 													disabled={expireVoucherMutation.isPending}
 												>
@@ -630,8 +846,7 @@ function UserDetailPage() {
 										</div>
 										{voucher.expiryDate && (
 											<div className="mb-1 text-muted-foreground text-sm">
-												Expires{" "}
-												{formatDate(voucher.expiryDate)}
+												Expires {formatDate(voucher.expiryDate)}
 											</div>
 										)}
 										<div className="mb-1 text-muted-foreground text-sm">
@@ -644,13 +859,17 @@ function UserDetailPage() {
 										)}
 										{voucher.uploader && (
 											<div className="mt-2 text-sm">
-												<span className="text-muted-foreground">Uploaded by: </span>
+												<span className="text-muted-foreground">
+													Uploaded by:{" "}
+												</span>
 												<Link
 													to="/admin/users/$userId"
 													params={{ userId: voucher.uploader._id }}
 													className="text-blue-600 hover:underline"
 												>
-													{voucher.uploader.username || voucher.uploader.firstName || voucher.uploader.telegramChatId}
+													{voucher.uploader.username ||
+														voucher.uploader.firstName ||
+														voucher.uploader.telegramChatId}
 												</Link>
 											</div>
 										)}
@@ -659,7 +878,9 @@ function UserDetailPage() {
 												size="sm"
 												variant="outline"
 												onClick={() =>
-													reverseClaimMutation.mutate(voucher._id as Id<"vouchers">)
+													reverseClaimMutation.mutate(
+														voucher._id as Id<"vouchers">,
+													)
 												}
 												disabled={reverseClaimMutation.isPending}
 											>
@@ -715,7 +936,9 @@ function UserDetailPage() {
 										</div>
 										<div className="mb-1 text-sm">
 											<span className="font-medium">Reason: </span>
-											<span className="text-red-600">{upload.failureReason}</span>
+											<span className="text-red-600">
+												{upload.failureReason}
+											</span>
 										</div>
 										{upload.errorMessage && (
 											<div className="mb-1 text-sm">
@@ -810,9 +1033,13 @@ function UserDetailPage() {
 													params={{ userId: report.uploader._id }}
 													className="text-blue-600 hover:underline"
 												>
-													{report.uploader.username || report.uploader.firstName || report.uploader.telegramChatId}
+													{report.uploader.username ||
+														report.uploader.firstName ||
+														report.uploader.telegramChatId}
 												</Link>
-											) : "Unknown"}
+											) : (
+												"Unknown"
+											)}
 										</div>
 									</div>
 									<div className="rounded bg-muted p-3">
@@ -908,9 +1135,13 @@ function UserDetailPage() {
 													params={{ userId: report.reporter._id }}
 													className="text-blue-600 hover:underline"
 												>
-													{report.reporter.username || report.reporter.firstName || report.reporter.telegramChatId}
+													{report.reporter.username ||
+														report.reporter.firstName ||
+														report.reporter.telegramChatId}
 												</Link>
-											) : "Unknown"}
+											) : (
+												"Unknown"
+											)}
 										</div>
 									</div>
 									<div className="rounded bg-muted p-3">
@@ -1026,7 +1257,9 @@ function UserDetailPage() {
 								adminMessages.map((message: any) => (
 									<div key={message._id} className="mb-3 flex justify-end">
 										<div className="max-w-xs rounded-lg bg-blue-500 p-3 text-white shadow-sm">
-											<p className="whitespace-pre-wrap text-sm">{message.text}</p>
+											<p className="whitespace-pre-wrap text-sm">
+												{message.text}
+											</p>
 											<p className="mt-1 text-xs opacity-75">
 												{formatDateTime(message.createdAt)}
 											</p>
