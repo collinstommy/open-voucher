@@ -22,6 +22,10 @@ function getSiteUrl() {
 	return CONVEX_SITE_URLS[getDeployment()] ?? CONVEX_SITE_URLS.prod;
 }
 
+export function getDevAuthUrl() {
+	return `${getSiteUrl()}/api/dev-auth`;
+}
+
 export function isJwtExpired(jwt: string): boolean {
 	try {
 		const payload = JSON.parse(atob(jwt.split(".")[1] ?? "")) as {
@@ -41,7 +45,7 @@ export async function fetchJwt(): Promise<string> {
 	if (existing) clearStoredJwt();
 
 	if (window.location.hostname === "localhost") {
-		const res = await fetch(`${getSiteUrl()}/api/dev-auth`, {
+		const res = await fetch(getDevAuthUrl(), {
 			method: "POST",
 			headers: { "X-OpenVoucher-Client": "web" },
 		});
