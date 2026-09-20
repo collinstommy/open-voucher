@@ -22,6 +22,17 @@ function getSiteUrl() {
 	return CONVEX_SITE_URLS[getDeployment()] ?? CONVEX_SITE_URLS.prod;
 }
 
+/** Localhost uses the Vite proxy so the browser is not subject to live CORS. */
+export function getDevAuthUrl() {
+	if (
+		typeof window !== "undefined" &&
+		window.location.hostname === "localhost"
+	) {
+		return "/convex-site/api/dev-auth";
+	}
+	return `${getSiteUrl()}/api/dev-auth`;
+}
+
 export function isJwtExpired(jwt: string): boolean {
 	try {
 		const payload = JSON.parse(atob(jwt.split(".")[1] ?? "")) as {
@@ -41,7 +52,7 @@ export async function fetchJwt(): Promise<string> {
 	if (existing) clearStoredJwt();
 
 	if (window.location.hostname === "localhost") {
-		const res = await fetch(`${getSiteUrl()}/api/dev-auth`, {
+		const res = await fetch(getDevAuthUrl(), {
 			method: "POST",
 			headers: { "X-OpenVoucher-Client": "web" },
 		});

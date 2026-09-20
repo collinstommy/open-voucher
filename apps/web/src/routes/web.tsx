@@ -8,11 +8,10 @@ import { createFileRoute, notFound } from "@tanstack/react-router";
 import { useMutation, useQuery } from "convex/react";
 import { type FormEvent, useRef, useState } from "react";
 import { useJwtAuth } from "@/auth/JwtAuthProvider";
-import { getDeployment } from "@/components/EnvironmentDropdown";
+import { getDevAuthUrl } from "@/auth/jwtStorage";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useUserAuth } from "@/hooks/useUserAuth";
-import { CONVEX_SITE_URLS } from "@/lib/convexConfig";
 
 export const Route = createFileRoute("/web")({
 	beforeLoad: () => {
@@ -72,13 +71,10 @@ function WebUploadTester() {
 		setMintBusy(true);
 		setSubmitError(null);
 		try {
-			const res = await fetch(
-				`${CONVEX_SITE_URLS[getDeployment()]}/api/dev-auth`,
-				{
-					method: "POST",
-					headers: { "X-OpenVoucher-Client": "web" },
-				},
-			);
+			const res = await fetch(getDevAuthUrl(), {
+				method: "POST",
+				headers: { "X-OpenVoucher-Client": "web" },
+			});
 			const data = (await res.json()) as { jwt?: string; error?: string };
 			if (!res.ok || typeof data.jwt !== "string") {
 				throw new Error(data.error ?? "Dev auth failed");
