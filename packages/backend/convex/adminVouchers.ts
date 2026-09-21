@@ -1,6 +1,6 @@
 import { v } from "convex/values";
-import { CLAIM_COSTS, UPLOAD_REWARDS } from "../src/lib/constants";
 import { applyCoinDelta } from "../src/lib/coinLedger";
+import { CLAIM_COSTS, UPLOAD_REWARDS } from "../src/lib/constants";
 import { recalculateReportCounts } from "../src/lib/reportCounts";
 import { adminMutation, adminQuery } from "./adminGuards";
 
@@ -182,7 +182,10 @@ export const clearReportAndUpdateVoucher = adminMutation({
 
 		await ctx.db.patch(report.voucherId, { status: newVoucherStatus });
 
-		await ctx.db.delete(reportId);
+		await ctx.db.patch(reportId, {
+			outcome: "admin_cleared",
+			resolvedAt: Date.now(),
+		});
 		await recalculateReportCounts(ctx, [report.reporterId, report.uploaderId]);
 
 		return {

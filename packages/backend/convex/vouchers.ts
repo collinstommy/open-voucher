@@ -1,5 +1,9 @@
 import { v } from "convex/values";
 import dayjs from "dayjs";
+import { applyCoinDelta } from "../src/lib/coinLedger";
+import { CLAIM_COSTS, UPLOAD_REWARDS } from "../src/lib/constants";
+import { recalculateReportCounts } from "../src/lib/reportCounts";
+import { reportCountsTowardLimits } from "../src/lib/reportOutcome";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import {
@@ -8,9 +12,6 @@ import {
 	type QueryCtx,
 } from "./_generated/server";
 import { userMutation, userQuery } from "./auth";
-import { CLAIM_COSTS, UPLOAD_REWARDS } from "../src/lib/constants";
-import { applyCoinDelta } from "../src/lib/coinLedger";
-import { recalculateReportCounts } from "../src/lib/reportCounts";
 
 function getVoucherExpiryCalendarDay(expiryDate: number): string {
 	const date = new Date(expiryDate);
@@ -317,8 +318,9 @@ export const reportVoucher = internalMutation({
 		// Check if 3+ of last 5 claims were reported
 		if (last5Claims.length >= 5) {
 			const last5ClaimIds = last5Claims.map((v) => v._id);
-			const last5Reported = reporterReports.filter((r) =>
-				last5ClaimIds.includes(r.voucherId),
+			const last5Reported = reporterReports.filter(
+				(r) =>
+					last5ClaimIds.includes(r.voucherId) && reportCountsTowardLimits(r),
 			);
 			if (last5Reported.length >= 3 && !user.flaggedForReviewAt) {
 				console.log(
@@ -349,6 +351,7 @@ export const reportVoucher = internalMutation({
 				reporterId: user._id,
 				uploaderId: voucher.uploaderId,
 				reason: "not_working",
+				outcome: "open",
 				createdAt: Date.now(),
 			});
 
@@ -404,7 +407,11 @@ export const reportVoucher = internalMutation({
 			const validReports = [];
 			for (const report of uploaderReports) {
 				const reporter = await ctx.db.get(report.reporterId);
-				if (reporter && !reporter.isBanned) {
+				if (
+					reporter &&
+					!reporter.isBanned &&
+					reportCountsTowardLimits(report)
+				) {
 					validReports.push(report);
 				}
 			}
@@ -784,18 +791,28 @@ export const confirmUploaderUsedVoucher = internalMutation({
 
 		await ctx.db.patch(voucherId, { status: "uploader_admitted_used" });
 
-		// Remove the report since uploader admitted (honesty should not penalize ban status)
-		const report = await ctx.db
+		const reports = await ctx.db
 			.query("reports")
 			.withIndex("by_voucher", (q) => q.eq("voucherId", voucherId))
-			.first();
+			.collect();
 
-		if (report) {
-			await ctx.db.delete(report._id);
-			await recalculateReportCounts(ctx, [
-				report.reporterId,
-				report.uploaderId,
-			]);
+		const countedReports = reports.filter(reportCountsTowardLimits);
+		const resolvedAt = Date.now();
+		for (const report of countedReports) {
+			await ctx.db.patch(report._id, {
+				outcome: "uploader_admitted",
+				resolvedAt,
+			});
+		}
+
+		if (countedReports.length > 0) {
+			await recalculateReportCounts(
+				ctx,
+				countedReports.flatMap((report) => [
+					report.reporterId,
+					report.uploaderId,
+				]),
+			);
 		}
 	},
 });
@@ -807,6 +824,20 @@ export const recordUploaderDenied = internalMutation({
 	},
 	handler: async (ctx, { uploaderId, voucherId }) => {
 		await ctx.db.patch(voucherId, { status: "uploader_denied" });
+
+		const reports = await ctx.db
+			.query("reports")
+			.withIndex("by_voucher", (q) => q.eq("voucherId", voucherId))
+			.collect();
+		const resolvedAt = Date.now();
+		for (const report of reports) {
+			if (report.outcome === undefined || report.outcome === "open") {
+				await ctx.db.patch(report._id, {
+					outcome: "uploader_denied",
+					resolvedAt,
+				});
+			}
+		}
 
 		await ctx.db.insert("transactions", {
 			userId: uploaderId,

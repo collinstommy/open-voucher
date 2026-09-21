@@ -755,7 +755,7 @@ describe("Ban Flow Tests", () => {
 		vi.useRealTimers();
 	});
 
-	test("uploader admission removes report but still gets flagged at threshold", async () => {
+	test("uploader admission keeps the report and still flags at threshold", async () => {
 		vi.useFakeTimers();
 		const t = convexTest(schema, modules);
 		const now = Date.now();
@@ -807,14 +807,14 @@ describe("Ban Flow Tests", () => {
 			amount: 5,
 		});
 
-		// Verify report is deleted after admission
 		report = await t.run(async (ctx) => {
 			return await ctx.db
 				.query("reports")
 				.withIndex("by_voucher", (q) => q.eq("voucherId", voucherIds[0]))
 				.first();
 		});
-		expect(report).toBeNull();
+		expect(report?.outcome).toBe("uploader_admitted");
+		expect(report?.resolvedAt).toEqual(expect.any(Number));
 
 		// Report 2 more vouchers (would be 4th report if first wasn't deleted)
 		vi.advanceTimersByTime(24 * 60 * 60 * 1000);
@@ -1329,7 +1329,7 @@ describe("Report count recalculation", () => {
 		expect(uploader?.uploadReportCount).toBe(1);
 	});
 
-	test("confirmUploaderUsedVoucher recalculates counts after deleting report", async () => {
+	test("confirmUploaderUsedVoucher keeps the report and drops it from counts", async () => {
 		const t = convexTest(schema, modules);
 		const now = Date.now();
 		const uploaderId = await createUser(t, {
@@ -1369,7 +1369,7 @@ describe("Report count recalculation", () => {
 			voucherId: v2,
 		});
 
-		let [uploader, reporter] = await t.run(async (ctx) => {
+		const [uploader, reporter] = await t.run(async (ctx) => {
 			return [await ctx.db.get(uploaderId), await ctx.db.get(reporterId)];
 		});
 		expect(uploader?.uploadReportCount).toBe(2);
@@ -1381,14 +1381,72 @@ describe("Report count recalculation", () => {
 			amount: 10,
 		});
 
-		[uploader, reporter] = await t.run(async (ctx) => {
-			return [await ctx.db.get(uploaderId), await ctx.db.get(reporterId)];
+		const [uploaderAfter, reporterAfter, admitted] = await t.run(
+			async (ctx) => {
+				const report = await ctx.db
+					.query("reports")
+					.withIndex("by_voucher", (q) => q.eq("voucherId", v1))
+					.first();
+				return [
+					await ctx.db.get(uploaderId),
+					await ctx.db.get(reporterId),
+					report,
+				];
+			},
+		);
+		expect(uploaderAfter?.uploadReportCount).toBe(1);
+		expect(reporterAfter?.claimReportCount).toBe(1);
+		expect(admitted?.outcome).toBe("uploader_admitted");
+	});
+
+	test("recordUploaderDenied keeps the report in the counts", async () => {
+		const t = convexTest(schema, modules);
+		const now = Date.now();
+		const uploaderId = await createUser(t, {
+			telegramChatId: "recalc_deny_uploader",
+			coins: 100,
+		});
+		const reporterId = await createUser(t, {
+			telegramChatId: "recalc_deny_reporter",
+			coins: 100,
+		});
+
+		const voucherId = await createVoucher(t, {
+			type: "10",
+			uploaderId,
+			status: "claimed",
+			claimerId: reporterId,
+			expiryDate: now + 7 * 24 * 60 * 60 * 1000,
+			claimedAt: now,
+			createdAt: now,
+		});
+
+		await t.mutation(internal.vouchers.reportVoucher, {
+			userId: reporterId,
+			voucherId,
+		});
+		await t.mutation(internal.vouchers.recordUploaderDenied, {
+			uploaderId,
+			voucherId,
+		});
+
+		const [uploader, reporter, report] = await t.run(async (ctx) => {
+			return [
+				await ctx.db.get(uploaderId),
+				await ctx.db.get(reporterId),
+				await ctx.db
+					.query("reports")
+					.withIndex("by_voucher", (q) => q.eq("voucherId", voucherId))
+					.first(),
+			];
 		});
 		expect(uploader?.uploadReportCount).toBe(1);
 		expect(reporter?.claimReportCount).toBe(1);
+		expect(report?.outcome).toBe("uploader_denied");
+		expect(report?.resolvedAt).toEqual(expect.any(Number));
 	});
 
-	test("clearReportAndUpdateVoucher recalculates counts after deleting report", async () => {
+	test("clearReportAndUpdateVoucher keeps the report and drops it from counts", async () => {
 		const t = convexTest(schema, modules);
 		const now = Date.now();
 		vi.stubEnv("ADMIN_PASSWORD", "test-admin-password");
@@ -1431,11 +1489,17 @@ describe("Report count recalculation", () => {
 			newVoucherStatus: "expired",
 		});
 
-		const [uploader, reporter] = await t.run(async (ctx) => {
-			return [await ctx.db.get(uploaderId), await ctx.db.get(reporterId)];
+		const [uploader, reporter, cleared] = await t.run(async (ctx) => {
+			const report = await ctx.db.get(reportId);
+			return [
+				await ctx.db.get(uploaderId),
+				await ctx.db.get(reporterId),
+				report,
+			];
 		});
 		expect(uploader?.uploadReportCount).toBe(0);
 		expect(reporter?.claimReportCount).toBe(0);
+		expect(cleared?.outcome).toBe("admin_cleared");
 		vi.unstubAllEnvs();
 	});
 
