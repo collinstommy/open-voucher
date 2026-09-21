@@ -1,7 +1,8 @@
 import { v } from "convex/values";
 import { applyCoinDelta } from "../src/lib/coinLedger";
-import { adminMutation, adminQuery } from "./adminGuards";
+import { reportCountsTowardLimits } from "../src/lib/reportOutcome";
 import { internalMutation, internalQuery } from "./_generated/server";
+import { adminMutation, adminQuery } from "./adminGuards";
 
 export const getAllUsers = adminQuery({
 	args: {},
@@ -485,6 +486,8 @@ export const backfillUserStats = internalMutation({
 		}
 
 		for (const report of allReports) {
+			if (!reportCountsTowardLimits(report)) continue;
+
 			const uploaderId = report.uploaderId.toString();
 			const reporterId = report.reporterId.toString();
 

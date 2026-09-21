@@ -1,5 +1,6 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
+import { reportOutcome } from "../src/lib/reportOutcome";
 
 export default defineSchema({
 	inviteCodes: defineTable({
@@ -102,6 +103,8 @@ export default defineSchema({
 		reason: v.string(),
 		replacementVoucherId: v.optional(v.id("vouchers")),
 		createdAt: v.number(),
+		outcome: v.optional(reportOutcome),
+		resolvedAt: v.optional(v.number()),
 	})
 		.index("by_voucher", ["voucherId"])
 		.index("by_uploader", ["uploaderId"])
