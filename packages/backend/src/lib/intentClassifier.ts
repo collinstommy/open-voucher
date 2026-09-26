@@ -10,6 +10,8 @@ export const INBOUND_CLASSIFICATIONS = [
 	"balance",
 	"limits_question",
 	"praise_or_noise",
+	"request_voucher",
+	"why_rejected",
 	"unknown",
 ] as const;
 
@@ -38,6 +40,8 @@ export const INBOUND_CLASSIFICATION_LABELS: Record<
 	balance: "Balance",
 	limits_question: "Limits question",
 	praise_or_noise: "Praise / noise",
+	request_voucher: "Request a voucher",
+	why_rejected: "Why was upload rejected?",
 	unknown: "Unknown",
 };
 
@@ -61,43 +65,55 @@ Classify the user's message into exactly one label:
 - balance               user asks for their coin balance or account balance; includes "my points", "what's my balance", "how many coins"
 - limits_question       user asks about limits or whether the app is free
 - praise_or_noise       thanks, testing, or anything else confidently non-actionable
+- request_voucher       user is asking for/wanting a voucher or wondering if a voucher/value is available now (e.g. "any €20 left?", "got a €10?", "when do vouchers refresh", "I want a €5"); does NOT include asking how the claiming process works
+- why_rejected          user says their voucher upload was rejected/failed or asks why it wasn't accepted, or is asking about a previous failed/rejected upload
 - unknown               ambiguous, low-confidence, or not covered above
 
-Reply ONLY with JSON: {"label": <label>, "confidence": <0..1>}
+Also decide escalate: whether this message needs a human operator to look at it. Set escalate=true when the user is frustrated, angry, abusive, demands immediate attention, or reports something critical (e.g. "this is a scam", "I've been unfairly banned", repeated frustration). Set escalate=false for routine questions, thanks, or simple help.
+
+Reply ONLY with JSON: {"label": <label>, "confidence": <0..1>, "escalate": <true|false>}
 
 If the message doesn't clearly fit any label, return "unknown".`;
 
 export type ClassificationResult = {
 	label: string;
 	confidence: number;
+	escalate?: boolean;
 };
 
 export function normalizeClassification(raw: ClassificationResult): {
 	intent: InboundClassification;
 	confidence: number;
+	escalate: boolean;
 } {
 	const confidence =
 		typeof raw.confidence === "number" && Number.isFinite(raw.confidence)
 			? Math.max(0, Math.min(1, raw.confidence))
 			: 0;
+	const escalate = raw.escalate === true;
 
 	if (confidence < CLASSIFICATION_CONFIDENCE_THRESHOLD) {
-		return { intent: "unknown", confidence };
+		return { intent: "unknown", confidence, escalate };
 	}
 
 	if (isInboundClassification(raw.label)) {
-		return { intent: raw.label, confidence };
+		return { intent: raw.label, confidence, escalate };
 	}
 
-	return { intent: "unknown", confidence };
+	return { intent: "unknown", confidence, escalate };
 }
 
 export async function classifyMessageText(
 	text: string,
 	apiKey: string,
-): Promise<{ intent: InboundClassification; confidence: number; raw: string }> {
+): Promise<{
+	intent: InboundClassification;
+	confidence: number;
+	escalate: boolean;
+	raw: string;
+}> {
 	if (!text.trim()) {
-		return { intent: "unknown", confidence: 0, raw: "" };
+		return { intent: "unknown", confidence: 0, escalate: false, raw: "" };
 	}
 
 	const geminiResponse = await callGeminiApi(
@@ -123,6 +139,7 @@ export async function classifyMessageText(
 			result = {
 				label: String(parsed.label),
 				confidence: Number(parsed.confidence),
+				escalate: "escalate" in parsed ? parsed.escalate === true : undefined,
 			};
 		} else {
 			result = { label: "unknown", confidence: 0 };
@@ -131,6 +148,6 @@ export async function classifyMessageText(
 		result = { label: "unknown", confidence: 0 };
 	}
 
-	const { intent, confidence } = normalizeClassification(result);
-	return { intent, confidence, raw: geminiResponse.raw };
+	const { intent, confidence, escalate } = normalizeClassification(result);
+	return { intent, confidence, escalate, raw: geminiResponse.raw };
 }
