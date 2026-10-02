@@ -175,6 +175,28 @@ export default defineSchema({
 		expiresAt: v.number(),
 	}).index("by_token", ["token"]),
 
+	dunnesSessions: defineTable({
+		username: v.string(),
+		accessToken: v.string(),
+		refreshToken: v.optional(v.string()),
+		expiresAtMs: v.number(),
+	}).index("by_username", ["username"]),
+
+	voucherChecks: defineTable({
+		voucherId: v.id("vouchers"),
+		userId: v.id("users"),
+		result: v.union(
+			v.literal("claimed"),
+			v.literal("redeemed"),
+			v.literal("unlinked"),
+			v.literal("other"),
+		),
+		rawJson: v.string(),
+		createdAt: v.number(),
+	})
+		.index("by_voucher", ["voucherId"])
+		.index("by_user", ["userId"]),
+
 	errors: defineTable({
 		errorType: v.string(),
 		text: v.string(),

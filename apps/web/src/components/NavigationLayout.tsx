@@ -14,6 +14,7 @@ const NAV_ITEMS = [
 	{ to: "/admin/health-check", label: "Health Check" },
 	{ to: "/admin/evals", label: "Evals" },
 	{ to: "/admin/vouchers", label: "Vouchers" },
+	{ to: "/admin/checks", label: "Checks" },
 	{ to: "/admin/failed-uploads", label: "Failed Uploads" },
 	{ to: "/admin/users", label: "Users" },
 	{ to: "/admin/feedback", label: "Feedback" },
@@ -44,10 +45,7 @@ function NavLink({
 				className: cn("font-semibold text-foreground", className),
 			}}
 			inactiveProps={{
-				className: cn(
-					"text-muted-foreground hover:text-foreground",
-					className,
-				),
+				className: cn("text-muted-foreground hover:text-foreground", className),
 			}}
 		>
 			{label}
