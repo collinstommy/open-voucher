@@ -9,10 +9,9 @@ export const Route = createFileRoute("/admin")({
 function AdminLayout() {
 	return (
 		<AdminApp>
-			<div className="mx-auto max-w-7xl px-4 py-3 sm:px-6">
-				<NavigationLayout />
+			<NavigationLayout>
 				<Outlet />
-			</div>
+			</NavigationLayout>
 		</AdminApp>
 	);
 }
