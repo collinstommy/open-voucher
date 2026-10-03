@@ -137,6 +137,15 @@ export async function releaseE2EEnv(): Promise<void> {
 }
 
 async function start(): Promise<E2EEnv> {
+	const deployment = (readEnvFile().CONVEX_DEPLOYMENT ?? "").split(" ")[0];
+	if (!deployment.startsWith("local:")) {
+		throw new Error(
+			`Refusing to start e2e against ${deployment || "an unset deployment"}. ` +
+				"This setup writes TELEGRAM_BOT_TOKEN and TELEGRAM_WEBHOOK_SECRET. " +
+				"Point packages/backend/.env.local at a local deployment first.",
+		);
+	}
+
 	reapStaleBackend();
 	const fake = await startFakeBotApi();
 

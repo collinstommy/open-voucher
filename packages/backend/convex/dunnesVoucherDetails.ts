@@ -1,6 +1,7 @@
 import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
 import { assertValidSession } from "../src/lib/adminAuth";
+import { stripBarcodeSpaces } from "../src/lib/barcode";
 import { adminQuery } from "./adminGuards";
 import {
 	ensureDunnesTokens,
@@ -190,7 +191,10 @@ export const getVoucherDetails = action({
 		if (!voucher) {
 			throw new Error("Voucher not found");
 		}
-		if (!voucher.barcodeNumber) {
+		const barcodeNumber = voucher.barcodeNumber
+			? stripBarcodeSpaces(voucher.barcodeNumber)
+			: "";
+		if (!barcodeNumber) {
 			const result = {
 				outcome: "no-barcode" as const,
 				label: "No barcode on this voucher.",
@@ -210,7 +214,7 @@ export const getVoucherDetails = action({
 			const { tokens, responses } = await authorizedLink(
 				username,
 				password,
-				voucher.barcodeNumber,
+				barcodeNumber,
 				stored,
 			);
 			await ctx.runMutation(internal.dunnesVoucherDetails.saveSession, {
