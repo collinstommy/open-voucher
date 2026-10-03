@@ -1,0 +1,1053 @@
+<!doctype html>
+<!--
+  PROTOTYPE — throwaway. Single direction: admin sidebar + Home + Vouchers.
+  Working navigation: sidebar links, "View all vouchers" from Home, filters,
+  search and the Check action. Sample data copied from the 3 Oct 2026 admin
+  screenshots. Not wired to Convex.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Voucher Admin — Prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fraunces:ital,opsz,wght@1,9..144,500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #0a0e13;
+    --bg-glow: rgba(79, 141, 255, 0.10);
+    --sidebar: #0b1016;
+    --panel: #111a24;
+    --panel-2: #16212d;
+    --panel-3: #1b2836;
+    --border: rgba(226, 238, 255, 0.08);
+    --border-strong: rgba(226, 238, 255, 0.16);
+    --text: #e9eff6;
+    --muted: #8d9bab;
+    --faint: #5c6b7b;
+    --accent: #4f8dff;
+    --accent-2: #8b6cff;
+    --accent-dim: rgba(79, 141, 255, 0.14);
+    --green: #46c06a;
+    --green-dim: rgba(70, 192, 106, 0.14);
+    --amber: #e0a63a;
+    --amber-dim: rgba(224, 166, 58, 0.14);
+    --red: #f0616d;
+    --red-dim: rgba(240, 97, 109, 0.14);
+    --violet: #a98bff;
+    --violet-dim: rgba(139, 108, 255, 0.16);
+    --paper: #fbf8f2;
+    --ink: #1d1a15;
+    --hot: #c0392b;
+    --side: 264px;
+    --r: 16px;
+    --r-sm: 11px;
+    --sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+    --serif: "Fraunces", Georgia, serif;
+    --shadow: 0 18px 40px -22px rgba(0, 0, 0, 0.85);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; min-height: 100%; }
+  body {
+    background:
+      radial-gradient(1100px 520px at 14% -12%, var(--bg-glow), transparent 60%),
+      radial-gradient(900px 500px at 100% 0%, rgba(139, 108, 255, 0.06), transparent 55%),
+      var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  button, input, select { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  a { color: inherit; }
+  ::selection { background: rgba(79, 141, 255, 0.35); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 8px; }
+  .mono { font-family: var(--mono); font-variant-ligatures: none; }
+
+  /* ---------------------------------------------------------------- shell */
+  .shell { display: grid; grid-template-columns: var(--side) minmax(0, 1fr); min-height: 100vh; }
+
+  /* -------------------------------------------------------------- sidebar */
+  .sidebar {
+    position: sticky; top: 0; height: 100vh;
+    display: flex; flex-direction: column;
+    background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent 30%), var(--sidebar);
+    border-right: 1px solid var(--border);
+    padding: 18px 14px 14px;
+  }
+  .brand { display: flex; align-items: center; gap: 11px; padding: 0 6px 18px; }
+  .mark {
+    width: 38px; height: 38px; flex: none; border-radius: 11px;
+    display: grid; place-items: center;
+    background: linear-gradient(140deg, #4f8dff, #8b6cff);
+    color: #fff; font-weight: 700; font-size: 18px;
+    box-shadow: 0 8px 20px -8px rgba(79, 141, 255, 0.8);
+  }
+  .brand .name { font-size: 15px; font-weight: 650; line-height: 1.15; }
+  .brand .sub { font-size: 12px; color: var(--muted); margin-top: 1px; }
+
+  .nav { flex: 1; overflow-y: auto; padding: 2px 0 6px; scrollbar-width: thin; }
+  .nav::-webkit-scrollbar { width: 8px; }
+  .nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 99px; }
+  .group + .group { margin-top: 14px; }
+  .group-h {
+    width: 100%; background: none; border: 0; text-align: left;
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 10px; color: var(--faint);
+    font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase;
+  }
+  .group-h .chev { margin-left: auto; transition: transform .18s ease; }
+  .group.closed .group-h .chev { transform: rotate(-90deg); }
+  .group.closed .group-items { display: none; }
+  .group-items { display: flex; flex-direction: column; gap: 2px; }
+  .nav-item {
+    position: relative;
+    display: flex; align-items: center; gap: 11px;
+    min-height: 40px; padding: 0 11px;
+    border-radius: 10px; border: 1px solid transparent;
+    color: #b9c6d4; font-size: 14px; text-decoration: none;
+    transition: background .14s ease, color .14s ease, border-color .14s ease;
+  }
+  .nav-item svg { width: 17px; height: 17px; color: var(--faint); flex: none; transition: color .14s ease; }
+  .nav-item:hover { background: rgba(255,255,255,0.045); color: #fff; }
+  .nav-item:hover svg { color: var(--muted); }
+  .nav-item.active {
+    background: var(--accent-dim);
+    border-color: rgba(79, 141, 255, 0.32);
+    color: #fff;
+  }
+  .nav-item.active svg { color: var(--accent); }
+  .nav-item.active::before {
+    content: ""; position: absolute; left: -14px; top: 50%; transform: translateY(-50%);
+    width: 3px; height: 20px; border-radius: 0 4px 4px 0; background: var(--accent);
+  }
+  .nav-item .soon {
+    margin-left: auto; font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--faint); background: rgba(255,255,255,0.04);
+    padding: 2px 6px; border-radius: 99px;
+  }
+  .side-foot { border-top: 1px solid var(--border); padding: 12px 4px 0; margin-top: 8px; }
+  .side-user { display: flex; align-items: center; gap: 10px; padding: 4px 6px 12px; }
+  .avatar { width: 32px; height: 32px; border-radius: 99px; flex: none; display: grid; place-items: center;
+            background: linear-gradient(140deg, #26384d, #1b2836); color: #cfe0f5; font-size: 12px; font-weight: 600; border: 1px solid var(--border-strong); }
+  .side-user .who { font-size: 13px; font-weight: 550; }
+  .side-user .role { font-size: 11.5px; color: var(--muted); }
+  .side-actions { display: flex; gap: 8px; }
+  .field-select {
+    flex: 1; min-height: 40px; border-radius: 10px;
+    background: var(--panel-2); border: 1px solid var(--border-strong);
+    padding: 0 10px; color: var(--text); font-size: 13px;
+  }
+  .ghost-btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    min-height: 40px; padding: 0 12px; border-radius: 10px;
+    background: var(--panel-2); border: 1px solid var(--border-strong);
+    color: var(--muted); font-size: 13px;
+  }
+  .ghost-btn:hover { color: #fff; border-color: var(--border-strong); background: var(--panel-3); }
+
+  /* ----------------------------------------------------------------- main */
+  .main { min-width: 0; display: flex; flex-direction: column; }
+  .topbar {
+    position: sticky; top: 0; z-index: 20;
+    display: flex; align-items: center; gap: 14px;
+    padding: 14px 32px;
+    background: rgba(10, 14, 19, 0.82);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+  }
+  .hamburger { display: none; width: 42px; height: 42px; border-radius: 10px;
+    background: var(--panel-2); border: 1px solid var(--border-strong); color: var(--text);
+    place-items: center; }
+  .crumb .k { font-size: 12px; color: var(--muted); letter-spacing: 0.02em; }
+  .crumb .v { font-size: 15px; font-weight: 600; line-height: 1.25; }
+  .topbar .right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+  .live {
+    display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--muted);
+    padding: 7px 11px; border-radius: 99px; border: 1px solid var(--border); background: var(--panel);
+  }
+  .live .dot { width: 7px; height: 7px; border-radius: 99px; background: var(--green); box-shadow: 0 0 0 3px var(--green-dim); }
+  .env-pill {
+    display: inline-flex; align-items: center; gap: 7px;
+    font-size: 12.5px; color: #cfe0f5;
+    padding: 7px 12px; border-radius: 99px;
+    background: var(--accent-dim); border: 1px solid rgba(79, 141, 255, 0.3);
+  }
+  .env-pill .dot { width: 6px; height: 6px; border-radius: 99px; background: var(--accent); }
+
+  .page { padding: 30px 32px 96px; max-width: 1320px; width: 100%; }
+  .page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 18px; flex-wrap: wrap; margin-bottom: 24px; }
+  .page-head h1 { margin: 0; font-size: 27px; font-weight: 680; letter-spacing: -0.03em; }
+  .page-head .sub { color: var(--muted); font-size: 14px; margin-top: 5px; }
+  .page-head .sub b { color: var(--text); font-weight: 600; }
+  .actions { display: flex; gap: 9px; flex-wrap: wrap; }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    min-height: 40px; padding: 0 15px; border-radius: 10px;
+    border: 1px solid var(--border-strong); background: var(--panel-2); color: var(--text);
+    font-size: 13.5px; font-weight: 550;
+    transition: background .14s ease, border-color .14s ease, transform .1s ease;
+  }
+  .btn:hover { background: var(--panel-3); }
+  .btn:active { transform: translateY(1px); }
+  .btn.primary { background: linear-gradient(140deg, #4f8dff, #6a7cff); border-color: transparent; color: #fff;
+                 box-shadow: 0 10px 24px -14px rgba(79,141,255,0.9); }
+  .btn.primary:hover { filter: brightness(1.06); }
+  .btn.sm { min-height: 34px; padding: 0 12px; font-size: 13px; border-radius: 9px; }
+  .btn svg { width: 16px; height: 16px; }
+
+  /* ------------------------------------------------------------------ kpi */
+  .kpi-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+  .kpi-grid + .kpi-grid { margin-top: 14px; }
+  .card {
+    position: relative; overflow: hidden;
+    background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0) 46%), var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+  }
+  .card::after {
+    content: ""; position: absolute; inset: 0 0 auto 0; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.16), transparent);
+  }
+  .kpi { padding: 16px 18px 17px; }
+  .kpi-top { display: flex; align-items: center; gap: 10px; }
+  .chip {
+    width: 34px; height: 34px; flex: none; border-radius: 10px;
+    display: grid; place-items: center; font-size: 13px; font-weight: 650;
+    border: 1px solid transparent;
+  }
+  .chip svg { width: 17px; height: 17px; }
+  .chip.blue { color: #9dc0ff; background: var(--accent-dim); border-color: rgba(79,141,255,0.24); }
+  .chip.green { color: #93e0aa; background: var(--green-dim); border-color: rgba(70,192,106,0.24); }
+  .chip.violet { color: #c3b0ff; background: var(--violet-dim); border-color: rgba(139,108,255,0.26); }
+  .chip.amber { color: #eccb85; background: var(--amber-dim); border-color: rgba(224,166,58,0.26); }
+  .kpi .label { color: var(--muted); font-size: 12.5px; font-weight: 500; }
+  .kpi .value { margin-top: 14px; font-size: 36px; font-weight: 660; letter-spacing: -0.045em; line-height: 1; font-variant-numeric: tabular-nums; }
+  .kpi.zero .value { color: var(--faint); }
+  .kpi .foot { margin-top: 11px; display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--faint); }
+  .trend { display: inline-flex; align-items: center; gap: 4px; font-weight: 600; }
+  .trend.up { color: var(--green); }
+  .trend.down { color: var(--red); }
+  .trend.flat { color: var(--muted); }
+  .trend svg { width: 12px; height: 12px; }
+  .stock-bar { height: 5px; border-radius: 99px; background: rgba(255,255,255,0.07); overflow: hidden; margin-top: 13px; }
+  .stock-bar > i { display: block; height: 100%; border-radius: inherit; }
+  .stock-bar > i.blue { background: linear-gradient(90deg, #3b74e6, #4f8dff); }
+  .stock-bar > i.green { background: linear-gradient(90deg, #2f9d55, #46c06a); }
+  .stock-bar > i.violet { background: linear-gradient(90deg, #6a54d8, #8b6cff); }
+  .stock-bar > i.zero { background: rgba(255,255,255,0.1); }
+
+  /* --------------------------------------------------------------- panels */
+  .section { margin-top: 26px; }
+  .section-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 14px; flex-wrap: wrap; }
+  .section-head h2 { margin: 0; font-size: 16px; font-weight: 620; letter-spacing: -0.01em; }
+  .section-head .hint { color: var(--muted); font-size: 13px; }
+  .link { color: var(--accent); text-decoration: none; font-size: 13.5px; font-weight: 550; display: inline-flex; align-items: center; gap: 5px; }
+  .link:hover { text-decoration: underline; }
+  .link svg { width: 15px; height: 15px; }
+
+  .split { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+
+  .panel { padding: 18px 18px 16px; }
+  .panel-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
+  .panel-head h3 { margin: 0; font-size: 14.5px; font-weight: 600; }
+  .seg { display: inline-flex; border: 1px solid var(--border-strong); border-radius: 10px; overflow: hidden; background: var(--panel-2); }
+  .seg button { border: 0; background: transparent; padding: 6px 11px; font-size: 12px; color: var(--muted); }
+  .seg button[aria-pressed="true"] { background: var(--accent-dim); color: #fff; }
+
+  svg.chart { display: block; width: 100%; height: auto; overflow: visible; }
+  .chart .grid-line { stroke: rgba(226,238,255,0.07); stroke-dasharray: 3 5; }
+  .chart .axis-label { fill: var(--faint); font-size: 11px; font-family: var(--sans); }
+  .chart .guide { stroke: rgba(226,238,255,0.22); stroke-dasharray: 3 4; }
+  .chart-tip {
+    position: absolute; pointer-events: none; opacity: 0; transform: translate(-50%, -120%);
+    background: #0c131b; border: 1px solid var(--border-strong); border-radius: 10px;
+    padding: 7px 10px; font-size: 12px; box-shadow: var(--shadow); transition: opacity .12s ease;
+    white-space: nowrap; z-index: 5;
+  }
+  .chart-tip b { font-variant-numeric: tabular-nums; }
+  .chart-wrap { position: relative; }
+
+  /* weekly failure list */
+  .weeks { border: 1px solid var(--border); border-radius: var(--r); background: var(--panel); overflow: hidden; }
+  .week-row {
+    display: grid; grid-template-columns: 82px minmax(90px, 1.5fr) 78px 78px 62px;
+    gap: 14px; align-items: center; padding: 11px 18px;
+    border-top: 1px solid var(--border); font-variant-numeric: tabular-nums; font-size: 13.5px;
+  }
+  .week-row:first-child { border-top: 0; }
+  .week-head {
+    display: grid; grid-template-columns: 82px minmax(90px, 1.5fr) 78px 78px 62px;
+    gap: 14px; padding: 11px 18px; color: var(--faint); font-size: 11.5px;
+    font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+    background: rgba(255,255,255,0.015);
+  }
+  .week-head .r, .week-row .r { text-align: right; }
+  .week-row > span:first-child { color: var(--text); font-weight: 550; }
+  .bar { height: 6px; border-radius: 99px; background: rgba(255,255,255,0.07); overflow: hidden; }
+  .bar > i { display: block; height: 100%; border-radius: inherit; background: var(--green); }
+  .bar.amber > i { background: var(--amber); }
+  .bar.red > i { background: var(--red); }
+  .bar.zero > i { background: rgba(255,255,255,0.14); }
+  .pill {
+    justify-self: end; display: inline-flex; align-items: center; gap: 6px;
+    font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 99px;
+    font-variant-numeric: tabular-nums;
+  }
+  .pill.green { color: #93e0aa; background: var(--green-dim); }
+  .pill.amber { color: #eccb85; background: var(--amber-dim); }
+  .pill.red { color: #f5a0a8; background: var(--red-dim); }
+  .pill.grey { color: var(--muted); background: rgba(255,255,255,0.05); }
+
+  /* this week mini bars */
+  .weekbars { display: grid; gap: 12px; }
+  .wb-row { display: grid; grid-template-columns: 42px 1fr; gap: 12px; align-items: center; }
+  .wb-row .d { font-size: 12.5px; color: var(--muted); }
+  .wb-stack { display: flex; flex-direction: column; gap: 4px; }
+  .wb-bar { height: 9px; border-radius: 99px; background: rgba(255,255,255,0.06); overflow: hidden; }
+  .wb-bar > i { display: block; height: 100%; border-radius: inherit; }
+  .wb-bar.up > i { background: linear-gradient(90deg, #3b74e6, #4f8dff); }
+  .wb-bar.cl > i { background: linear-gradient(90deg, #2f9d55, #46c06a); }
+  .legend { display: flex; gap: 16px; margin-top: 14px; }
+  .legend span { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--muted); }
+  .legend i { width: 9px; height: 9px; border-radius: 3px; display: inline-block; }
+
+  /* ------------------------------------------------------------- vouchers */
+  .toolbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
+  .search { position: relative; flex: 1; min-width: 220px; max-width: 380px; }
+  .search svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; color: var(--faint); }
+  .search input {
+    width: 100%; min-height: 42px; padding: 0 14px 0 38px;
+    background: var(--panel); border: 1px solid var(--border-strong); border-radius: 10px;
+    color: var(--text); font-size: 13.5px;
+  }
+  .search input::placeholder { color: var(--faint); }
+  .filters { display: flex; gap: 7px; flex-wrap: wrap; }
+  .filters button {
+    background: var(--panel); border: 1px solid var(--border); color: var(--muted);
+    border-radius: 99px; padding: 8px 13px; font-size: 13px; font-weight: 500;
+    transition: background .14s ease, color .14s ease, border-color .14s ease;
+  }
+  .filters button:hover { color: #fff; }
+  .filters button[aria-pressed="true"] { border-color: transparent; background: var(--accent-dim); color: #fff; }
+  .filters button .n { color: var(--faint); margin-left: 6px; font-variant-numeric: tabular-nums; }
+  .filters button[aria-pressed="true"] .n { color: #9dc0ff; }
+  .toolbar .spacer { flex: 1; }
+  .count { color: var(--muted); font-size: 13px; white-space: nowrap; }
+
+  .v-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+  .vcard {
+    display: flex; flex-direction: column; overflow: hidden;
+    background: linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0) 40%), var(--panel);
+    border: 1px solid var(--border); border-radius: var(--r);
+    transition: transform .16s ease, border-color .16s ease, box-shadow .16s ease;
+  }
+  .vcard:hover { transform: translateY(-3px); border-color: rgba(79,141,255,0.4); box-shadow: var(--shadow); }
+  .v-media { position: relative; background: #0e151d; border-bottom: 1px solid var(--border); }
+  .v-media .badge {
+    position: absolute; top: 12px; left: 12px; z-index: 2;
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 11px; font-weight: 650; letter-spacing: 0.05em; text-transform: uppercase;
+    padding: 4px 9px; border-radius: 99px; backdrop-filter: blur(6px);
+  }
+  .badge.available { color: #9ff0b6; background: rgba(28, 74, 44, 0.72); border: 1px solid rgba(70,192,106,0.4); }
+  .badge.claimed { color: #cbd8e6; background: rgba(38, 52, 68, 0.75); border: 1px solid rgba(226,238,255,0.18); }
+  .badge.reported { color: #ffb4bb; background: rgba(82, 32, 38, 0.75); border: 1px solid rgba(240,97,109,0.4); }
+  .badge.expired { color: var(--muted); background: rgba(30,38,48,0.8); border: 1px solid var(--border-strong); }
+  .v-media .soon-flag {
+    position: absolute; top: 12px; right: 12px; z-index: 2;
+    font-size: 11px; font-weight: 650; padding: 4px 9px; border-radius: 99px;
+    color: #ffd9a3; background: rgba(80, 56, 12, 0.75); border: 1px solid rgba(224,166,58,0.45);
+  }
+  .v-body { padding: 15px 16px 16px; display: flex; flex-direction: column; gap: 11px; flex: 1; }
+  .v-title-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+  .v-amount { font-size: 21px; font-weight: 680; letter-spacing: -0.035em; font-variant-numeric: tabular-nums; }
+  .v-amount small { font-size: 12px; font-weight: 500; color: var(--muted); letter-spacing: 0; margin-left: 4px; }
+  .v-type { font-size: 12px; color: var(--muted); }
+  .meta { display: grid; gap: 6px; }
+  .meta-row { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+  .meta-row .k { width: 64px; flex: none; color: var(--faint); }
+  .meta-row .v { color: #c9d6e4; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .meta-row .v.linkish { color: var(--accent); text-decoration: none; }
+  .meta-row .v.linkish:hover { text-decoration: underline; }
+  .meta-row .v.warn { color: var(--amber); font-weight: 550; }
+  .meta-row .v.mono { font-family: var(--mono); font-size: 11.5px; }
+  .v-foot { margin-top: auto; padding-top: 12px; display: flex; align-items: center; gap: 10px; border-top: 1px solid var(--border); }
+  .check-result {
+    display: inline-flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 550;
+    color: #9ff0b6; background: var(--green-dim); border: 1px solid rgba(70,192,106,0.28);
+    padding: 5px 10px; border-radius: 8px; font-family: var(--mono); font-size: 11px;
+  }
+  .check-result.bad { color: #ffb4bb; background: var(--red-dim); border-color: rgba(240,97,109,0.3); }
+
+  .empty { padding: 64px 24px; text-align: center; color: var(--muted); }
+  .empty .big { font-size: 15px; color: var(--text); font-weight: 600; margin-bottom: 4px; }
+
+  /* -------------------------------------------------------------- receipt */
+  .receipt { display: grid; place-items: center; padding: 22px 16px; min-height: 260px; }
+  .receipt.compact { padding: 12px; min-height: 150px; }
+  .receipt.photo {
+    background:
+      radial-gradient(90% 70% at 28% -5%, rgba(255,255,255,0.22), transparent 52%),
+      linear-gradient(160deg, #cdbba4, #8e7d6c 46%, #b6a48f);
+  }
+  .receipt.clean { background: radial-gradient(120% 90% at 50% 0%, #f6f4ef, #d9d5cc); }
+  .slip {
+    width: min(238px, 96%); background: var(--paper); color: var(--ink);
+    padding: 16px 14px 12px; text-align: center; border-radius: 2px;
+    box-shadow: 0 10px 24px -14px rgba(0,0,0,0.5);
+  }
+  .receipt.photo .slip {
+    transform: rotate(-1.6deg);
+    box-shadow: 0 16px 30px -12px rgba(40, 24, 10, 0.55);
+    clip-path: polygon(0 7px, 8% 0, 16% 6px, 27% 0, 40% 5px, 55% 0, 70% 6px, 84% 0, 100% 5px, 100% 100%, 0 100%);
+  }
+  .slip .store { font-weight: 700; letter-spacing: 0.14em; font-size: 13px; color: #17140f; }
+  .slip .store small { display: block; letter-spacing: 0.26em; font-size: 8px; margin-top: 2px; color: #4a4238; }
+  .slip .script { font-family: var(--serif); font-style: italic; font-size: 14px; margin: 5px 0 6px; color: #3b352c; }
+  .slip .deal { font-weight: 700; font-size: 20px; letter-spacing: -0.02em; margin-top: 8px; color: #17140f; }
+  .slip .exp { color: var(--hot); font-weight: 700; font-size: 12.5px; margin-top: 4px; }
+  .slip .fine { font-size: 9.5px; line-height: 1.35; margin-top: 6px; color: #4a4238; }
+  .slip .bars { display: flex; justify-content: center; align-items: stretch; height: 46px; gap: 1px; margin: 10px 0 4px; }
+  .slip .bars i { display: block; background: transparent; }
+  .slip .bars i.on { background: #1a1714; }
+  .slip .code { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.05em; color: #17140f; }
+  .slip .terms { font-size: 8.5px; color: #7a7166; margin-top: 6px; }
+  .slip.compact { width: 100%; padding: 10px 8px; box-shadow: none; }
+  .slip.compact .script, .slip.compact .fine, .slip.compact .bars,
+  .slip.compact .code, .slip.compact .terms { display: none; }
+  .slip.compact .deal { font-size: 13px; margin: 4px 0 0; }
+  .slip.compact .exp { font-size: 10px; }
+
+  /* ----------------------------------------------------------------- misc */
+  .placeholder { padding: 60px 20px; text-align: center; color: var(--muted); }
+  .placeholder .glyph { width: 54px; height: 54px; margin: 0 auto 14px; border-radius: 14px; display: grid; place-items: center;
+                        background: var(--panel-2); border: 1px solid var(--border-strong); }
+  .placeholder h2 { margin: 0 0 6px; color: var(--text); font-size: 18px; }
+
+  .scrim { display: none; }
+
+  /* ------------------------------------------------------------ responsive */
+  @media (max-width: 1180px) {
+    .v-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .split { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 900px) {
+    .shell { grid-template-columns: 1fr; }
+    .sidebar {
+      position: fixed; inset: 0 auto 0 0; z-index: 40; width: min(300px, 86vw);
+      transform: translateX(-104%); transition: transform .2s ease;
+    }
+    .sidebar.open { transform: none; }
+    .scrim { display: none; position: fixed; inset: 0; z-index: 30; background: rgba(4,7,11,0.6); backdrop-filter: blur(1px); }
+    .scrim.show { display: block; }
+    .hamburger { display: grid; }
+    .topbar { padding: 12px 16px; }
+    .page { padding: 20px 16px 80px; }
+    .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .week-head { display: none; }
+    .week-row { grid-template-columns: 64px minmax(60px, 1fr) auto; gap: 10px; padding: 11px 14px; }
+    .week-row .hide-sm { display: none; }
+  }
+  @media (max-width: 620px) {
+    .v-grid { grid-template-columns: 1fr; }
+    .kpi-grid { grid-template-columns: 1fr; }
+    .page-head h1 { font-size: 22px; }
+    .live { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+  <aside class="sidebar" id="sidebar" aria-label="Admin navigation"></aside>
+  <div class="scrim" id="scrim"></div>
+  <div class="main">
+    <header class="topbar">
+      <button class="hamburger" id="hamburger" aria-label="Open navigation">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+      <div class="crumb"><div class="k" id="crumb-k">Overview</div><div class="v" id="crumb-v">Home</div></div>
+      <div class="right">
+        <span class="live"><span class="dot"></span>Live data</span>
+        <span class="env-pill"><span class="dot"></span><span id="env-label">Production</span></span>
+      </div>
+    </header>
+    <main class="page" id="page"></main>
+  </div>
+</div>
+
+<script>
+/* ------------------------------------------------------------------ data */
+const NAV = [
+  ["Overview", [
+    ["Home", "home", "house"],
+    ["Analytics", "analytics", "chart", false],
+  ]],
+  ["Operations", [
+    ["Vouchers", "vouchers", "ticket"],
+    ["Failed Uploads", "failed", "alert", false],
+  ]],
+  ["Users & Safety", [
+    ["Users", "users", "users", false],
+    ["Banned", "banned", "ban", false],
+    ["Feedback", "feedback", "message", false],
+  ]],
+  ["System", [
+    ["Health Check", "health", "activity", false],
+    ["Evals", "evals", "clipboard", false],
+    ["Checks", "checks", "shield", false],
+    ["Settings", "settings", "gear", false],
+  ]],
+];
+
+const WEEKS = [
+  ["Sep 28", 287, 2, 1], ["Sep 21", 395, 9, 2], ["Sep 14", 355, 8, 2],
+  ["Sep 7", 373, 8, 2], ["Aug 31", 379, 10, 3], ["Aug 24", 370, 1, 0],
+  ["Aug 17", 343, 5, 1], ["Aug 10", 362, 5, 1], ["Aug 3", 386, 7, 2],
+  ["Jul 27", 374, 17, 5], ["Jul 20", 356, 6, 2], ["Jul 13", 379, 5, 1],
+];
+
+const GROWTH = {
+  "30": [
+    ["Sep 4", 1268], ["Sep 6", 1272], ["Sep 8", 1275], ["Sep 10", 1279],
+    ["Sep 12", 1283], ["Sep 14", 1289], ["Sep 16", 1296], ["Sep 18", 1301],
+    ["Sep 20", 1308], ["Sep 22", 1315], ["Sep 24", 1321], ["Sep 26", 1329],
+    ["Sep 28", 1338], ["Sep 30", 1347], ["Oct 2", 1361], ["Oct 3", 1455],
+  ],
+  "all": [
+    ["Jul 4", 806], ["Jul 11", 858], ["Jul 18", 903], ["Jul 25", 941],
+    ["Aug 1", 988], ["Aug 8", 1024], ["Aug 15", 1061], ["Aug 22", 1112],
+    ["Aug 29", 1170], ["Sep 5", 1203], ["Sep 12", 1231], ["Sep 19", 1276],
+    ["Sep 26", 1311], ["Oct 3", 1455],
+  ],
+};
+
+const VOUCHERS = [
+  { id: "js799t51edfj6cfmjjsv8g9pkn8fjntg", type: 10, who: "Cindy", status: "available", exp: "5 Oct 2026", up: "3 Oct, 18:01", kind: "photo", offer: "SAVE €10", fine: "When you spend €50 or more on Groceries.", code: "270734 134504" },
+  { id: "js7d84d8d6vs5p84b9ayhnbpqn8fkcyj", type: 5, who: "Aoife", status: "available", exp: "Today", up: "3 Oct, 17:31", kind: "clean", offer: "€5 OFF €25", fine: "Valid 27 Sep – 3 Oct", code: "2707349 7527 72", soon: true },
+  { id: "js7c9hec3ddnyspnj7vck88586822bz", type: 5, who: "Aoife", status: "claimed", exp: "3 Oct 2026", up: "3 Oct, 17:31", kind: "clean", offer: "€5 OFF €25", fine: "Valid 27 Sep – 3 Oct", code: "2707235 3923 58", claimer: "jm7c3hac3ddnyspnj7vck885d8622bz" },
+  { id: "js8aa21c0thursday0000000000001", type: 5, who: "Liam", status: "available", exp: "Thursday", up: "2 Oct, 11:04", kind: "clean", offer: "€5 OFF €25", fine: "Valid 2 Oct – 8 Oct", code: "2707011 2201 19", soon: true },
+  { id: "js1photo0save1euro000000000002", type: 5, who: "Mae", status: "reported", exp: "4 Oct 2026", up: "1 Oct, 09:12", kind: "photo", offer: "SAVE €1", fine: "On Groceries. Voucher valid for 7 days.", code: "2706881 1044 02" },
+  { id: "js10photo0grid000000000000003", type: 10, who: "Cian", status: "available", exp: "6 Oct 2026", up: "3 Oct, 16:44", kind: "photo", offer: "SAVE €10", fine: "When you spend €50 or more on Groceries.", code: "2707341 34504" },
+  { id: "js20claimed000000000000000004", type: 20, who: "Nora", status: "claimed", exp: "1 Oct 2026", up: "28 Sep, 13:20", kind: "clean", offer: "€20 OFF €80", fine: "Valid 24 Sep – 1 Oct", code: "2706900 1188 40", claimer: "js9b2e4f1a7c3d5e8f0a2b4c6d8e0f2" },
+  { id: "js5flat0000000000000000000005", type: 10, who: "Ruth", status: "available", exp: "9 Oct 2026", up: "3 Oct, 08:02", kind: "clean", offer: "€10 OFF €40", fine: "Valid 3 Oct – 9 Oct", code: "2707550 4410 11" },
+  { id: "js9expired00000000000000000006", type: 5, who: "Oisin", status: "expired", exp: "30 Sep 2026", up: "25 Sep, 10:40", kind: "clean", offer: "€5 OFF €25", fine: "Valid 22 Sep – 30 Sep", code: "2706123 0091 74" },
+];
+
+const STATE = {
+  page: "home",
+  filter: "all",
+  query: "",
+  range: "30",
+  env: "Production",
+  checked: {},
+  collapsed: {},
+  openNav: false,
+};
+
+/* --------------------------------------------------------------- helpers */
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+const ICONS = {
+  house: '<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M9.5 21v-6h5v6"/>',
+  chart: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+  ticket: '<path d="M3 9a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v1a2 2 0 0 0 0 4v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1a2 2 0 0 0 0-4Z"/><path d="M13 7v10"/>',
+  alert: '<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4M12 17h.01"/>',
+  users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>',
+  ban: '<circle cx="12" cy="12" r="9"/><path d="m5.6 5.6 12.8 12.8"/>',
+  message: '<path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.9 8.9 0 0 1-3.8-.9L3 21l1.9-5.2A8.4 8.4 0 0 1 3 11.5 8.4 8.4 0 0 1 12 3a8.4 8.4 0 0 1 9 8.5Z"/>',
+  activity: '<path d="M22 12h-4l-3 8-4-16-3 8H2"/>',
+  clipboard: '<path d="M9 3h6a1 1 0 0 1 1 1v1H8V4a1 1 0 0 1 1-1Z"/><path d="M8 5H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><path d="m9 14 2 2 4-4"/>',
+  shield: '<path d="M12 22s8-3.5 8-10V5l-8-3-8 3v7c0 6.5 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/>',
+  gear: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.7 1.1V21a2 2 0 1 1-4 0v-.1A1.6 1.6 0 0 0 7 19.4a1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0-1.1-2.7H1a2 2 0 1 1 0-4h.1A1.6 1.6 0 0 0 2.6 7a1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H7a1.6 1.6 0 0 0 1-1.5V1a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V7a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1Z"/>',
+  arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+  trendUp: '<path d="M3 17 9 11l4 4 8-8"/><path d="M14 7h7v7"/>',
+  trendDown: '<path d="M3 7l6 6 4-4 8 8"/><path d="M21 10v7h-7"/>',
+  sparkle: '<path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M18.4 5.6l-2.8 2.8M8.4 15.6l-2.8 2.8"/>',
+};
+
+function icon(name) {
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${ICONS[name] || ""}</svg>`;
+}
+
+function barcode(seed) {
+  let n = 2166136261;
+  for (const ch of seed) n = (n * 16777619) ^ ch.charCodeAt(0);
+  let html = "";
+  for (let i = 0; i < 46; i++) {
+    n = (n * 1664525 + 1013904223) >>> 0;
+    const w = (n % 3) + 1;
+    const on = n % 4 !== 0;
+    html += `<i class="${on ? "on" : ""}" style="width:${w}px"></i>`;
+  }
+  return html;
+}
+
+function receipt(v, compact) {
+  const photo = v.kind === "photo";
+  return `<div class="receipt ${photo ? "photo" : "clean"}${compact ? " compact" : ""}">
+    <div class="slip${compact ? " compact" : ""}">
+      <div class="store">DUNNES<small>STORES</small></div>
+      ${photo && !compact ? '<div class="script">Always better value</div>' : ""}
+      <div class="deal">${esc(v.offer)}</div>
+      ${v.soon && !compact ? `<div class="exp">Expires ${esc(v.exp)}</div>` : ""}
+      <div class="fine">${esc(v.fine)}</div>
+      <div class="bars">${barcode(v.id)}</div>
+      <div class="code">${esc(v.code)}</div>
+      <div class="terms">Terms and conditions apply</div>
+    </div>
+  </div>`;
+}
+
+function trend(dir, label) {
+  const name = { up: "trendUp", down: "trendDown", flat: "arrow" }[dir] || "arrow";
+  return `<span class="trend ${dir}">${icon(name)}${label}</span>`;
+}
+
+/* --------------------------------------------------------------- sidebar */
+function sidebarHTML() {
+  const groups = NAV.map(([label, items]) => {
+    const closed = STATE.collapsed[label];
+    const links = items.map(([name, id, ic, implemented = true]) => {
+      const active = STATE.page === id || (!["home", "vouchers"].includes(STATE.page) && STATE.page === id);
+      return `<a class="nav-item${active ? " active" : ""}" href="?page=${id}" data-nav="${id}">
+        ${icon(ic)}<span>${name}</span>${implemented ? "" : '<span class="soon">soon</span>'}
+      </a>`;
+    }).join("");
+    return `<div class="group${closed ? " closed" : ""}">
+      <button class="group-h" data-group="${label}" aria-expanded="${!closed}">
+        ${label}<span class="chev"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m6 9 6 6 6-6"/></svg></span>
+      </button>
+      <div class="group-items">${links}</div>
+    </div>`;
+  }).join("");
+  return `${groups}
+    <div class="side-foot">
+      <div class="side-user">
+        <span class="avatar">TA</span>
+        <span><span class="who">Tom A.</span><br><span class="role">Administrator</span></span>
+      </div>
+      <div class="side-actions">
+        <select class="field-select" id="env-select" aria-label="Environment">
+          <option>Production</option>
+          <option>Development</option>
+        </select>
+        <button class="ghost-btn" type="button" title="Logout">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5M21 12H9"/></svg>
+        </button>
+      </div>
+    </div>`;
+}
+
+/* ------------------------------------------------------------------ home */
+function kpi(label, value, chip, chipClass, foot, opts = {}) {
+  return `<div class="card kpi${opts.zero ? " zero" : ""}">
+    <div class="kpi-top"><span class="chip ${chipClass}">${chip}</span><span class="label">${label}</span></div>
+    <div class="value">${value}</div>
+    ${opts.bar ? `<div class="stock-bar"><i class="${opts.barClass}" style="width:${opts.bar}%"></i></div>` : ""}
+    <div class="foot">${foot}</div>
+  </div>`;
+}
+
+function weekRows() {
+  const rows = WEEKS.map(([label, total, failed, rate]) => {
+    const tone = rate >= 5 ? "red" : rate >= 3 ? "amber" : rate === 0 ? "zero" : "";
+    const pill = rate >= 5 ? "red" : rate >= 3 ? "amber" : rate === 0 ? "grey" : "green";
+    return `<div class="week-row">
+      <span>${label}</span>
+      <div class="bar ${tone}"><i style="width:${Math.max(rate, 1.5) * 15}%"></i></div>
+      <span class="r hide-sm">${total}</span>
+      <span class="r hide-sm">${failed}</span>
+      <span class="pill ${pill}">${rate}%</span>
+    </div>`;
+  }).join("");
+  return `<div class="weeks">
+    <div class="week-head"><span>Week</span><span></span><span class="r">Total</span><span class="r">Failed</span><span class="r">Rate</span></div>
+    ${rows}
+  </div>`;
+}
+
+const WEEK_DAYS = [["Mon", 44, 51], ["Tue", 58, 47], ["Wed", 51, 60], ["Thu", 62, 55], ["Fri", 71, 66], ["Sat", 39, 41], ["Sun", 28, 33]];
+
+function weekBars() {
+  const max = 80;
+  const rows = WEEK_DAYS.map(([d, up, cl]) => `<div class="wb-row">
+    <span class="d">${d}</span>
+    <div class="wb-stack">
+      <div class="wb-bar up"><i style="width:${(up / max) * 100}%"></i></div>
+      <div class="wb-bar cl"><i style="width:${(cl / max) * 100}%"></i></div>
+    </div>
+  </div>`).join("");
+  return `<div class="weekbars">${rows}</div>
+    <div class="legend">
+      <span><i style="background:#4f8dff"></i>Uploaded</span>
+      <span><i style="background:#46c06a"></i>Claimed</span>
+    </div>`;
+}
+
+function smoothPath(points) {
+  if (points.length < 2) return "";
+  let d = `M ${points[0][0]} ${points[0][1]}`;
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = points[i - 1] || points[i];
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    const p3 = points[i + 2] || p2;
+    const c1x = p1[0] + (p2[0] - p0[0]) / 6;
+    const c1y = p1[1] + (p2[1] - p0[1]) / 6;
+    const c2x = p2[0] - (p3[0] - p1[0]) / 6;
+    const c2y = p2[1] - (p3[1] - p1[1]) / 6;
+    d += ` C ${c1x} ${c1y}, ${c2x} ${c2y}, ${p2[0]} ${p2[1]}`;
+  }
+  return d;
+}
+
+function growthChart() {
+  const data = GROWTH[STATE.range];
+  const w = 720, h = 240, padL = 46, padR = 16, padT = 18, padB = 34;
+  const values = data.map((d) => d[1]);
+  const min = Math.min(...values) - 40;
+  const max = Math.max(...values) + 20;
+  const sx = (i) => padL + (i * (w - padL - padR)) / (values.length - 1);
+  const sy = (v) => padT + (1 - (v - min) / (max - min)) * (h - padT - padB);
+  const pts = values.map((v, i) => [sx(i), sy(v)]);
+  const line = smoothPath(pts);
+  const area = `${line} L ${sx(values.length - 1)} ${h - padB} L ${padL} ${h - padB} Z`;
+  const ticks = 4;
+  const grid = Array.from({ length: ticks + 1 }, (_, i) => {
+    const v = min + ((max - min) * i) / ticks;
+    const y = sy(v);
+    return `<line class="grid-line" x1="${padL}" y1="${y}" x2="${w - padR}" y2="${y}"/>
+      <text class="axis-label" x="${padL - 10}" y="${y + 3}" text-anchor="end">${Math.round(v)}</text>`;
+  }).join("");
+  const xlabels = data.filter((_, i) => i % Math.ceil(data.length / 6) === 0 || i === data.length - 1)
+    .map(([lab]) => {
+      const i = data.findIndex((d) => d[0] === lab);
+      return `<text class="axis-label" x="${sx(i)}" y="${h - 10}" text-anchor="middle">${lab}</text>`;
+    }).join("");
+  return `<div class="chart-wrap" id="chart-wrap">
+    <svg class="chart" viewBox="0 0 ${w} ${h}" role="img" aria-label="User growth">
+      <defs>
+        <linearGradient id="area" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#4f8dff" stop-opacity="0.35"/>
+          <stop offset="100%" stop-color="#4f8dff" stop-opacity="0"/>
+        </linearGradient>
+        <linearGradient id="stroke" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stop-color="#4f8dff"/>
+          <stop offset="100%" stop-color="#8b6cff"/>
+        </linearGradient>
+      </defs>
+      ${grid}${xlabels}
+      <path d="${area}" fill="url(#area)"/>
+      <path d="${line}" fill="none" stroke="url(#stroke)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+      <g id="chart-guide" style="opacity:0">
+        <line class="guide" y1="${padT}" y2="${h - padB}"/>
+        <circle r="5" fill="#0a0e13" stroke="#4f8dff" stroke-width="2.5"/>
+      </g>
+      <rect x="${padL}" y="${padT}" width="${w - padL - padR}" height="${h - padT - padB}" fill="transparent" id="chart-hit"/>
+    </svg>
+    <div class="chart-tip" id="chart-tip"></div>
+  </div>`;
+}
+
+function recentCards() {
+  return VOUCHERS.slice(0, 3).map(vcard).join("");
+}
+
+function homePage() {
+  return `<div class="page-head">
+      <div>
+        <h1>Home</h1>
+        <div class="sub">Here's how the voucher shelf is doing today.</div>
+      </div>
+      <div class="actions">
+        <button class="btn" type="button" data-nav="analytics">${icon("chart")}Analytics</button>
+        <button class="btn primary" type="button" data-nav="vouchers">${icon("ticket")}Browse vouchers</button>
+      </div>
+    </div>
+
+    <div class="kpi-grid">
+      ${kpi("€5 available", "50", "€5", "green", `${icon("sparkle")}Healthy stock · 50 on the shelf`, { bar: 60, barClass: "green" })}
+      ${kpi("€10 available", "34", "€10", "blue", `Steady · 34 on the shelf`, { bar: 41, barClass: "blue" })}
+      ${kpi("€20 available", "0", "€20", "violet", `Nothing at €20 — worth a nudge`, { zero: true, bar: 2, barClass: "zero" })}
+    </div>
+    <div class="kpi-grid">
+      ${kpi("Total uploaded", "9,962", "↑", "blue", `${trend("up", "+5.4%")} vs last week`)}
+      ${kpi("Vouchers claimed", "7,821", "✓", "green", `${trend("up", "+3.1%")} vs last week`)}
+      ${kpi("Users", "1,455", "U", "violet", `${trend("up", "+94")} this week`)}
+    </div>
+
+    <div class="section split">
+      <div class="card panel">
+        <div class="panel-head">
+          <h3>User growth</h3>
+          <div class="seg" role="group" aria-label="Range">
+            <button type="button" data-range="30" aria-pressed="${STATE.range === "30"}">Last 30 days</button>
+            <button type="button" data-range="all" aria-pressed="${STATE.range === "all"}">All time</button>
+          </div>
+        </div>
+        <div class="sub" style="color:var(--muted);font-size:13px;margin:2px 0 6px">Cumulative registered accounts</div>
+        ${growthChart()}
+      </div>
+      <div class="card panel">
+        <div class="panel-head"><h3>This week</h3><span class="hint" style="color:var(--muted);font-size:12.5px">uploads vs claims</span></div>
+        ${weekBars()}
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-head">
+        <h2>Weekly upload failure rate</h2>
+        <span class="hint">Last 12 weeks · target under 3%</span>
+      </div>
+      ${weekRows()}
+    </div>
+
+    <div class="section">
+      <div class="section-head">
+        <h2>Latest vouchers</h2>
+        <a class="link" href="?page=vouchers" data-nav="vouchers">View all vouchers ${icon("arrow")}</a>
+      </div>
+      <div class="v-grid">${recentCards()}</div>
+    </div>`;
+}
+
+/* -------------------------------------------------------------- vouchers */
+function matches(v) {
+  if (STATE.filter === "available" && v.status !== "available") return false;
+  if (STATE.filter === "claimed" && v.status !== "claimed") return false;
+  if (STATE.filter === "reported" && v.status !== "reported") return false;
+  if (STATE.filter === "soon" && !v.soon) return false;
+  if (STATE.query) {
+    const q = STATE.query.toLowerCase();
+    if (!v.id.toLowerCase().includes(q) && !v.who.toLowerCase().includes(q)) return false;
+  }
+  return true;
+}
+
+function counts() {
+  return {
+    all: VOUCHERS.length,
+    available: VOUCHERS.filter((v) => v.status === "available").length,
+    claimed: VOUCHERS.filter((v) => v.status === "claimed").length,
+    reported: VOUCHERS.filter((v) => v.status === "reported").length,
+    soon: VOUCHERS.filter((v) => v.soon).length,
+  };
+}
+
+function vcard(v) {
+  const checked = STATE.checked[v.id];
+  const soon = v.soon ? `<span class="soon-flag">Expires soon</span>` : "";
+  const claimer = v.claimer
+    ? `<div class="meta-row"><span class="k">Claimer</span><span class="v mono">${esc(v.claimer)}</span></div>`
+    : "";
+  const result = checked
+    ? `<span class="check-result${checked.bad ? " bad" : ""}">${checked.bad ? "✕" : "✓"} ${esc(checked.text)}</span>`
+    : "";
+  return `<article class="vcard">
+    <div class="v-media">
+      <span class="badge ${v.status}">${v.status}</span>
+      ${soon}
+      ${receipt(v)}
+    </div>
+    <div class="v-body">
+      <div class="v-title-row">
+        <span class="v-amount">€${v.type}<small>voucher</small></span>
+      </div>
+      <div class="meta">
+        <div class="meta-row"><span class="k">ID</span><span class="v mono" title="${esc(v.id)}">${esc(v.id)}</span></div>
+        <div class="meta-row"><span class="k">Uploader</span><a class="v linkish" href="#" data-nav="users">${esc(v.who)}</a></div>
+        ${claimer}
+        <div class="meta-row"><span class="k">Expires</span><span class="v${v.soon ? " warn" : ""}">${esc(v.exp)}</span></div>
+        <div class="meta-row"><span class="k">Uploaded</span><span class="v">${esc(v.up)}</span></div>
+      </div>
+      <div class="v-foot">
+        <button class="btn sm" type="button" data-check="${v.id}">Check</button>
+        ${result}
+      </div>
+    </div>
+  </article>`;
+}
+
+function vouchersPage() {
+  const list = VOUCHERS.filter(matches);
+  const c = counts();
+  const filterBtn = (id, label) => `<button type="button" data-filter="${id}" aria-pressed="${STATE.filter === id}">${label}<span class="n">${c[id]}</span></button>`;
+  const grid = list.length
+    ? `<div class="v-grid">${list.map(vcard).join("")}</div>`
+    : `<div class="empty"><div class="big">No vouchers match</div>Try clearing the search or picking another filter.</div>`;
+  return `<div class="page-head">
+      <div>
+        <h1>Vouchers</h1>
+        <div class="sub"><b>9,962</b> uploaded all time · <b>7,821</b> claimed</div>
+      </div>
+      <div class="actions">
+        <button class="btn" type="button">${icon("alert")}Failed uploads</button>
+        <button class="btn primary" type="button">${icon("arrow")}Export</button>
+      </div>
+    </div>
+    <div class="toolbar">
+      <label class="search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg>
+        <input id="search" type="search" placeholder="Search by voucher ID or uploader…" value="${esc(STATE.query)}" />
+      </label>
+      <div class="filters">
+        ${filterBtn("all", "All")}
+        ${filterBtn("available", "Available")}
+        ${filterBtn("claimed", "Claimed")}
+        ${filterBtn("reported", "Reported")}
+        ${filterBtn("soon", "Expiring")}
+      </div>
+      <span class="spacer"></span>
+      <span class="count">Showing <b>${list.length}</b> of ${VOUCHERS.length} sample</span>
+    </div>
+    ${grid}
+    <div style="display:flex;justify-content:center;margin-top:26px">
+      <button class="btn" type="button">Load more vouchers</button>
+    </div>`;
+}
+
+/* ------------------------------------------------------------ placeholder */
+const TITLES = Object.fromEntries(NAV.flatMap(([, items]) => items.map(([name, id]) => [id, name])));
+const SECTIONS = Object.fromEntries(NAV.flatMap(([s, items]) => items.map(([, id]) => [id, s])));
+
+function placeholderPage() {
+  return `<div class="page-head"><div><h1>${TITLES[STATE.page] || "Page"}</h1>
+      <div class="sub">This screen isn't part of the prototype.</div></div></div>
+    <div class="card"><div class="placeholder">
+      <div class="glyph">${icon("sparkle")}</div>
+      <h2>${TITLES[STATE.page] || "Coming soon"}</h2>
+      <p>The prototype covers <b>Home</b> and <b>Vouchers</b>. Say the word and we'll bring this one in too.</p>
+    </div></div>`;
+}
+
+/* ---------------------------------------------------------------- render */
+function pageHTML() {
+  if (STATE.page === "home") return homePage();
+  if (STATE.page === "vouchers") return vouchersPage();
+  return placeholderPage();
+}
+
+function render() {
+  document.getElementById("sidebar").innerHTML = sidebarHTML();
+  document.getElementById("page").innerHTML = pageHTML();
+  document.getElementById("crumb-k").textContent = SECTIONS[STATE.page] || "Overview";
+  document.getElementById("crumb-v").textContent = TITLES[STATE.page] || "Home";
+  document.getElementById("env-label").textContent = STATE.env;
+  document.title = `Voucher Admin — ${TITLES[STATE.page] || "Home"}`;
+  try {
+    const url = STATE.page === "home" ? location.pathname : `?page=${STATE.page}`;
+    history.replaceState(null, "", url);
+  } catch { /* file:// or sandboxed contexts */ }
+  bindChart();
+}
+
+function goto(page) {
+  STATE.page = page;
+  STATE.openNav = false;
+  document.getElementById("scrim").classList.remove("show");
+  document.getElementById("sidebar").classList.remove("open");
+  window.scrollTo({ top: 0 });
+  render();
+}
+
+/* ------------------------------------------------------------ chart hover */
+function bindChart() {
+  const wrap = document.getElementById("chart-wrap");
+  if (!wrap) return;
+  const svg = wrap.querySelector("svg");
+  const hit = document.getElementById("chart-hit");
+  const guide = document.getElementById("chart-guide");
+  const tip = document.getElementById("chart-tip");
+  const data = GROWTH[STATE.range];
+  const w = 720, h = 240, padL = 46, padR = 16, padT = 18, padB = 34;
+  const values = data.map((d) => d[1]);
+  const min = Math.min(...values) - 40, max = Math.max(...values) + 20;
+  const sx = (i) => padL + (i * (w - padL - padR)) / (values.length - 1);
+  const sy = (v) => padT + (1 - (v - min) / (max - min)) * (h - padT - padB);
+
+  hit.addEventListener("mousemove", (e) => {
+    const rect = svg.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * w;
+    let idx = 0, best = Infinity;
+    for (let i = 0; i < data.length; i++) { const d = Math.abs(sx(i) - x); if (d < best) { best = d; idx = i; } }
+    const px = sx(idx), py = sy(values[idx]);
+    guide.style.opacity = "1";
+    guide.querySelector("line").setAttribute("x1", px);
+    guide.querySelector("line").setAttribute("x2", px);
+    guide.querySelector("circle").setAttribute("cx", px);
+    guide.querySelector("circle").setAttribute("cy", py);
+    tip.style.opacity = "1";
+    tip.style.left = `${(px / w) * 100}%`;
+    tip.style.top = `${(py / h) * rect.height}px`;
+    tip.innerHTML = `${esc(data[idx][0])}<br><b>${values[idx].toLocaleString()}</b> users`;
+  });
+  hit.addEventListener("mouseleave", () => { guide.style.opacity = "0"; tip.style.opacity = "0"; });
+}
+
+/* ---------------------------------------------------------------- events */
+document.addEventListener("click", (e) => {
+  const nav = e.target.closest("[data-nav]");
+  if (nav) { e.preventDefault(); goto(nav.dataset.nav); return; }
+
+  const group = e.target.closest("[data-group]");
+  if (group) { STATE.collapsed[group.dataset.group] = !STATE.collapsed[group.dataset.group]; render(); return; }
+
+  const filter = e.target.closest("[data-filter]");
+  if (filter) { STATE.filter = filter.dataset.filter; render(); return; }
+
+  const range = e.target.closest("[data-range]");
+  if (range) { STATE.range = range.dataset.range; render(); return; }
+
+  const check = e.target.closest("[data-check]");
+  if (check) {
+    const v = VOUCHERS.find((x) => x.id === check.dataset.check);
+    check.textContent = "Checking…";
+    check.disabled = true;
+    setTimeout(() => {
+      STATE.checked[v.id] = v.status === "claimed"
+        ? { bad: true, text: "Dunnes: already redeemed" }
+        : { bad: false, text: `Dunnes: valid · €${v.type} balance` };
+      render();
+    }, 650);
+    return;
+  }
+});
+
+document.addEventListener("input", (e) => {
+  if (e.target.id === "search") {
+    STATE.query = e.target.value;
+    const active = document.getElementById("search");
+    const pos = active.selectionStart;
+    render();
+    const next = document.getElementById("search");
+    if (next) { next.focus(); try { next.setSelectionRange(pos, pos); } catch { /* ignore */ } }
+  }
+});
+
+document.addEventListener("change", (e) => {
+  if (e.target.id === "env-select") { STATE.env = e.target.value; document.getElementById("env-label").textContent = STATE.env; }
+});
+
+document.getElementById("hamburger").addEventListener("click", () => {
+  const open = document.getElementById("sidebar").classList.toggle("open");
+  document.getElementById("scrim").classList.toggle("show", open);
+});
+document.getElementById("scrim").addEventListener("click", () => {
+  document.getElementById("sidebar").classList.remove("open");
+  document.getElementById("scrim").classList.remove("show");
+});
+
+/* ------------------------------------------------------------------ boot */
+const bootPage = new URLSearchParams(location.search).get("page");
+if (bootPage && (TITLES[bootPage])) STATE.page = bootPage;
+render();
+</script>
+</body>
+</html>
