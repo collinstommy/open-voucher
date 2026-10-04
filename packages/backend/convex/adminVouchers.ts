@@ -3,7 +3,32 @@ import { applyCoinDelta } from "../src/lib/coinLedger";
 import { CLAIM_COSTS, UPLOAD_REWARDS } from "../src/lib/constants";
 import { recalculateReportCounts } from "../src/lib/reportCounts";
 import type { Id } from "./_generated/dataModel";
+import { internalQuery } from "./_generated/server";
 import { adminMutation, adminQuery } from "./adminGuards";
+
+/**
+ * Lists voucher images created since `since`, with fresh download URLs.
+ * Backs the incremental image backup in scripts/backup.sh — the CLI runs
+ * it with deployment credentials, and only reads the recent index range.
+ */
+export const getImageUploadsSince = internalQuery({
+	args: { since: v.number() },
+	handler: async (ctx, { since }) => {
+		const rows = await ctx.db
+			.query("vouchers")
+			.withIndex("by_creation_time", (q) => q.gt("_creationTime", since))
+			.collect();
+
+		return await Promise.all(
+			rows.map(async (voucher) => ({
+				voucherId: voucher._id,
+				createdAt: voucher.createdAt,
+				imageStorageId: voucher.imageStorageId,
+				url: await ctx.storage.getUrl(voucher.imageStorageId),
+			})),
+		);
+	},
+});
 
 export const getTodaysVouchers = adminQuery({
 	args: {},
