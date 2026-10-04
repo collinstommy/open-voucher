@@ -163,12 +163,14 @@ on("report_replacement_yes", async (c, event, bot) => {
 				],
 			},
 		);
-	} else {
+	} else if (result.status === "refunded") {
 		await bot.sendMessage(
 			c.chatId,
 			"⚠️ No replacement vouchers available. Your coins have been refunded.",
 		);
 	}
+	// Anything else is a duplicate tap or a forged callback: this report is
+	// already settled (or was never ours to settle), so do nothing.
 });
 
 on("report_replacement_no", async (c, event, bot) => {
@@ -194,12 +196,9 @@ on("report_replacement_no", async (c, event, bot) => {
 			c.chatId,
 			"✅ Your coins have been refunded. Thank you for reporting!",
 		);
-	} else {
-		await bot.sendMessage(
-			c.chatId,
-			"⚠️ Unable to process refund. Please contact support.",
-		);
 	}
+	// Anything else is a duplicate tap or a forged callback: this report is
+	// already settled (or was never ours to settle), so do nothing.
 });
 
 on("report_cancel", async (c, _event, bot) => {
