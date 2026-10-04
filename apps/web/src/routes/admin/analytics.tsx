@@ -53,6 +53,7 @@ const TRANSACTION_LABELS: Record<string, string> = {
 	self_invalidated: "Self invalidated",
 	claim_returned: "Admin claim returned",
 	replacement_received: "Replacement received",
+	admin_removed: "Voucher removed",
 };
 
 const CLASSIFIED_INTENT_LABELS: Record<string, string> = {

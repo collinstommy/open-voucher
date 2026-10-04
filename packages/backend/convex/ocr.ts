@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import dayjs from "dayjs";
-import { stripBarcodeSpaces } from "../src/lib/barcode";
+import { firstMatchingBarcode, stripBarcodeSpaces } from "../src/lib/barcode";
 import { applyCoinDelta } from "../src/lib/coinLedger";
 import { UPLOAD_REWARDS } from "../src/lib/constants";
 import { callGeminiApi } from "../src/lib/gemini";
@@ -1044,10 +1044,12 @@ export const storeVoucherFromOcr = internalMutation({
 			return { success: false, reason: "COULD_NOT_READ_BARCODE" };
 		}
 
-		const existing = await ctx.db
-			.query("vouchers")
-			.withIndex("by_barcode", (q) => q.eq("barcodeNumber", barcodeNumber))
-			.first();
+		const existing = await firstMatchingBarcode(barcodeNumber, (key) =>
+			ctx.db
+				.query("vouchers")
+				.withIndex("by_barcode", (q) => q.eq("barcodeNumber", key))
+				.first(),
+		);
 
 		if (existing) {
 			await recordFailedUpload(

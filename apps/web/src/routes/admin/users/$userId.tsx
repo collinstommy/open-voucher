@@ -300,6 +300,15 @@ function UserDetailPage() {
 		onSuccess: () => queryClient.invalidateQueries(),
 	});
 
+	const removeVoucherMutation = useMutation({
+		mutationFn: (voucherId: Id<"vouchers">) =>
+			convex.mutation(api.adminVouchers.removeVoucherAndReverseCoins, {
+				token: token!,
+				voucherId,
+			}),
+		onSuccess: () => queryClient.invalidateQueries(),
+	});
+
 	const reverseClaimMutation = useMutation({
 		mutationFn: (voucherId: Id<"vouchers">) =>
 			convex.mutation(api.adminVouchers.reverseClaim, {
@@ -729,19 +738,41 @@ function UserDetailPage() {
 												</Link>
 											</div>
 										)}
-										{voucher.status !== "expired" && (
-											<div className="mt-3">
+										{voucher.status !== "removed" && (
+											<div className="mt-3 flex flex-wrap gap-2">
+												{voucher.status !== "expired" && (
+													<Button
+														size="sm"
+														variant="destructive"
+														onClick={() =>
+															expireVoucherMutation.mutate(
+																voucher._id as Id<"vouchers">,
+															)
+														}
+														disabled={expireVoucherMutation.isPending}
+													>
+														Expire & Deduct Coins
+													</Button>
+												)}
 												<Button
 													size="sm"
-													variant="destructive"
-													onClick={() =>
-														expireVoucherMutation.mutate(
-															voucher._id as Id<"vouchers">,
-														)
-													}
-													disabled={expireVoucherMutation.isPending}
+													variant="outline"
+													onClick={() => {
+														const claimerNote = voucher.claimer
+															? "The uploader and the claimer each get a reversing coin entry, so both balances go back to where they were for this voucher."
+															: "The uploader gets a reversing coin entry, so their balance goes back to where it was for this voucher.";
+														const confirmed = window.confirm(
+															`Remove this voucher from their lists?\n\n${claimerNote}\n\nThe voucher is kept so this barcode cannot be uploaded again.`,
+														);
+														if (confirmed) {
+															removeVoucherMutation.mutate(
+																voucher._id as Id<"vouchers">,
+															);
+														}
+													}}
+													disabled={removeVoucherMutation.isPending}
 												>
-													Expire & Deduct Coins
+													Remove & reverse coins
 												</Button>
 											</div>
 										)}
