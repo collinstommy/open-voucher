@@ -13,16 +13,43 @@ import {
 	XAxis,
 	YAxis,
 } from "recharts";
-import { Button } from "@/components/ui/button";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
 
 export const Route = createFileRoute("/admin/")({
 	component: HomeComponent,
 });
 
+type CleanupResult = {
+	dryRun: boolean;
+	marked: number;
+	deleted: number;
+	skipped: number;
+	toMark: unknown[];
+	toDelete: unknown[];
+};
+
 function formatDate(dateStr: string) {
 	const date = new Date(dateStr);
 	return `${date.toLocaleDateString("en-US", { month: "short" })} ${date.getDate()}`;
+}
+
+function formatCount(value: number) {
+	return value.toLocaleString("en-IE");
+}
+
+function shareOf(count: number, total: number) {
+	if (total <= 0) return 0;
+	return Math.round((count / total) * 100);
+}
+
+function rateColor(rate: number) {
+	if (rate >= 30) return "var(--red)";
+	if (rate >= 15) return "var(--gold)";
+	return "var(--green)";
+}
+
+function todayKey() {
+	return new Date().toISOString().split("T")[0];
 }
 
 function HomeComponent() {
@@ -31,15 +58,23 @@ function HomeComponent() {
 	const queryClient = useQueryClient();
 	const [range, setRange] = useState<"all" | "30days">("30days");
 	const [dryRun, setDryRun] = useState(true);
-	const [cleanupResult, setCleanupResult] = useState<any>(null);
+	const [cleanupResult, setCleanupResult] = useState<CleanupResult | null>(
+		null,
+	);
 	const stats = useQuery(
 		convexQuery(api.adminDashboard.getStats, token ? { token } : "skip"),
 	);
 	const userGrowth = useQuery(
-		convexQuery(api.adminAnalytics.getUserGrowth, token ? { token, range } : "skip"),
+		convexQuery(
+			api.adminAnalytics.getUserGrowth,
+			token ? { token, range } : "skip",
+		),
 	);
 	const weeklyVouchers = useQuery(
-		convexQuery(api.adminDashboard.getWeeklyVouchers, token ? { token } : "skip"),
+		convexQuery(
+			api.adminDashboard.getWeeklyVouchers,
+			token ? { token } : "skip",
+		),
 	);
 	const weeklyFailures = useQuery(
 		convexQuery(
@@ -49,172 +84,182 @@ function HomeComponent() {
 	);
 
 	const cleanupMutation = useMutation({
-		mutationFn: () =>
-			convex.mutation(api.adminDashboard.cleanupExpiredVoucherImages, {
-				token: token!,
+		mutationFn: () => {
+			if (!token) {
+				throw new Error("Not signed in");
+			}
+			return convex.mutation(api.adminDashboard.cleanupExpiredVoucherImages, {
+				token,
 				dryRun,
-			}),
+			});
+		},
 		onSuccess: (data) => {
 			setCleanupResult(data);
 			queryClient.invalidateQueries();
 		},
 	});
 
+	const five = stats.data?.vouchersByType["5"] ?? 0;
+	const ten = stats.data?.vouchersByType["10"] ?? 0;
+	const twenty = stats.data?.vouchersByType["20"] ?? 0;
+	const available = five + ten + twenty;
+	const totalUploaded = stats.data?.totalUploaded ?? 0;
+	const claimedCount = stats.data?.claimedCount ?? 0;
+	const claimRate =
+		totalUploaded > 0
+			? Math.round((claimedCount / totalUploaded) * 1000) / 10
+			: 0;
+	const failureWeeks = weeklyFailures.data ?? [];
+	const failureAverage =
+		failureWeeks.length > 0
+			? Math.round(
+					(failureWeeks.reduce((sum, week) => sum + week.rate, 0) /
+						failureWeeks.length) *
+						10,
+				) / 10
+			: 0;
+	const weekDays = weeklyVouchers.data ?? [];
+	const weekPeak = Math.max(
+		1,
+		...weekDays.map((day) => Math.max(day.uploaded, day.claimed)),
+	);
+	const weekUploaded = weekDays.reduce((sum, day) => sum + day.uploaded, 0);
+	const weekClaimed = weekDays.reduce((sum, day) => sum + day.claimed, 0);
+	const growth = userGrowth.data?.data ?? [];
+	const growthLatest = growth.at(-1)?.cumulative ?? 0;
+
 	return (
-		<div className="grid gap-6">
-			<section className="rounded-lg border p-4">
-				<h2 className="mb-4 font-medium">Voucher Statistics</h2>
+		<div className="stack">
+			<div className="masthead">
+				<div>
+					<h1 className="display">Home</h1>
+					<p className="lede">Voucher inventory, growth and system health.</p>
+				</div>
+			</div>
+
+			<section className="panel">
+				<div className="panel-head">
+					<h2>Voucher inventory</h2>
+					{stats.data && (
+						<span className="note">{formatCount(available)} available now</span>
+					)}
+				</div>
 				{stats.isLoading ? (
-					<div className="text-muted-foreground text-sm">Loading stats...</div>
+					<div className="panel-body">
+						<p className="muted">Loading stats...</p>
+					</div>
 				) : stats.error ? (
-					<div className="text-red-500 text-sm">Error loading stats</div>
+					<div className="panel-body">
+						<p className="warn">Error loading stats</p>
+					</div>
 				) : (
-					<div className="grid gap-4">
-						<div className="grid grid-cols-3 gap-4">
-							<div className="rounded-md border p-3">
-								<div className="mb-1 text-muted-foreground text-xs">
-									€5 Available
-								</div>
-								<div className="font-semibold text-2xl">
-									{stats.data?.vouchersByType["5"] ?? 0}
-								</div>
-							</div>
-							<div className="rounded-md border p-3">
-								<div className="mb-1 text-muted-foreground text-xs">
-									€10 Available
-								</div>
-								<div className="font-semibold text-2xl">
-									{stats.data?.vouchersByType["10"] ?? 0}
-								</div>
-							</div>
-							<div className="rounded-md border p-3">
-								<div className="mb-1 text-muted-foreground text-xs">
-									€20 Available
-								</div>
-								<div className="font-semibold text-2xl">
-									{stats.data?.vouchersByType["20"] ?? 0}
-								</div>
-							</div>
-						</div>
-
-						<div className="grid grid-cols-3 gap-4">
-							<div className="rounded-md border p-3">
-								<div className="mb-1 text-muted-foreground text-xs">
-									Total Uploaded
-								</div>
-								<div className="font-semibold text-2xl">
-									{stats.data?.totalUploaded ?? 0}
-								</div>
-							</div>
-							<div className="rounded-md border p-3">
-								<div className="mb-1 text-muted-foreground text-xs">
-									Vouchers Claimed
-								</div>
-								<div className="font-semibold text-2xl">
-									{stats.data?.claimedCount ?? 0}
-								</div>
-							</div>
-							<div className="rounded-md border p-3">
-								<div className="mb-1 text-muted-foreground text-xs">Users</div>
-								<div className="font-semibold text-2xl">
-									{stats.data?.userCount ?? 0}
-								</div>
-							</div>
-						</div>
-
-						<div className="mt-6">
-							<h3 className="mb-3 text-sm font-medium text-muted-foreground">
-								Weekly Upload Failure Rate
-							</h3>
-							{weeklyFailures.isLoading ? (
-								<div className="text-muted-foreground text-sm">Loading...</div>
-							) : weeklyFailures.error ? (
-								<div className="text-red-500 text-sm">Error loading data</div>
-							) : (
-								<div className="overflow-x-auto">
-									<table className="w-full text-sm">
-										<thead>
-											<tr className="border-b">
-												<th className="pb-2 text-left font-medium">Week</th>
-												<th className="pb-2 text-right font-medium">Total</th>
-												<th className="pb-2 text-right font-medium">Failed</th>
-												<th className="pb-2 text-right font-medium">Rate</th>
-											</tr>
-										</thead>
-										<tbody>
-											{weeklyFailures.data?.map((week) => (
-												<tr key={week.weekStart} className="border-b">
-													<td className="py-2">{week.label}</td>
-													<td className="py-2 text-right">{week.total}</td>
-													<td className="py-2 text-right">{week.failed}</td>
-													<td className="py-2 text-right">
-														<span
-															className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${
-																week.rate >= 30
-																	? "bg-red-100 text-red-700"
-																	: week.rate >= 15
-																		? "bg-yellow-100 text-yellow-700"
-																		: "bg-green-100 text-green-700"
-															}`}
-														>
-															{week.rate}%
-														</span>
-													</td>
-												</tr>
-											))}
-										</tbody>
-									</table>
-								</div>
-							)}
-						</div>
+					<div className="inventory">
+						<Stock
+							label="€5 vouchers"
+							count={five}
+							share={shareOf(five, available)}
+						/>
+						<Stock
+							label="€10 vouchers"
+							count={ten}
+							share={shareOf(ten, available)}
+						/>
+						<Stock
+							label="€20 vouchers"
+							count={twenty}
+							share={shareOf(twenty, available)}
+						/>
 					</div>
 				)}
 			</section>
 
-			<section className="rounded-lg border p-4">
-				<div className="mb-4 flex items-center justify-between">
-					<h2 className="font-medium">User Growth</h2>
-					<select
-						value={range}
-						onChange={(e) => setRange(e.target.value as "all" | "30days")}
-						className="rounded-md border border-input bg-background px-3 py-1 text-foreground text-sm"
-					>
-						<option value="30days">Last 30 Days</option>
-						<option value="all">All Time</option>
-					</select>
+			{stats.data && (
+				<div className="metrics">
+					<article className="metric">
+						<p className="eyebrow">Total uploaded</p>
+						<div className="display metric-value num">
+							{formatCount(totalUploaded)}
+						</div>
+					</article>
+					<article className="metric">
+						<p className="eyebrow">Vouchers claimed</p>
+						<div className="display metric-value num">
+							{formatCount(claimedCount)}
+						</div>
+						{totalUploaded > 0 && (
+							<p className="metric-note">
+								<b>{claimRate}%</b> of uploaded vouchers are claimed.
+							</p>
+						)}
+					</article>
+					<article className="metric">
+						<p className="eyebrow">Users</p>
+						<div className="display metric-value num">
+							{formatCount(stats.data.userCount)}
+						</div>
+					</article>
+				</div>
+			)}
+
+			<section className="panel">
+				<div className="panel-head">
+					<h2>User growth</h2>
+					<fieldset className="seg">
+						<legend className="sr-only">Time range</legend>
+						<button
+							type="button"
+							aria-pressed={range === "30days"}
+							onClick={() => setRange("30days")}
+						>
+							Last 30 days
+						</button>
+						<button
+							type="button"
+							aria-pressed={range === "all"}
+							onClick={() => setRange("all")}
+						>
+							All time
+						</button>
+					</fieldset>
 				</div>
 				{userGrowth.isLoading ? (
-					<div className="h-64 text-muted-foreground text-sm">
-						Loading chart...
+					<div className="panel-body">
+						<p className="muted">Loading chart...</p>
 					</div>
 				) : userGrowth.error ? (
-					<div className="h-64 text-red-500 text-sm">Error loading chart</div>
+					<div className="panel-body">
+						<p className="warn">Error loading chart</p>
+					</div>
 				) : (
-					<div className="h-64">
+					<div className="chart-wrap">
 						<ResponsiveContainer width="100%" height="100%">
-							<LineChart data={userGrowth.data?.data ?? []}>
-								<CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+							<LineChart data={growth}>
+								<CartesianGrid
+									stroke="rgba(196,214,236,0.08)"
+									vertical={false}
+								/>
 								<XAxis
 									dataKey="date"
 									tickFormatter={formatDate}
-									stroke="#6b7280"
+									stroke="#6C7686"
 									fontSize={12}
 									tickLine={false}
 									axisLine={false}
 									interval={range === "30days" ? 4 : "preserveStartEnd"}
 								/>
 								<YAxis
-									stroke="#6b7280"
+									stroke="#6C7686"
 									fontSize={12}
 									tickLine={false}
 									axisLine={false}
+									width={40}
 								/>
 								<Tooltip
 									contentStyle={{
-										backgroundColor: "#1f2937",
-										border: "none",
-										borderRadius: "6px",
-										color: "#fff",
+										backgroundColor: "#1B2029",
+										border: "1px solid rgba(196,214,236,0.14)",
+										borderRadius: "9px",
+										color: "#E9EDF3",
 									}}
 									labelFormatter={(label) => formatDate(label as string)}
 									formatter={(value) => [value, "Users"]}
@@ -222,134 +267,251 @@ function HomeComponent() {
 								<Line
 									type="monotone"
 									dataKey="cumulative"
-									stroke="#3b82f6"
-									strokeWidth={2}
+									stroke="#E6B25C"
+									strokeWidth={2.2}
 									dot={false}
-									activeDot={{ r: 6, fill: "#3b82f6" }}
+									activeDot={{ r: 5, fill: "#E6B25C" }}
 								/>
 							</LineChart>
 						</ResponsiveContainer>
 					</div>
 				)}
-			</section>
-
-			<section className="rounded-lg border p-4">
-				<h2 className="mb-4 font-medium">This Week's Vouchers</h2>
-				{weeklyVouchers.isLoading ? (
-					<div className="text-muted-foreground text-sm">Loading...</div>
-				) : weeklyVouchers.error ? (
-					<div className="text-red-500 text-sm">Error loading data</div>
-				) : (
-					<div className="overflow-x-auto">
-						<table className="w-full text-sm">
-							<thead>
-								<tr className="border-b">
-									<th className="pb-2 text-left font-medium">Date</th>
-									<th className="pb-2 text-right font-medium">Uploaded</th>
-									<th className="pb-2 text-right font-medium">Claimed</th>
-								</tr>
-							</thead>
-							<tbody>
-								{weeklyVouchers.data?.map((day) => (
-									<tr key={day.date} className="border-b">
-										<td className="py-2">
-											{new Date(day.date).toLocaleDateString("en-US", {
-												weekday: "short",
-												month: "short",
-												day: "numeric",
-											})}
-										</td>
-										<td className="py-2 text-right">{day.uploaded}</td>
-										<td className="py-2 text-right">{day.claimed}</td>
-									</tr>
-								))}
-							</tbody>
-						</table>
+				{growth.length > 0 && (
+					<div className="panel-foot">
+						<span>
+							<b>{formatCount(growthLatest)}</b>{" "}
+							{range === "30days"
+								? "new accounts in the last 30 days"
+								: "accounts in this chart"}
+						</span>
 					</div>
 				)}
 			</section>
 
-			<section className="rounded-lg border p-4">
-				<h2 className="mb-4 font-medium">Expired Voucher Image Cleanup</h2>
-				<p className="mb-4 text-muted-foreground text-sm">
-					Deletes images from vouchers expired 90+ days (after 30-day grace
-					period). Processes up to 100 vouchers per run — repeat until counts
-					reach zero. Dry run previews what would happen.
-				</p>
-				<div className="mb-4 flex items-center gap-4">
-					<label className="flex items-center gap-2 text-sm">
-						<input
-							type="checkbox"
-							checked={dryRun}
-							onChange={(e) => setDryRun(e.target.checked)}
-							className="rounded"
-						/>
-						Dry run (preview only)
-					</label>
-					<Button
-						onClick={() => cleanupMutation.mutate()}
-						disabled={cleanupMutation.isPending || !token}
-						variant={dryRun ? "outline" : "destructive"}
-					>
-						{cleanupMutation.isPending
-							? "Running..."
-							: dryRun
-								? "Preview Cleanup"
-								: "Run Cleanup"}
-					</Button>
-				</div>
-
-				{cleanupResult && (
-					<div className="rounded-md border bg-muted/50 p-4">
-						<div className="mb-3 flex items-center gap-2">
-							<span
-								className={`rounded-full px-2 py-1 font-medium text-xs ${
-									cleanupResult.dryRun
-										? "bg-blue-100 text-blue-800"
-										: "bg-green-100 text-green-800"
-								}`}
-							>
-								{cleanupResult.dryRun ? "DRY RUN" : "EXECUTED"}
+			<div className="stack row-split">
+				<section className="panel">
+					<div className="panel-head">
+						<h2>Weekly upload failure rate</h2>
+						{failureWeeks.length > 0 && (
+							<span className="note">
+								{failureWeeks.length}-week average {failureAverage}%
 							</span>
-						</div>
-						<div className="grid grid-cols-3 gap-4 text-sm">
-							<div>
-								<div className="text-muted-foreground text-xs">
-									To Mark ({">"} 90 days expired)
-								</div>
-								<div className="font-semibold text-lg">
-									{cleanupResult.toMark?.length ?? 0}
-								</div>
-							</div>
-							<div>
-								<div className="text-muted-foreground text-xs">
-									To Delete (marked {"<"} 30 days ago)
-								</div>
-								<div className="font-semibold text-lg">
-									{cleanupResult.toDelete?.length ?? 0}
-								</div>
-							</div>
-							<div>
-								<div className="text-muted-foreground text-xs">Skipped</div>
-								<div className="font-semibold text-lg">
-									{cleanupResult.skipped ?? 0}
-								</div>
-							</div>
-						</div>
-						{!cleanupResult.dryRun && (
-							<div className="mt-3 border-t pt-3 text-sm">
-								<span className="text-green-600">
-									Marked: {cleanupResult.marked}
-								</span>
-								{" · "}
-								<span className="text-red-600">
-									Deleted: {cleanupResult.deleted}
-								</span>
-							</div>
 						)}
 					</div>
-				)}
+					<div className="panel-body tight">
+						{weeklyFailures.isLoading ? (
+							<p className="muted">Loading...</p>
+						) : weeklyFailures.error ? (
+							<p className="warn">Error loading data</p>
+						) : (
+							<table className="data">
+								<thead>
+									<tr>
+										<th>Week</th>
+										<th className="r">Total</th>
+										<th className="r">Failed</th>
+										<th className="r">Rate</th>
+									</tr>
+								</thead>
+								<tbody>
+									{failureWeeks.map((week) => (
+										<tr key={week.weekStart}>
+											<td>{week.label}</td>
+											<td className="r num">{week.total}</td>
+											<td className="r num">{week.failed}</td>
+											<td>
+												<div className="rate-cell">
+													<span className="micro" aria-hidden="true">
+														<span
+															style={{
+																width: `${Math.min(week.rate, 100)}%`,
+																background: rateColor(week.rate),
+															}}
+														/>
+													</span>
+													<span className="rate-num num">{week.rate}%</span>
+												</div>
+											</td>
+										</tr>
+									))}
+								</tbody>
+							</table>
+						)}
+					</div>
+				</section>
+
+				<section className="panel">
+					<div className="panel-head">
+						<h2>This week</h2>
+						{weekDays.length > 0 && (
+							<span className="note">
+								{formatDate(weekDays[0].date)} –{" "}
+								{formatDate(weekDays[weekDays.length - 1].date)}
+							</span>
+						)}
+					</div>
+					<div className="panel-body tight">
+						{weeklyVouchers.isLoading ? (
+							<p className="muted">Loading...</p>
+						) : weeklyVouchers.error ? (
+							<p className="warn">Error loading data</p>
+						) : (
+							weekDays.map((day) => (
+								<div key={day.date} className="week-row">
+									<div
+										className={
+											day.date === todayKey() ? "week-day today" : "week-day"
+										}
+									>
+										{new Date(day.date).toLocaleDateString("en-US", {
+											weekday: "short",
+											month: "short",
+											day: "numeric",
+										})}
+									</div>
+									<div className="week-bars" aria-hidden="true">
+										<div className="week-bar up">
+											<span
+												style={{
+													width: `${(day.uploaded / weekPeak) * 100}%`,
+												}}
+											/>
+										</div>
+										<div className="week-bar cl">
+											<span
+												style={{
+													width: `${(day.claimed / weekPeak) * 100}%`,
+												}}
+											/>
+										</div>
+									</div>
+									<div className="week-nums num">
+										{day.uploaded}
+										<small>{day.claimed}</small>
+									</div>
+								</div>
+							))
+						)}
+					</div>
+					{weekDays.length > 0 && (
+						<div className="panel-foot spread">
+							<div className="legend">
+								<span>
+									<i style={{ background: "var(--blue)" }} />
+									Uploaded
+								</span>
+								<span>
+									<i style={{ background: "var(--green)" }} />
+									Claimed
+								</span>
+							</div>
+							<span>
+								<b>{formatCount(weekUploaded)}</b> up ·{" "}
+								<b>{formatCount(weekClaimed)}</b> claimed
+							</span>
+						</div>
+					)}
+				</section>
+			</div>
+
+			<section className="panel">
+				<div className="panel-body">
+					<div className="maint">
+						<div>
+							<h2>Expired voucher image cleanup</h2>
+							<p>
+								Deletes images from vouchers expired 90+ days, after a 30-day
+								grace period. Processes up to 100 vouchers per run. Repeat until
+								counts reach zero.
+							</p>
+						</div>
+						<div className="maint-actions">
+							<label className="check">
+								<input
+									type="checkbox"
+									checked={dryRun}
+									onChange={(e) => setDryRun(e.target.checked)}
+								/>
+								Dry run
+							</label>
+							<button
+								type="button"
+								className={dryRun ? "btn btn-gold" : "btn btn-danger"}
+								onClick={() => cleanupMutation.mutate()}
+								disabled={cleanupMutation.isPending || !token}
+							>
+								{cleanupMutation.isPending
+									? "Running..."
+									: dryRun
+										? "Preview cleanup"
+										: "Run cleanup"}
+							</button>
+						</div>
+					</div>
+					{cleanupResult && (
+						<div>
+							<span
+								className={
+									cleanupResult.dryRun ? "cleanup-flag dry" : "cleanup-flag ran"
+								}
+							>
+								{cleanupResult.dryRun ? "Dry run" : "Executed"}
+							</span>
+							<div className="cleanup-result">
+								<div>
+									<p className="eyebrow">To mark</p>
+									<div className="display stock-value num">
+										{cleanupResult.toMark.length}
+									</div>
+								</div>
+								<div>
+									<p className="eyebrow">To delete</p>
+									<div className="display stock-value num">
+										{cleanupResult.toDelete.length}
+									</div>
+								</div>
+								<div>
+									<p className="eyebrow">Skipped</p>
+									<div className="display stock-value num">
+										{cleanupResult.skipped}
+									</div>
+								</div>
+							</div>
+							{!cleanupResult.dryRun && (
+								<p className="note" style={{ marginTop: 14 }}>
+									Marked {cleanupResult.marked} · Deleted{" "}
+									{cleanupResult.deleted}
+								</p>
+							)}
+						</div>
+					)}
+				</div>
 			</section>
+		</div>
+	);
+}
+
+function Stock({
+	label,
+	count,
+	share,
+}: {
+	label: string;
+	count: number;
+	share: number;
+}) {
+	return (
+		<div className="stock">
+			<div className="stock-top">
+				<div>
+					<p className="eyebrow">{label}</p>
+					<div className="display stock-value num">{formatCount(count)}</div>
+				</div>
+				<div className="stock-share num">{share}% of stock</div>
+			</div>
+			<div className="track" aria-hidden="true">
+				<span style={{ width: `${share}%` }} />
+			</div>
 		</div>
 	);
 }

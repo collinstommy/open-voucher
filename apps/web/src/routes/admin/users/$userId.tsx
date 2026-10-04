@@ -4,7 +4,6 @@ import type { Id } from "@open-voucher/backend/convex/_generated/dataModel";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useConvex } from "convex/react";
-import { ArrowLeft } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
@@ -127,6 +126,19 @@ function buildActivityItems(
 	].sort((a, b) => b.createdAt - a.createdAt);
 }
 
+function voucherStatusClass(status: string) {
+	switch (status) {
+		case "available":
+			return "s-available";
+		case "claimed":
+			return "s-claimed";
+		case "reported":
+			return "s-reported";
+		default:
+			return "";
+	}
+}
+
 function UserLink({
 	user,
 }: {
@@ -141,7 +153,7 @@ function UserLink({
 		<Link
 			to="/admin/users/$userId"
 			params={{ userId: user._id }}
-			className="text-blue-600 hover:underline"
+			className="u-name"
 		>
 			{user.username || user.firstName || user.telegramChatId}
 		</Link>
@@ -307,11 +319,11 @@ function UserDetailPage() {
 	});
 
 	if (isLoading) {
-		return <div className="text-muted-foreground">Loading user details...</div>;
+		return <p className="muted">Loading user details...</p>;
 	}
 
 	if (error) {
-		return <div className="text-red-500">Error loading user details</div>;
+		return <p className="warn">Error loading user details</p>;
 	}
 
 	const user = data?.user;
@@ -361,354 +373,308 @@ function UserDetailPage() {
 	};
 
 	if (!user) {
-		return <div className="text-red-500">User not found</div>;
+		return <p className="warn">User not found</p>;
 	}
 
 	return (
-		<div className="space-y-6">
-			<div className="flex items-center gap-4">
-				<Link to="/admin/users">
-					<Button variant="ghost" size="sm">
-						<ArrowLeft className="mr-2 h-4 w-4" />
-						Back
-					</Button>
-				</Link>
-			</div>
+		<div className="stack">
+			<Link to="/admin/users" className="link-btn">
+				Back to users
+			</Link>
 
-			{/* User Header */}
-			<div className="rounded-lg border p-6">
-				<div className="flex items-start justify-between">
-					<div>
-						<div className="flex items-center gap-2">
-							<h1 className="font-semibold text-2xl">
-								{user.username || user.firstName || "Unknown User"}
-							</h1>
-							{user.isBanned && (
-								<span className="rounded-full bg-red-100 px-2 py-0.5 font-medium text-red-700 text-xs">
-									Banned
-								</span>
-							)}
-							{user.flaggedForReviewAt && !user.isBanned && (
-								<span className="rounded-full bg-yellow-100 px-2 py-0.5 font-medium text-xs text-yellow-700">
-									Flagged for Review
-								</span>
-							)}
-						</div>
-						<p className="text-muted-foreground text-sm">
-							{user.telegramChatId}
-						</p>
+			<section className="panel">
+				<div className="panel-body">
+					<div className="msg-head">
+						<h1 className="display" style={{ fontSize: 36 }}>
+							{user.username || user.firstName || "Unknown user"}
+						</h1>
+						{user.isBanned && (
+							<span className="status s-reported">
+								<i />
+								banned
+							</span>
+						)}
+						{user.flaggedForReviewAt && !user.isBanned && (
+							<span className="status s-flagged">
+								<i />
+								flagged
+							</span>
+						)}
 					</div>
-					<div className="flex gap-2">
+					<p className="u-id">{user.telegramChatId}</p>
+					<div className="actions">
 						{!user.flaggedForReviewAt && (
-							<Button
-								variant="outline"
+							<button
+								type="button"
+								className="btn"
 								onClick={() => flagForReviewMutation.mutate()}
 								disabled={flagForReviewMutation.isPending}
 							>
 								{flagForReviewMutation.isPending
 									? "Flagging..."
-									: "Flag for Review"}
-							</Button>
+									: "Flag for review"}
+							</button>
 						)}
 						{!user.isBanned && (
-							<Button
-								variant="outline"
+							<button
+								type="button"
+								className="btn"
 								onClick={handleSendWarning}
 								disabled={sendMessageMutation.isPending}
 							>
 								{sendMessageMutation.isPending ? "Sending..." : "Send warning"}
-							</Button>
+							</button>
 						)}
 						{user.flaggedForReviewAt && !user.isBanned && (
-							<Button
-								variant="outline"
+							<button
+								type="button"
+								className="btn btn-quiet"
 								onClick={() => dismissFlagMutation.mutate()}
 								disabled={dismissFlagMutation.isPending}
 							>
-								Dismiss Flag
-							</Button>
+								Dismiss flag
+							</button>
 						)}
 						{user.isBanned ? (
-							<Button
-								variant="outline"
+							<button
+								type="button"
+								className="btn btn-quiet"
 								onClick={() => unbanMutation.mutate()}
 								disabled={unbanMutation.isPending}
 							>
-								Unban User
-							</Button>
+								Unban
+							</button>
 						) : (
-							<Button
-								variant="destructive"
+							<button
+								type="button"
+								className="btn btn-danger"
 								onClick={() => banMutation.mutate()}
 								disabled={banMutation.isPending}
 							>
-								Ban User
-							</Button>
+								Ban
+							</button>
 						)}
 					</div>
 				</div>
-			</div>
+			</section>
 
-			{/* Tab Bar */}
-			<div className="flex flex-wrap gap-2">
+			<div className="chips">
 				{TABS.map((tab) => (
-					<Button
+					<button
 						key={tab}
-						variant={activeTab === tab ? "default" : "outline"}
-						size="sm"
+						type="button"
+						className="chip"
+						aria-pressed={activeTab === tab}
 						onClick={() => setActiveTab(tab)}
 					>
 						{TAB_LABELS[tab]}
 						{tabCounts[tab] > 0 && (
-							<span className="ml-1.5 opacity-70">({tabCounts[tab]})</span>
+							<span className="count">{tabCounts[tab]}</span>
 						)}
-					</Button>
+					</button>
 				))}
 			</div>
 
-			{/* Transactions Tab */}
 			{activeTab === "transactions" && (
 				<>
-					{/* Stats Grid */}
-					<div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
-						<div className="rounded-md border p-3">
-							<div className="mb-1 text-muted-foreground text-xs">Coins</div>
-							<div className="font-semibold text-xl">{user.coins}</div>
+					<div className="stats five">
+						<div className="stat">
+							<div className="k">Coins</div>
+							<div className="v num">{user.coins}</div>
 						</div>
-						<div className="rounded-md border p-3">
-							<div className="mb-1 text-muted-foreground text-xs">Uploaded</div>
-							<div className="font-semibold text-xl">
-								{stats?.uploadedCount}
-							</div>
+						<div className="stat">
+							<div className="k">Uploaded</div>
+							<div className="v num">{stats?.uploadedCount}</div>
 						</div>
-						<div className="rounded-md border p-3">
-							<div className="mb-1 text-muted-foreground text-xs">Claimed</div>
-							<div className="font-semibold text-xl">{stats?.claimedCount}</div>
+						<div className="stat">
+							<div className="k">Claimed</div>
+							<div className="v num">{stats?.claimedCount}</div>
 						</div>
-						<div className="rounded-md border p-3">
-							<div className="mb-1 text-muted-foreground text-xs">
-								Upload Reports
-							</div>
-							<div className="font-semibold text-red-500 text-xl">
-								{stats?.reportsAgainstUploadsCount}
-							</div>
+						<div className="stat accent-red">
+							<div className="k">Upload reports</div>
+							<div className="v num">{stats?.reportsAgainstUploadsCount}</div>
 						</div>
-						<div className="rounded-md border p-3">
-							<div className="mb-1 text-muted-foreground text-xs">
-								Reports Filed
-							</div>
-							<div className="font-semibold text-orange-500 text-xl">
-								{stats?.reportsFiledCount}
-							</div>
+						<div className="stat accent-gold">
+							<div className="k">Reports filed</div>
+							<div className="v num">{stats?.reportsFiledCount}</div>
 						</div>
 					</div>
 
 					{/* Deduct Coins */}
-					<div className="rounded-lg border p-4">
-						<div className="mb-3">
-							<h3 className="font-semibold">Deduct coins</h3>
-							<p className="text-muted-foreground text-sm">
-								Remove coins from this user's balance. A ledger transaction is
-								recorded automatically.
-							</p>
-						</div>
-						<div className="mb-3 flex flex-wrap gap-2">
-							{DEDUCTION_TYPES.map((type) => (
-								<Button
-									key={type}
-									variant={deductType === type ? "default" : "outline"}
-									size="sm"
-									onClick={() => setDeductType(type)}
-									disabled={deductCoinsMutation.isPending}
-								>
-									{DEDUCTION_TYPE_LABELS[type]}
-								</Button>
-							))}
-						</div>
-						<div className="flex flex-wrap items-end gap-2">
-							<div className="flex flex-col gap-1">
-								<label
-									htmlFor="deduct-amount"
-									className="text-muted-foreground text-xs"
-								>
-									Amount
-								</label>
-								<input
-									id="deduct-amount"
-									type="number"
-									min={1}
-									step={1}
-									value={deductAmount}
-									onChange={(e) => {
-										setDeductAmount(e.target.value);
-										setDeductError(null);
-									}}
-									placeholder="e.g. 10"
-									className="w-32 rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-									disabled={deductCoinsMutation.isPending}
-								/>
+					<section className="panel">
+						<div className="panel-body">
+							<div className="mb-3">
+								<h3 className="display" style={{ fontSize: 22 }}>
+									Deduct coins
+								</h3>
+								<p className="lede">
+									Remove coins from this user's balance. A ledger transaction is
+									recorded automatically.
+								</p>
 							</div>
-							<Button
-								variant="destructive"
-								onClick={handleDeductCoins}
-								disabled={
-									deductCoinsMutation.isPending ||
-									!deductAmount.trim() ||
-									Number(deductAmount) <= 0 ||
-									amountExceedsBalance
-								}
-							>
-								{deductCoinsMutation.isPending
-									? "Deducting..."
-									: "Deduct coins"}
-							</Button>
+							<div className="chips" style={{ marginBottom: 12 }}>
+								{DEDUCTION_TYPES.map((type) => (
+									<button
+										key={type}
+										type="button"
+										className="chip"
+										aria-pressed={deductType === type}
+										onClick={() => setDeductType(type)}
+										disabled={deductCoinsMutation.isPending}
+									>
+										{DEDUCTION_TYPE_LABELS[type]}
+									</button>
+								))}
+							</div>
+							<div className="composer">
+								<div>
+									<label htmlFor="deduct-amount" className="eyebrow">
+										Amount
+									</label>
+									<input
+										id="deduct-amount"
+										type="number"
+										min={1}
+										step={1}
+										value={deductAmount}
+										onChange={(e) => {
+											setDeductAmount(e.target.value);
+											setDeductError(null);
+										}}
+										placeholder="e.g. 10"
+										className="input"
+										style={{ width: 140, marginTop: 6 }}
+										disabled={deductCoinsMutation.isPending}
+									/>
+								</div>
+								<button
+									type="button"
+									className="btn btn-danger"
+									onClick={handleDeductCoins}
+									disabled={
+										deductCoinsMutation.isPending ||
+										!deductAmount.trim() ||
+										Number(deductAmount) <= 0 ||
+										amountExceedsBalance
+									}
+								>
+									{deductCoinsMutation.isPending
+										? "Deducting..."
+										: "Deduct coins"}
+								</button>
+							</div>
+							{deductError && <p className="warn">{deductError}</p>}
+							{!deductError && amountExceedsBalance && (
+								<p className="warn">
+									Amount exceeds the user's balance of {user?.coins ?? 0} coin
+									{(user?.coins ?? 0) === 1 ? "" : "s"}
+								</p>
+							)}
+							{deductCoinsMutation.isError && (
+								<p className="warn">
+									{deductCoinsMutation.error?.message ||
+										"Failed to deduct coins. Please try again."}
+								</p>
+							)}
 						</div>
-						{deductError && (
-							<p className="mt-2 text-red-500 text-sm">{deductError}</p>
-						)}
-						{!deductError && amountExceedsBalance && (
-							<p className="mt-2 text-red-500 text-sm">
-								Amount exceeds the user's balance of {user?.coins ?? 0} coin
-								{(user?.coins ?? 0) === 1 ? "" : "s"}
-							</p>
-						)}
-						{deductCoinsMutation.isError && (
-							<p className="mt-2 text-red-500 text-sm">
-								{deductCoinsMutation.error?.message ||
-									"Failed to deduct coins. Please try again."}
-							</p>
-						)}
-					</div>
+					</section>
 
 					{/* Activity Table */}
 					{activityItems.length === 0 ? (
-						<div className="rounded-lg border p-12 text-center text-muted-foreground">
-							No transactions or reports
-						</div>
+						<div className="empty">No transactions or reports</div>
 					) : (
-						<div className="rounded-lg border">
-							<table className="w-full text-sm">
-								<thead className="border-b bg-muted/50">
-									<tr>
-										<th className="p-3 text-left font-medium">Type</th>
-										<th className="p-3 text-left font-medium">Amount</th>
-										<th className="p-3 text-left font-medium">Details</th>
-										<th className="p-3 text-left font-medium">Date</th>
-									</tr>
-								</thead>
-								<tbody>
-									{activityItems.map((item) => {
-										if (item.kind === "transaction") {
-											const tx = item.transaction;
+						<section className="panel">
+							<div className="panel-body tight table-scroll">
+								<table className="data">
+									<thead>
+										<tr>
+											<th>Type</th>
+											<th>Amount</th>
+											<th>Details</th>
+											<th>Date</th>
+										</tr>
+									</thead>
+									<tbody>
+										{activityItems.map((item) => {
+											if (item.kind === "transaction") {
+												const tx = item.transaction;
+												return (
+													<tr key={item.id} className="border-b last:border-0">
+														<td>
+															<span className="intent">
+																{tx.type.replace(/_/g, " ")}
+															</span>
+														</td>
+														<td>
+															<span className={tx.amount > 0 ? "pos" : "neg"}>
+																{tx.amount > 0 ? "+" : ""}
+																{tx.amount}
+															</span>
+														</td>
+														<td className="muted">
+															{tx.voucherId ? `Voucher ${tx.voucherId}` : "—"}
+														</td>
+														<td className="p-3 text-muted-foreground">
+															{formatDateTime(tx.createdAt)}
+														</td>
+													</tr>
+												);
+											}
+
+											const report = item.report;
+											const voucherLabel = report.voucher
+												? `€${report.voucher.type} voucher`
+												: "Voucher";
+
 											return (
 												<tr key={item.id} className="border-b last:border-0">
-													<td className="p-3">
-														<span
-															className={`rounded-full px-2 py-1 font-medium text-xs ${
-																tx.type === "signup_bonus"
-																	? "bg-green-100 text-green-800"
-																	: tx.type === "upload_reward"
-																		? "bg-blue-100 text-blue-800"
-																		: tx.type === "claim_spend"
-																			? "bg-red-100 text-red-800"
-																			: tx.type === "report_refund"
-																				? "bg-purple-100 text-purple-800"
-																				: tx.type === "uploader_denied"
-																					? "bg-red-100 text-red-800"
-																					: tx.type === "admin_expiry_deduction"
-																						? "bg-rose-100 text-rose-800"
-																						: tx.type === "claim_reversed"
-																							? "bg-teal-100 text-teal-800"
-																							: tx.type ===
-																									"replacement_received"
-																								? "bg-indigo-100 text-indigo-800"
-																								: "bg-amber-100 text-amber-800"
-															}`}
-														>
-															{tx.type.replace(/_/g, " ")}
+													<td>
+														<span className="intent">
+															{item.kind === "report_filed"
+																? "report filed"
+																: "report against"}
 														</span>
 													</td>
-													<td className="p-3">
-														<span
-															className={
-																tx.amount > 0
-																	? "text-green-600"
-																	: "text-red-600"
-															}
-														>
-															{tx.amount > 0 ? "+" : ""}
-															{tx.amount}
-														</span>
+													<td className="p-3 text-muted-foreground">—</td>
+													<td className="p-3 text-muted-foreground">
+														<div>{voucherLabel}</div>
+														<div className="text-xs">
+															{item.kind === "report_filed" ? (
+																<>
+																	Uploaded by{" "}
+																	{report.uploader ? (
+																		<UserLink user={report.uploader} />
+																	) : (
+																		"Unknown"
+																	)}
+																</>
+															) : (
+																<>
+																	Reported by{" "}
+																	{report.reporter ? (
+																		<UserLink user={report.reporter} />
+																	) : (
+																		"Unknown"
+																	)}
+																</>
+															)}
+														</div>
+														{report.voucher?.expiryDate && (
+															<div className="text-xs">
+																Expires {formatDate(report.voucher.expiryDate)}
+															</div>
+														)}
 													</td>
 													<td className="p-3 text-muted-foreground">
-														{tx.voucherId ? `Voucher ${tx.voucherId}` : "—"}
-													</td>
-													<td className="p-3 text-muted-foreground">
-														{formatDateTime(tx.createdAt)}
+														{formatDateTime(report.createdAt)}
 													</td>
 												</tr>
 											);
-										}
-
-										const report = item.report;
-										const voucherLabel = report.voucher
-											? `€${report.voucher.type} voucher`
-											: "Voucher";
-
-										return (
-											<tr key={item.id} className="border-b last:border-0">
-												<td className="p-3">
-													<span
-														className={`rounded-full px-2 py-1 font-medium text-xs ${
-															item.kind === "report_filed"
-																? "bg-orange-100 text-orange-800"
-																: "bg-red-100 text-red-800"
-														}`}
-													>
-														{item.kind === "report_filed"
-															? "report filed"
-															: "report against"}
-													</span>
-												</td>
-												<td className="p-3 text-muted-foreground">—</td>
-												<td className="p-3 text-muted-foreground">
-													<div>{voucherLabel}</div>
-													<div className="text-xs">
-														{item.kind === "report_filed" ? (
-															<>
-																Uploaded by{" "}
-																{report.uploader ? (
-																	<UserLink user={report.uploader} />
-																) : (
-																	"Unknown"
-																)}
-															</>
-														) : (
-															<>
-																Reported by{" "}
-																{report.reporter ? (
-																	<UserLink user={report.reporter} />
-																) : (
-																	"Unknown"
-																)}
-															</>
-														)}
-													</div>
-													{report.voucher?.expiryDate && (
-														<div className="text-xs">
-															Expires {formatDate(report.voucher.expiryDate)}
-														</div>
-													)}
-												</td>
-												<td className="p-3 text-muted-foreground">
-													{formatDateTime(report.createdAt)}
-												</td>
-											</tr>
-										);
-									})}
-								</tbody>
-							</table>
-						</div>
+										})}
+									</tbody>
+								</table>
+							</div>
+						</section>
 					)}
 				</>
 			)}
@@ -717,21 +683,19 @@ function UserDetailPage() {
 			{activeTab === "uploaded" && (
 				<>
 					{uploadedVouchers.length === 0 ? (
-						<div className="rounded-lg border p-12 text-center text-muted-foreground">
-							No uploaded vouchers
-						</div>
+						<div className="empty">No uploaded vouchers</div>
 					) : (
-						<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+						<div className="grid">
 							{uploadedVouchers.map((voucher) => (
-								<div key={voucher._id} className="rounded-lg border p-4">
+								<div key={voucher._id} className="vcard">
 									{voucher.imageUrl ? (
 										<img
 											src={voucher.imageUrl}
 											alt="Voucher"
-											className="mb-3 h-96 w-full rounded border bg-muted object-contain"
+											className="shot"
 										/>
 									) : (
-										<div className="mb-3 flex h-96 w-full items-center justify-center rounded bg-muted">
+										<div className="shot shot-empty">
 											<span className="text-muted-foreground text-xs">
 												No image
 											</span>
@@ -744,21 +708,11 @@ function UserDetailPage() {
 										<div className="mb-1 text-muted-foreground text-xs">
 											ID: {voucher._id}
 										</div>
-										<div className="mb-1 text-muted-foreground text-sm">
-											Status:{" "}
+										<div className="mb-2">
 											<span
-												className={`inline-flex rounded-full px-2 py-1 font-medium text-xs ${
-													voucher.status === "available"
-														? "bg-green-100 text-green-800"
-														: voucher.status === "claimed"
-															? "bg-blue-100 text-blue-800"
-															: voucher.status === "reported"
-																? "bg-red-100 text-red-800"
-																: voucher.status === "expired"
-																	? "bg-gray-100 text-gray-800"
-																	: "bg-yellow-100 text-yellow-800"
-												}`}
+												className={`status ${voucherStatusClass(voucher.status)}`}
 											>
+												<i />
 												{voucher.status}
 											</span>
 										</div>
@@ -776,7 +730,7 @@ function UserDetailPage() {
 												<Link
 													to="/admin/users/$userId"
 													params={{ userId: voucher.claimer._id }}
-													className="text-blue-600 hover:underline"
+													className="u-name"
 												>
 													{voucher.claimer.username ||
 														voucher.claimer.firstName ||
@@ -834,21 +788,19 @@ function UserDetailPage() {
 			{activeTab === "claimed" && (
 				<>
 					{claimedVouchers.length === 0 ? (
-						<div className="rounded-lg border p-12 text-center text-muted-foreground">
-							No claimed vouchers
-						</div>
+						<div className="empty">No claimed vouchers</div>
 					) : (
-						<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+						<div className="grid">
 							{claimedVouchers.map((voucher) => (
-								<div key={voucher._id} className="rounded-lg border p-4">
+								<div key={voucher._id} className="vcard">
 									{voucher.imageUrl ? (
 										<img
 											src={voucher.imageUrl}
 											alt="Voucher"
-											className="mb-3 h-96 w-full rounded border bg-muted object-contain"
+											className="shot"
 										/>
 									) : (
-										<div className="mb-3 flex h-96 w-full items-center justify-center rounded bg-muted">
+										<div className="shot shot-empty">
 											<span className="text-muted-foreground text-xs">
 												No image
 											</span>
@@ -861,17 +813,11 @@ function UserDetailPage() {
 										<div className="mb-1 text-muted-foreground text-xs">
 											ID: {voucher._id}
 										</div>
-										<div className="mb-1 text-muted-foreground text-sm">
-											Status:{" "}
+										<div className="mb-2">
 											<span
-												className={`inline-flex rounded-full px-2 py-1 font-medium text-xs ${
-													voucher.status === "claimed"
-														? "bg-green-100 text-green-800"
-														: voucher.status === "reported"
-															? "bg-red-100 text-red-800"
-															: "bg-gray-100 text-gray-800"
-												}`}
+												className={`status ${voucherStatusClass(voucher.status)}`}
 											>
+												<i />
 												{voucher.status}
 											</span>
 										</div>
@@ -896,7 +842,7 @@ function UserDetailPage() {
 												<Link
 													to="/admin/users/$userId"
 													params={{ userId: voucher.uploader._id }}
-													className="text-blue-600 hover:underline"
+													className="u-name"
 												>
 													{voucher.uploader.username ||
 														voucher.uploader.firstName ||
@@ -930,35 +876,34 @@ function UserDetailPage() {
 			{activeTab === "failed" && (
 				<>
 					{failedUploads.length === 0 ? (
-						<div className="rounded-lg border p-12 text-center text-muted-foreground">
-							No failed uploads
-						</div>
+						<div className="empty">No failed uploads</div>
 					) : (
-						<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+						<div className="grid">
 							{failedUploads.map((upload) => (
-								<div key={upload._id} className="rounded-lg border p-4">
+								<div key={upload._id} className="vcard">
 									{upload.imageUrl ? (
 										<img
 											src={upload.imageUrl}
 											alt="Failed Upload"
-											className="mb-3 h-96 w-full rounded border bg-muted object-contain"
+											className="shot"
 										/>
 									) : (
-										<div className="mb-3 flex h-96 w-full items-center justify-center rounded bg-muted">
+										<div className="shot shot-empty">
 											<span className="text-muted-foreground text-xs">
 												No image
 											</span>
 										</div>
 									)}
 									<div className="mb-3">
-										<div className="mb-2 flex items-center gap-2">
+										<div className="mb-2">
 											<span
-												className={`rounded-full px-2 py-1 font-medium text-xs ${
+												className={
 													upload.failureType === "validation"
-														? "bg-yellow-100 text-yellow-800"
-														: "bg-red-100 text-red-800"
-												}`}
+														? "status s-flagged"
+														: "status s-failed"
+												}
 											>
+												<i />
 												{upload.failureType}
 											</span>
 										</div>
@@ -1018,21 +963,19 @@ function UserDetailPage() {
 			{activeTab === "reportsFiled" && (
 				<>
 					{reportsFiledByUser.length === 0 ? (
-						<div className="rounded-lg border p-12 text-center text-muted-foreground">
-							No reports filed
-						</div>
+						<div className="empty">No reports filed</div>
 					) : (
-						<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+						<div className="grid">
 							{reportsFiledByUser.map((report) => (
-								<div key={report._id} className="rounded-lg border p-4">
+								<div key={report._id} className="vcard">
 									{report.voucher?.imageUrl ? (
 										<img
 											src={report.voucher.imageUrl}
 											alt="Voucher"
-											className="mb-3 h-96 w-full rounded border bg-muted object-contain"
+											className="shot"
 										/>
 									) : (
-										<div className="mb-3 flex h-96 w-full items-center justify-center rounded bg-muted">
+										<div className="shot shot-empty">
 											<span className="text-muted-foreground text-xs">
 												No image
 											</span>
@@ -1062,7 +1005,7 @@ function UserDetailPage() {
 												<Link
 													to="/admin/users/$userId"
 													params={{ userId: report.uploader._id }}
-													className="text-blue-600 hover:underline"
+													className="u-name"
 												>
 													{report.uploader.username ||
 														report.uploader.firstName ||
@@ -1073,7 +1016,7 @@ function UserDetailPage() {
 											)}
 										</div>
 									</div>
-									<div className="rounded bg-muted p-3">
+									<div className="reason">
 										<div className="mb-1 text-muted-foreground text-xs">
 											Reason
 										</div>
@@ -1120,21 +1063,19 @@ function UserDetailPage() {
 			{activeTab === "reportsAgainst" && (
 				<>
 					{reportsAgainstUploads.length === 0 ? (
-						<div className="rounded-lg border p-12 text-center text-muted-foreground">
-							No reports against uploads
-						</div>
+						<div className="empty">No reports against uploads</div>
 					) : (
-						<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+						<div className="grid">
 							{reportsAgainstUploads.map((report) => (
-								<div key={report._id} className="rounded-lg border p-4">
+								<div key={report._id} className="vcard">
 									{report.voucher?.imageUrl ? (
 										<img
 											src={report.voucher.imageUrl}
 											alt="Voucher"
-											className="mb-3 h-96 w-full rounded border bg-muted object-contain"
+											className="shot"
 										/>
 									) : (
-										<div className="mb-3 flex h-96 w-full items-center justify-center rounded bg-muted">
+										<div className="shot shot-empty">
 											<span className="text-muted-foreground text-xs">
 												No image
 											</span>
@@ -1164,7 +1105,7 @@ function UserDetailPage() {
 												<Link
 													to="/admin/users/$userId"
 													params={{ userId: report.reporter._id }}
-													className="text-blue-600 hover:underline"
+													className="u-name"
 												>
 													{report.reporter.username ||
 														report.reporter.firstName ||
@@ -1175,7 +1116,7 @@ function UserDetailPage() {
 											)}
 										</div>
 									</div>
-									<div className="rounded bg-muted p-3">
+									<div className="reason">
 										<div className="mb-1 text-muted-foreground text-xs">
 											Reason
 										</div>
@@ -1223,84 +1164,53 @@ function UserDetailPage() {
 				<>
 					{/* Feedback & Support Messages */}
 					{feedbackAndSupport.length === 0 ? (
-						<div className="rounded-lg border p-12 text-center text-muted-foreground">
-							No feedback or support messages
-						</div>
+						<div className="empty">No feedback or support messages</div>
 					) : (
-						<div className="space-y-4">
+						<div>
 							{feedbackAndSupport.map((item: any) => (
-								<div
+								<article
 									key={item._id}
-									className={`rounded-lg border p-4 ${
-										item.status === "new"
-											? "border-blue-500 bg-blue-50 dark:bg-blue-950"
-											: ""
-									} ${
-										item.type === "support"
-											? "border-amber-200 bg-amber-50 dark:bg-amber-950/30"
-											: ""
+									className={`msg${item.status === "new" ? "fresh" : ""}${
+										item.type === "support" ? "support" : ""
 									}`}
 								>
-									<div className="mb-3 flex items-start justify-between">
-										<div>
-											<div className="flex items-center gap-2">
-												<span className="font-medium">
-													{item.type === "feedback" ? "Feedback" : "Support"}
-												</span>
-												{item.type === "support" && (
-													<span className="rounded bg-amber-500 px-2 py-1 text-white text-xs">
-														Support
-													</span>
-												)}
-											</div>
-											<div className="text-muted-foreground text-xs">
-												{formatDateTime(item.createdAt)}
-											</div>
-										</div>
-										<span
-											className={`rounded-full px-2 py-1 font-medium text-xs ${
-												item.status === "new"
-													? "bg-blue-100 text-blue-800"
-													: item.status === "read"
-														? "bg-green-100 text-green-800"
-														: "bg-gray-100 text-gray-800"
-											}`}
-										>
-											{item.status}
+									<div className="msg-head">
+										<span className="msg-user">
+											{item.type === "feedback" ? "Feedback" : "Support"}
 										</span>
+										<span className="msg-meta">
+											{formatDateTime(item.createdAt)}
+										</span>
+										<span className="intent">{item.status}</span>
 									</div>
-									<p className="whitespace-pre-wrap">{item.text}</p>
-								</div>
+									<p className="msg-text">{item.text}</p>
+								</article>
 							))}
 						</div>
 					)}
 
 					{/* Admin Messages */}
-					<div className="mt-6">
-						<h3 className="mb-3 font-semibold text-lg">Admin Messages</h3>
+					<div className="stack">
+						<h2 className="display" style={{ fontSize: 22 }}>
+							Admin messages
+						</h2>
 
-						<div className="mb-4 max-h-96 space-y-4 overflow-y-auto rounded-lg bg-gray-50 p-4">
+						<div className="thread">
 							{adminMessages.length === 0 ? (
-								<div className="py-8 text-center text-muted-foreground">
-									No admin messages sent to this user
-								</div>
+								<div className="empty">No admin messages sent to this user</div>
 							) : (
 								adminMessages.map((message: any) => (
-									<div key={message._id} className="mb-3 flex justify-end">
-										<div className="max-w-xs rounded-lg bg-blue-500 p-3 text-white shadow-sm">
-											<p className="whitespace-pre-wrap text-sm">
-												{message.text}
-											</p>
-											<p className="mt-1 text-xs opacity-75">
-												{formatDateTime(message.createdAt)}
-											</p>
-										</div>
+									<div key={message._id} className="bubble">
+										<p>{message.text}</p>
+										<p className="msg-meta">
+											{formatDateTime(message.createdAt)}
+										</p>
 									</div>
 								))
 							)}
 						</div>
 
-						<div className="flex gap-2">
+						<div className="composer">
 							<input
 								type="text"
 								value={messageText}
@@ -1311,17 +1221,19 @@ function UserDetailPage() {
 									sendMessageMutation.mutate(messageText)
 								}
 								placeholder="Type a message..."
-								className="flex-1 rounded-lg border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+								className="input"
 								disabled={sendMessageMutation.isPending}
 							/>
-							<Button
+							<button
+								type="button"
+								className="btn btn-gold"
 								onClick={() =>
 									messageText.trim() && sendMessageMutation.mutate(messageText)
 								}
 								disabled={sendMessageMutation.isPending || !messageText.trim()}
 							>
 								{sendMessageMutation.isPending ? "Sending..." : "Send"}
-							</Button>
+							</button>
 						</div>
 					</div>
 				</>

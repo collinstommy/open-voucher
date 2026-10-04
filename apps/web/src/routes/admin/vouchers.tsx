@@ -1,12 +1,10 @@
-import { Button } from "@/components/ui/button";
-import { useAdminAuth } from "@/hooks/useAdminAuth";
-import { formatDate, formatDateTime } from "@/lib/utils";
-
 import { api } from "@open-voucher/backend/convex/_generated/api";
 import type { Id } from "@open-voucher/backend/convex/_generated/dataModel";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useConvex, usePaginatedQuery } from "convex/react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useAdminAuth } from "@/hooks/useAdminAuth";
+import { formatDate, formatDateTime } from "@/lib/utils";
 
 type DunnesDetails = {
 	outcome: "not-configured" | "no-barcode" | "checked" | "error";
@@ -17,6 +15,19 @@ type DunnesDetails = {
 export const Route = createFileRoute("/admin/vouchers")({
 	component: VouchersPage,
 });
+
+function statusClass(status: string) {
+	switch (status) {
+		case "available":
+			return "s-available";
+		case "claimed":
+			return "s-claimed";
+		case "reported":
+			return "s-reported";
+		default:
+			return "";
+	}
+}
 
 function VouchersPage() {
 	const { token } = useAdminAuth();
@@ -68,18 +79,6 @@ function VouchersPage() {
 	const canLoadMore = status === "CanLoadMore";
 	const isLoadingMore = status === "LoadingMore";
 
-	if (isLoading) {
-		return <div className="text-muted-foreground">Loading vouchers...</div>;
-	}
-
-	if (!results || results.length === 0) {
-		return (
-			<div className="text-muted-foreground py-12 text-center">
-				No vouchers found
-			</div>
-		);
-	}
-
 	const handleLoadMore = () => {
 		if (canLoadMore) {
 			loadMore(50);
@@ -88,98 +87,103 @@ function VouchersPage() {
 
 	return (
 		<div>
-			<div className="mb-6 flex items-center justify-between">
-				<h1 className="text-xl font-semibold">
-					All Vouchers
-					{results.length > 0 && (
-						<span className="text-muted-foreground text-base font-normal ml-2">
-							(Showing {results.length})
-						</span>
-					)}
-				</h1>
-			</div>
-			<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-				{results.map((voucher) => (
-					<div key={voucher._id} className="rounded-lg border p-4">
-						{voucher.imageUrl ? (
-							<img
-								src={voucher.imageUrl}
-								alt="Voucher"
-								className="mb-3 h-96 w-full rounded border object-contain bg-muted"
-							/>
-						) : (
-							<div className="bg-muted mb-3 flex h-96 w-full items-center justify-center rounded">
-								<span className="text-muted-foreground text-xs">No image</span>
-							</div>
-						)}
-						<div className="mb-3">
-							<div className="mb-2 font-medium">€{voucher.type} Voucher</div>
-							<div className="text-muted-foreground mb-1 text-xs font-mono">
-								Voucher ID: {voucher._id}
-							</div>
-							<div className="text-muted-foreground mb-1 text-xs font-mono">
-								Uploader:{" "}
-								<Link
-									to="/admin/users/$userId"
-									params={{ userId: voucher.uploaderId }}
-									className="text-primary hover:underline"
-								>
-									{voucher.uploaderFirstName || voucher.uploaderId}
-								</Link>
-							</div>
-							{voucher.claimerId && (
-								<div className="text-muted-foreground mb-1 text-xs font-mono">
-									Claimer: {voucher.claimerId}
-								</div>
-							)}
-							<div className="text-muted-foreground mb-1 text-sm">
-								Status:{" "}
-								<span
-									className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
-										voucher.status === "available"
-											? "bg-green-100 text-green-800"
-											: voucher.status === "claimed"
-												? "bg-blue-100 text-blue-800"
-												: voucher.status === "reported"
-													? "bg-red-100 text-red-800"
-													: voucher.status === "expired"
-														? "bg-gray-100 text-gray-800"
-														: "bg-yellow-100 text-yellow-800"
-									}`}
-								>
-									{voucher.status}
-								</span>
-							</div>
-							<div className="text-muted-foreground mb-1 text-sm">
-								Expires {formatDate(voucher.expiryDate)}
-							</div>
-							<div className="text-muted-foreground text-sm">
-								Uploaded {formatDateTime(voucher.createdAt)}
-							</div>
-						</div>
-						<Button
-							type="button"
-							variant="outline"
-							size="sm"
-							onClick={() => openDetails(voucher._id)}
-						>
-							Check
-						</Button>
+			<div className="masthead">
+				<div>
+					<h1 className="display">Vouchers</h1>
+					<p className="lede">
+						Every voucher uploaded through the bot, newest first.
+					</p>
+				</div>
+				{results.length > 0 && (
+					<div className="stamp">
+						<b className="num">{results.length}</b> loaded
 					</div>
-				))}
+				)}
 			</div>
-			{(canLoadMore || isLoadingMore) && (
-				<div className="mt-6 flex justify-center">
-					<Button
-						onClick={handleLoadMore}
-						disabled={isLoadingMore}
-						variant="outline"
-						size="lg"
-					>
-						{isLoadingMore ? "Loading..." : "Load More"}
-					</Button>
+
+			{isLoading ? (
+				<p className="muted">Loading vouchers...</p>
+			) : results.length === 0 ? (
+				<div className="empty">No vouchers found</div>
+			) : (
+				<div className="grid">
+					{results.map((voucher) => (
+						<article key={voucher._id} className="vcard">
+							<div className="vmedia">
+								{voucher.imageUrl ? (
+									<img src={voucher.imageUrl} alt="Voucher" />
+								) : (
+									<span className="muted">No image</span>
+								)}
+							</div>
+							<div className="vbody">
+								<div className="vhead">
+									<h2 className="display vvalue num">
+										€{voucher.type}
+										<span>Voucher</span>
+									</h2>
+									<span className={`status ${statusClass(voucher.status)}`}>
+										<i />
+										{voucher.status}
+									</span>
+								</div>
+								<p className="vuploader">
+									Uploaded by{" "}
+									<Link
+										to="/admin/users/$userId"
+										params={{ userId: voucher.uploaderId }}
+									>
+										<b>{voucher.uploaderFirstName || voucher.uploaderId}</b>
+									</Link>
+								</p>
+								<dl className="ledger">
+									<div>
+										<dt>Voucher ID</dt>
+										<dd className="mono">{voucher._id}</dd>
+									</div>
+									{voucher.claimerId && (
+										<div>
+											<dt>Claimer</dt>
+											<dd className="mono">{voucher.claimerId}</dd>
+										</div>
+									)}
+									<div>
+										<dt>Expires</dt>
+										<dd>{formatDate(voucher.expiryDate)}</dd>
+									</div>
+									<div>
+										<dt>Uploaded</dt>
+										<dd>{formatDateTime(voucher.createdAt)}</dd>
+									</div>
+								</dl>
+								<div className="vactions">
+									<button
+										type="button"
+										className="btn"
+										onClick={() => openDetails(voucher._id)}
+									>
+										Check
+									</button>
+								</div>
+							</div>
+						</article>
+					))}
 				</div>
 			)}
+
+			{(canLoadMore || isLoadingMore) && (
+				<div className="pager">
+					<button
+						type="button"
+						className="btn"
+						onClick={handleLoadMore}
+						disabled={isLoadingMore}
+					>
+						{isLoadingMore ? "Loading..." : "Load 50 more"}
+					</button>
+				</div>
+			)}
+
 			{detailsId && (
 				<DunnesDetailsDialog
 					pending={detailsPending}
@@ -203,32 +207,32 @@ function DunnesDetailsDialog({
 	details: DunnesDetails | null;
 	onClose: () => void;
 }) {
+	const dialogRef = useRef<HTMLDivElement>(null);
+
+	useEffect(() => {
+		dialogRef.current?.focus();
+	}, []);
+
 	return (
 		<div
-			className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+			className="dialog-scrim"
 			role="dialog"
 			aria-label="Check"
 			onKeyDown={(event) => {
 				if (event.key === "Escape") onClose();
 			}}
 		>
-			<div
-				className="bg-background max-h-[85vh] w-full max-w-3xl overflow-auto rounded-lg border p-4 shadow-lg"
-				tabIndex={-1}
-				autoFocus
-			>
-				<div className="mb-4 flex items-center justify-between gap-4">
-					<h2 className="text-lg font-semibold">Check</h2>
-					<Button type="button" variant="outline" size="sm" onClick={onClose}>
+			<div className="dialog" tabIndex={-1} ref={dialogRef}>
+				<div className="dialog-head">
+					<h2>Check</h2>
+					<button type="button" className="btn btn-quiet" onClick={onClose}>
 						Close
-					</Button>
+					</button>
 				</div>
-				{pending && (
-					<p className="text-muted-foreground text-sm">Checking...</p>
-				)}
+				{pending && <p className="muted">Checking...</p>}
 				{details && (
-					<div className="grid gap-4">
-						<p className="text-sm">{details.label}</p>
+					<div className="stack">
+						<p>{details.label}</p>
 						{details.outcome === "checked" && (
 							<Payload title="LinkVoucher" value={details.response} />
 						)}
@@ -242,10 +246,10 @@ function DunnesDetailsDialog({
 function Payload({ title, value }: { title: string; value: unknown }) {
 	return (
 		<section>
-			<h3 className="mb-2 text-sm font-medium">{title}</h3>
-			<pre className="bg-muted overflow-auto rounded p-3 text-xs">
-				{JSON.stringify(value, null, 2)}
-			</pre>
+			<p className="eyebrow" style={{ marginBottom: 8 }}>
+				{title}
+			</p>
+			<pre className="payload">{JSON.stringify(value, null, 2)}</pre>
 		</section>
 	);
 }

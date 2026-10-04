@@ -1,10 +1,8 @@
-import { Button } from "@/components/ui/button";
-import { useAdminAuth } from "@/hooks/useAdminAuth";
-import { formatDateTime } from "@/lib/utils";
-
 import { api } from "@open-voucher/backend/convex/_generated/api";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { usePaginatedQuery } from "convex/react";
+import { useAdminAuth } from "@/hooks/useAdminAuth";
+import { formatDateTime } from "@/lib/utils";
 
 export const Route = createFileRoute("/admin/checks")({
 	component: ChecksPage,
@@ -18,6 +16,19 @@ function prettyJson(raw: string): string {
 	}
 }
 
+function statusClass(status: string) {
+	switch (status) {
+		case "available":
+			return "s-available";
+		case "claimed":
+			return "s-claimed";
+		case "reported":
+			return "s-reported";
+		default:
+			return "";
+	}
+}
+
 function ChecksPage() {
 	const { token } = useAdminAuth();
 	const { results, status, loadMore } = usePaginatedQuery(
@@ -26,98 +37,105 @@ function ChecksPage() {
 		{ initialNumItems: 20 },
 	);
 
-	if (status === "LoadingFirstPage") {
-		return <div className="text-muted-foreground">Loading checks...</div>;
-	}
-
-	if (results.length === 0) {
-		return (
-			<div className="text-muted-foreground py-12 text-center">
-				No checks yet
-			</div>
-		);
-	}
+	const isLoading = status === "LoadingFirstPage";
+	const isLoadingMore = status === "LoadingMore";
 
 	return (
-		<div>
-			<h1 className="mb-6 text-xl font-semibold">
-				Checks
-				<span className="text-muted-foreground ml-2 text-base font-normal">
-					(Showing {results.length})
-				</span>
-			</h1>
-			<div className="grid gap-4">
-				{results.map((check) => (
-					<article key={check._id} className="rounded-lg border p-4">
-						<div className="grid gap-4 sm:grid-cols-[8rem_1fr]">
-							{check.imageUrl ? (
-								<img
-									src={check.imageUrl}
-									alt="Voucher"
-									className="bg-muted h-32 w-full rounded border object-contain"
-								/>
-							) : (
-								<div className="bg-muted flex h-32 items-center justify-center rounded">
-									<span className="text-muted-foreground text-xs">
-										No voucher image
-									</span>
-								</div>
-							)}
-							<div className="grid gap-1 text-sm">
-								<div className="font-medium">
-									{check.voucherType === null
-										? "Voucher missing"
-										: `€${check.voucherType} voucher`}
-								</div>
-								<div className="text-muted-foreground font-mono text-xs">
-									{check.voucherId}
-								</div>
-								{check.barcodeNumber && (
-									<div className="text-muted-foreground font-mono text-xs">
-										{check.barcodeNumber}
-									</div>
-								)}
-								{check.voucherStatus && (
-									<div className="text-muted-foreground">
-										Voucher status: {check.voucherStatus}
-									</div>
-								)}
-								<div>
-									<Link
-										to="/admin/users/$userId"
-										params={{ userId: check.userId }}
-										className="text-primary hover:underline"
-									>
-										{check.userFirstName || check.userId}
-									</Link>
-								</div>
-								<div className="font-medium">{check.result}</div>
-								<div className="text-muted-foreground">
-									{formatDateTime(check.createdAt)}
-								</div>
-							</div>
-						</div>
-						<pre className="bg-muted mt-4 max-h-64 overflow-auto rounded p-3 text-xs">
-							{prettyJson(check.rawJson)}
-						</pre>
-					</article>
-				))}
+		<div className="stack">
+			<div className="masthead">
+				<div>
+					<h1 className="display">Checks</h1>
+					<p className="lede">Dunnes voucher lookups, newest first.</p>
+				</div>
+				{results.length > 0 && (
+					<div className="stamp">
+						<b className="num">{results.length}</b> loaded
+					</div>
+				)}
 			</div>
-			{status === "CanLoadMore" && (
-				<div className="mt-6 flex justify-center">
-					<Button
-						type="button"
-						variant="outline"
-						size="lg"
-						onClick={() => loadMore(20)}
-					>
-						Load More
-					</Button>
+
+			{isLoading ? (
+				<p className="muted">Loading checks...</p>
+			) : results.length === 0 ? (
+				<div className="empty">No checks yet</div>
+			) : (
+				<div className="stack">
+					{results.map((check) => (
+						<article key={check._id} className="panel">
+							<div className="panel-body">
+								<div className="check-row">
+									<div className="vmedia">
+										{check.imageUrl ? (
+											<img src={check.imageUrl} alt="Voucher" />
+										) : (
+											<span className="muted">No image</span>
+										)}
+									</div>
+									<div>
+										<div className="vhead">
+											<h2 className="display vvalue num">
+												{check.voucherType === null
+													? "Missing"
+													: `€${check.voucherType}`}
+												<span>Voucher</span>
+											</h2>
+											{check.voucherStatus && (
+												<span
+													className={`status ${statusClass(check.voucherStatus)}`}
+												>
+													<i />
+													{check.voucherStatus}
+												</span>
+											)}
+										</div>
+										<p className="vuploader">
+											Checked by{" "}
+											<Link
+												to="/admin/users/$userId"
+												params={{ userId: check.userId }}
+											>
+												<b>{check.userFirstName || check.userId}</b>
+											</Link>
+										</p>
+										<dl className="ledger">
+											<div>
+												<dt>Voucher ID</dt>
+												<dd className="mono">{check.voucherId}</dd>
+											</div>
+											{check.barcodeNumber && (
+												<div>
+													<dt>Barcode</dt>
+													<dd className="mono">{check.barcodeNumber}</dd>
+												</div>
+											)}
+											<div>
+												<dt>Result</dt>
+												<dd>{check.result}</dd>
+											</div>
+											<div>
+												<dt>Checked</dt>
+												<dd>{formatDateTime(check.createdAt)}</dd>
+											</div>
+										</dl>
+									</div>
+								</div>
+								<pre className="payload">{prettyJson(check.rawJson)}</pre>
+							</div>
+						</article>
+					))}
 				</div>
 			)}
-			{status === "LoadingMore" && (
-				<div className="text-muted-foreground mt-6 text-center text-sm">
-					Loading...
+
+			{(status === "CanLoadMore" || isLoadingMore) && (
+				<div className="pager">
+					<button
+						type="button"
+						className="btn"
+						onClick={() => loadMore(20)}
+						disabled={isLoadingMore}
+					>
+						{isLoadingMore ? "Loading..." : "Load 20 more"}
+					</button>
 				</div>
 			)}
 		</div>

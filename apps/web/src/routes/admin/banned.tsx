@@ -1,12 +1,11 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { convexQuery } from "@convex-dev/react-query";
 import { api } from "@open-voucher/backend/convex/_generated/api";
+import type { Id } from "@open-voucher/backend/convex/_generated/dataModel";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useConvex } from "convex/react";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
 import { formatDateTime } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import { useConvex } from "convex/react";
-import type { Id } from "@open-voucher/backend/convex/_generated/dataModel";
 
 export const Route = createFileRoute("/admin/banned")({
 	component: BannedUsers,
@@ -14,6 +13,13 @@ export const Route = createFileRoute("/admin/banned")({
 
 const UPLOAD_WARNING_MESSAGE =
 	"Warning: Vouchers you uploaded have been reported as not working by several other community members. Please only upload unused, valid vouchers. Continued reports may result in a coin deduction or a permanent ban.";
+
+function requireToken(token: string | null): string {
+	if (!token) {
+		throw new Error("Not signed in");
+	}
+	return token;
+}
 
 function BannedUsers() {
 	const { token } = useAdminAuth();
@@ -30,32 +36,44 @@ function BannedUsers() {
 
 	const banMutation = useMutation({
 		mutationFn: (userId: Id<"users">) =>
-			convex.mutation(api.adminUsers.banUser, { token: token!, userId }),
+			convex.mutation(api.adminUsers.banUser, {
+				token: requireToken(token),
+				userId,
+			}),
 		onSuccess: () => queryClient.invalidateQueries(),
 	});
 
 	const dismissMutation = useMutation({
 		mutationFn: (userId: Id<"users">) =>
-			convex.mutation(api.adminUsers.dismissFlag, { token: token!, userId }),
+			convex.mutation(api.adminUsers.dismissFlag, {
+				token: requireToken(token),
+				userId,
+			}),
 		onSuccess: () => queryClient.invalidateQueries(),
 	});
 
 	const unbanMutation = useMutation({
 		mutationFn: (userId: Id<"users">) =>
-			convex.mutation(api.adminUsers.unbanUser, { token: token!, userId }),
+			convex.mutation(api.adminUsers.unbanUser, {
+				token: requireToken(token),
+				userId,
+			}),
 		onSuccess: () => queryClient.invalidateQueries(),
 	});
 
 	const flagForReviewMutation = useMutation({
 		mutationFn: (userId: Id<"users">) =>
-			convex.mutation(api.adminUsers.flagForReview, { token: token!, userId }),
+			convex.mutation(api.adminUsers.flagForReview, {
+				token: requireToken(token),
+				userId,
+			}),
 		onSuccess: () => queryClient.invalidateQueries(),
 	});
 
 	const sendWarningMutation = useMutation({
 		mutationFn: (userId: Id<"users">) =>
 			convex.mutation(api.messages.sendMessageToUser, {
-				token: token!,
+				token: requireToken(token),
 				userId,
 				messageText: UPLOAD_WARNING_MESSAGE,
 			}),
@@ -78,184 +96,174 @@ function BannedUsers() {
 		}
 	};
 
-	if (bannedLoading || flaggedLoading) {
-		return <div>Loading...</div>;
-	}
-
 	return (
-		<div className="space-y-10">
-			{/* Flagged for Review */}
-			<div className="space-y-6">
-				<div className="flex items-center justify-between">
-					<div>
-						<h1 className="text-2xl font-bold">Flagged for Review</h1>
-						<p className="text-muted-foreground">
-							Users automatically flagged by the system. Review and either ban
-							or dismiss.
-						</p>
-					</div>
+		<div className="stack">
+			<div className="masthead">
+				<div>
+					<h1 className="display">Banned</h1>
+					<p className="lede">
+						Accounts flagged for review, and accounts already banned.
+					</p>
 				</div>
+				{!bannedLoading && !flaggedLoading && (
+					<div className="stamp">
+						<b className="num">{flaggedUsers?.length ?? 0}</b> flagged
+						<br />
+						<b className="num">{bannedUsers?.length ?? 0}</b> banned
+					</div>
+				)}
+			</div>
 
-				<div className="space-y-4">
-					{!flaggedUsers || flaggedUsers.length === 0 ? (
-						<div className="rounded-lg border p-8 text-center text-muted-foreground">
-							No users flagged for review
+			{bannedLoading || flaggedLoading ? (
+				<p className="muted">Loading...</p>
+			) : (
+				<div className="stack">
+					<section className="stack">
+						<div className="panel-head" style={{ padding: 0, border: 0 }}>
+							<h2>Flagged for review</h2>
+							<span className="note">
+								Review each account, then ban or dismiss.
+							</span>
 						</div>
-					) : (
-						flaggedUsers.map((user) => (
-							<div key={user._id} className="rounded-lg border p-6 space-y-3">
-								<div className="flex items-start justify-between">
-									<div>
-										<h3 className="font-medium">
+						{!flaggedUsers || flaggedUsers.length === 0 ? (
+							<div className="empty">No users flagged for review</div>
+						) : (
+							flaggedUsers.map((user) => (
+								<article key={user._id} className="panel">
+									<div className="panel-body">
+										<div className="msg-head">
 											<Link
+												className="msg-user"
 												to="/admin/users/$userId"
 												params={{ userId: user._id }}
-												className="hover:text-blue-600 hover:underline"
 											>
-												{user.firstName || user.username || "Unknown User"}
-												{user.username && (
-													<span className="text-muted-foreground ml-2">
-														@{user.username}
-													</span>
-												)}
+												{user.firstName || user.username || "Unknown user"}
+												{user.username ? ` @${user.username}` : ""}
 											</Link>
-										</h3>
-										<p className="text-sm text-muted-foreground">
-											Chat ID: {user.telegramChatId}
-										</p>
-										<div className="mt-2 flex gap-4 text-sm text-muted-foreground">
-											<span>Uploads: {user.uploadCount}</span>
-											<span>Claims: {user.claimCount}</span>
-											<span>Upload Reports: {user.uploadReportCount}</span>
-											<span>Claim Reports: {user.claimReportCount}</span>
+											<span className="status s-flagged">
+												<i />
+												flagged
+											</span>
+										</div>
+										<div className="u-id">{user.telegramChatId}</div>
+										<div className="meta-line">
+											<span>Uploads {user.uploadCount}</span>
+											<span>Claims {user.claimCount}</span>
+											<span>Upload reports {user.uploadReportCount}</span>
+											<span>Claim reports {user.claimReportCount}</span>
 											{user.adminMessageCount > 0 && (
-												<span title="Admin messages sent">
-													✉️ {user.adminMessageCount}
-												</span>
+												<span>Admin messages {user.adminMessageCount}</span>
+											)}
+											<span>
+												Flagged{" "}
+												{user.flaggedForReviewAt
+													? formatDateTime(user.flaggedForReviewAt)
+													: ""}
+											</span>
+										</div>
+										<div className="actions">
+											<button
+												type="button"
+												className="btn"
+												onClick={() => handleSendWarning(user)}
+												disabled={sendWarningMutation.isPending}
+											>
+												Send warning
+											</button>
+											<button
+												type="button"
+												className="btn btn-danger"
+												onClick={() => banMutation.mutate(user._id)}
+												disabled={banMutation.isPending}
+											>
+												Ban
+											</button>
+											<button
+												type="button"
+												className="btn btn-quiet"
+												onClick={() => dismissMutation.mutate(user._id)}
+												disabled={dismissMutation.isPending}
+											>
+												Dismiss
+											</button>
+										</div>
+									</div>
+								</article>
+							))
+						)}
+					</section>
+
+					<section className="stack">
+						<div className="panel-head" style={{ padding: 0, border: 0 }}>
+							<h2>Banned users</h2>
+							<span className="note">Accounts blocked from the service.</span>
+						</div>
+						{!bannedUsers || bannedUsers.length === 0 ? (
+							<div className="empty">No banned users</div>
+						) : (
+							bannedUsers.map((user) => (
+								<article key={user._id} className="panel">
+									<div className="panel-body">
+										<div className="msg-head">
+											<Link
+												className="msg-user"
+												to="/admin/users/$userId"
+												params={{ userId: user._id }}
+											>
+												{user.firstName || user.username || "Unknown user"}
+												{user.username ? ` @${user.username}` : ""}
+											</Link>
+											<span className="status s-reported">
+												<i />
+												banned
+											</span>
+										</div>
+										<div className="u-id">{user.telegramChatId}</div>
+										<div className="meta-line">
+											{user.adminMessageCount > 0 && (
+												<span>Admin messages {user.adminMessageCount}</span>
+											)}
+											{user.bannedAt && (
+												<span>Banned {formatDateTime(user.bannedAt)}</span>
 											)}
 										</div>
-									</div>
-									<div className="text-sm text-muted-foreground">
-										Flagged: {formatDateTime(user.flaggedForReviewAt!)}
-									</div>
-								</div>
-								<div className="flex gap-2">
-									<Button
-										variant="outline"
-										onClick={() => handleSendWarning(user)}
-										disabled={sendWarningMutation.isPending}
-									>
-										Send warning
-									</Button>
-									<Button
-										variant="destructive"
-										size="sm"
-										onClick={() => banMutation.mutate(user._id)}
-										disabled={banMutation.isPending}
-									>
-										Ban User
-									</Button>
-									<Button
-										variant="outline"
-										size="sm"
-										onClick={() => dismissMutation.mutate(user._id)}
-										disabled={dismissMutation.isPending}
-									>
-										Dismiss
-									</Button>
-								</div>
-							</div>
-						))
-					)}
-				</div>
-			</div>
-
-			{/* Banned Users */}
-			<div className="space-y-6">
-				<div className="flex items-center justify-between">
-					<div>
-						<h2 className="text-2xl font-bold">Banned Users</h2>
-						<p className="text-muted-foreground">
-							Users who have been banned from the service
-						</p>
-					</div>
-				</div>
-
-				<div className="space-y-4">
-					{!bannedUsers || bannedUsers.length === 0 ? (
-						<div className="rounded-lg border p-8 text-center text-muted-foreground">
-							No banned users
-						</div>
-					) : (
-						bannedUsers.map((user) => (
-							<div key={user._id} className="rounded-lg border p-6 space-y-3">
-								<div className="flex items-start justify-between">
-									<div>
-										<h3 className="font-medium">
-											<Link
-												to="/admin/users/$userId"
-												params={{ userId: user._id }}
-												className="hover:text-blue-600 hover:underline"
+										<div className="actions">
+											{!user.flaggedForReviewAt && (
+												<button
+													type="button"
+													className="btn"
+													onClick={() => flagForReviewMutation.mutate(user._id)}
+													disabled={flagForReviewMutation.isPending}
+												>
+													{flagForReviewMutation.isPending
+														? "Flagging..."
+														: "Flag for review"}
+												</button>
+											)}
+											<button
+												type="button"
+												className="btn"
+												onClick={() => handleSendWarning(user)}
+												disabled={sendWarningMutation.isPending}
 											>
-												{user.firstName || user.username || "Unknown User"}
-												{user.username && (
-													<span className="text-muted-foreground ml-2">
-														@{user.username}
-													</span>
-												)}
-											</Link>
-										</h3>
-										<p className="text-sm text-muted-foreground">
-											Chat ID: {user.telegramChatId}
-										</p>
-										{user.adminMessageCount > 0 && (
-											<div
-												className="mt-2 text-sm text-muted-foreground"
-												title="Admin messages sent"
+												Send warning
+											</button>
+											<button
+												type="button"
+												className="btn btn-quiet"
+												onClick={() => unbanMutation.mutate(user._id)}
+												disabled={unbanMutation.isPending}
 											>
-												✉️ {user.adminMessageCount}
-											</div>
-										)}
-									</div>
-									{user.bannedAt && (
-										<div className="text-sm text-muted-foreground">
-											Banned: {formatDateTime(user.bannedAt)}
+												Unban
+											</button>
 										</div>
-									)}
-								</div>
-								<div className="flex gap-2">
-									{!user.flaggedForReviewAt && (
-										<Button
-											variant="outline"
-											onClick={() => flagForReviewMutation.mutate(user._id)}
-											disabled={flagForReviewMutation.isPending}
-										>
-											{flagForReviewMutation.isPending
-												? "Flagging..."
-												: "Flag for Review"}
-										</Button>
-									)}
-									<Button
-										variant="outline"
-										onClick={() => handleSendWarning(user)}
-										disabled={sendWarningMutation.isPending}
-									>
-										Send warning
-									</Button>
-									<Button
-										variant="outline"
-										size="sm"
-										onClick={() => unbanMutation.mutate(user._id)}
-										disabled={unbanMutation.isPending}
-									>
-										Unban User
-									</Button>
-								</div>
-							</div>
-						))
-					)}
+									</div>
+								</article>
+							))
+						)}
+					</section>
 				</div>
-			</div>
+			)}
 		</div>
 	);
 }

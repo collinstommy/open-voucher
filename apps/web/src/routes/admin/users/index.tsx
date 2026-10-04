@@ -5,7 +5,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useConvex } from "convex/react";
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
 
 export const Route = createFileRoute("/admin/users/")({
@@ -23,6 +22,28 @@ type SortField =
 	| "banScore";
 type SortDirection = "asc" | "desc";
 
+function ratioClass(value: number) {
+	if (!Number.isFinite(value) || value > 1.5) return "sev-red";
+	if (value > 1) return "sev-amber";
+	return "";
+}
+
+function formatRatio(value: number) {
+	if (value === Number.POSITIVE_INFINITY) return "∞";
+	return value.toFixed(2);
+}
+
+function scoreWidth(score: number) {
+	if (!Number.isFinite(score)) return 100;
+	return Math.min(100, score * 80);
+}
+
+function scoreColor(score: number) {
+	if (!Number.isFinite(score) || score > 2) return "var(--red)";
+	if (score > 1) return "var(--gold)";
+	return "var(--green)";
+}
+
 function UsersPage() {
 	const { token } = useAdminAuth();
 	const convex = useConvex();
@@ -35,14 +56,22 @@ function UsersPage() {
 	);
 
 	const banMutation = useMutation({
-		mutationFn: (userId: Id<"users">) =>
-			convex.mutation(api.adminUsers.banUser, { token: token!, userId }),
+		mutationFn: (userId: Id<"users">) => {
+			if (!token) {
+				throw new Error("Not signed in");
+			}
+			return convex.mutation(api.adminUsers.banUser, { token, userId });
+		},
 		onSuccess: () => queryClient.invalidateQueries(),
 	});
 
 	const unbanMutation = useMutation({
-		mutationFn: (userId: Id<"users">) =>
-			convex.mutation(api.adminUsers.unbanUser, { token: token!, userId }),
+		mutationFn: (userId: Id<"users">) => {
+			if (!token) {
+				throw new Error("Not signed in");
+			}
+			return convex.mutation(api.adminUsers.unbanUser, { token, userId });
+		},
 		onSuccess: () => queryClient.invalidateQueries(),
 	});
 
@@ -56,11 +85,11 @@ function UsersPage() {
 	};
 
 	if (isLoading) {
-		return <div className="text-muted-foreground">Loading users...</div>;
+		return <p className="muted">Loading users...</p>;
 	}
 
 	if (error) {
-		return <div className="text-red-500">Error loading users</div>;
+		return <p className="warn">Error loading users</p>;
 	}
 
 	const users = (data?.users ?? [])
@@ -93,270 +122,198 @@ function UsersPage() {
 
 	return (
 		<div>
-			<div className="mb-6 flex items-center justify-between">
-				<h1 className="font-semibold text-xl">Users ({users.length})</h1>
+			<div className="masthead">
+				<div>
+					<h1 className="display">Users</h1>
+					<p className="lede">Every account, worst behaviour first.</p>
+				</div>
+				<div className="stamp">
+					<b className="num">{users.length}</b> accounts
+				</div>
 			</div>
-			<div className="overflow-x-auto">
-				<table className="w-full border-collapse">
-					<thead>
-						<tr className="border-b text-left">
-							<th className="pr-4 pb-3 font-medium">User</th>
-							<th className="pr-4 pb-3 font-medium">
-								<button
-									onClick={() => handleSort("coins")}
-									className="flex items-center gap-1 hover:text-foreground"
-								>
-									Coins
-									{sortField === "coins" ? (
-										sortDirection === "asc" ? (
-											<span>↑</span>
-										) : (
-											<span>↓</span>
-										)
-									) : (
-										<span className="opacity-30">⇅</span>
-									)}
-								</button>
-							</th>
-							<th className="pr-4 pb-3 font-medium">
-								<button
-									onClick={() => handleSort("uploadCount")}
-									className="flex items-center gap-1 hover:text-foreground"
-								>
-									Uploaded
-									{sortField === "uploadCount" ? (
-										sortDirection === "asc" ? (
-											<span>↑</span>
-										) : (
-											<span>↓</span>
-										)
-									) : (
-										<span className="opacity-30">⇅</span>
-									)}
-								</button>
-							</th>
-							<th className="pr-4 pb-3 font-medium">
-								<button
-									onClick={() => handleSort("claimCount")}
-									className="flex items-center gap-1 hover:text-foreground"
-								>
-									Claimed
-									{sortField === "claimCount" ? (
-										sortDirection === "asc" ? (
-											<span>↑</span>
-										) : (
-											<span>↓</span>
-										)
-									) : (
-										<span className="opacity-30">⇅</span>
-									)}
-								</button>
-							</th>
-							<th className="pr-4 pb-3 font-medium">
-								<button
-									onClick={() => handleSort("uploadReportCount")}
-									className="flex items-center gap-1 hover:text-foreground"
-								>
-									Upload Reports
-									{sortField === "uploadReportCount" ? (
-										sortDirection === "asc" ? (
-											<span>↑</span>
-										) : (
-											<span>↓</span>
-										)
-									) : (
-										<span className="opacity-30">⇅</span>
-									)}
-								</button>
-							</th>
-							<th className="pr-4 pb-3 font-medium">
-								<button
-									onClick={() => handleSort("claimReportCount")}
-									className="flex items-center gap-1 hover:text-foreground"
-								>
-									Claim Reports
-									{sortField === "claimReportCount" ? (
-										sortDirection === "asc" ? (
-											<span>↑</span>
-										) : (
-											<span>↓</span>
-										)
-									) : (
-										<span className="opacity-30">⇅</span>
-									)}
-								</button>
-							</th>
-							<th className="pr-4 pb-3 font-medium">
-								<button
-									onClick={() => handleSort("uploadReportRatio")}
-									className="flex items-center gap-1 hover:text-foreground"
-								>
-									Upload Report Ratio
-									{sortField === "uploadReportRatio" ? (
-										sortDirection === "asc" ? (
-											<span>↑</span>
-										) : (
-											<span>↓</span>
-										)
-									) : (
-										<span className="opacity-30">⇅</span>
-									)}
-								</button>
-							</th>
-							<th className="pr-4 pb-3 font-medium">
-								<button
-								type="button"
-									onClick={() => handleSort("claimReportRatio")}
-									className="flex items-center gap-1 hover:text-foreground"
-								>
-									Claim Report Ratio
-									{sortField === "claimReportRatio" ? (
-										sortDirection === "asc" ? (
-											<span>↑</span>
-										) : (
-											<span>↓</span>
-										)
-									) : (
-										<span className="opacity-30">⇅</span>
-									)}
-								</button>
-							</th>
-							<th className="pr-4 pb-3 font-medium">
-								<button
-									type="button"
-									onClick={() => handleSort("banScore")}
-									className="flex items-center gap-1 hover:text-foreground"
-								>
-									Ban Score
-									{sortField === "banScore" ? (
-										sortDirection === "asc" ? (
-											<span>↑</span>
-										) : (
-											<span>↓</span>
-										)
-									) : (
-										<span className="opacity-30">⇅</span>
-									)}
-								</button>
-							</th>
-							<th className="pb-3 font-medium">Actions</th>
-						</tr>
-					</thead>
-					<tbody>
-						{users.map((user) => (
-							<tr key={user._id} className="border-b">
-								<td className="py-3 pr-4">
-									<Link to="/admin/users/$userId" params={{ userId: user._id }}>
-										<div className="cursor-pointer hover:underline">
-											<div className="font-medium">
+
+			<section className="panel">
+				<div className="panel-head">
+					<h2>Accounts by ban score</h2>
+					<span className="note">
+						Ratios count only once a user has 2 or more reports
+					</span>
+				</div>
+				<div className="panel-body tight table-scroll">
+					<table className="users-table">
+						<thead>
+							<tr>
+								<th>User</th>
+								<SortHeader
+									label="Coins"
+									field="coins"
+									sortField={sortField}
+									sortDirection={sortDirection}
+									onSort={handleSort}
+								/>
+								<SortHeader
+									label="Uploaded"
+									field="uploadCount"
+									sortField={sortField}
+									sortDirection={sortDirection}
+									onSort={handleSort}
+								/>
+								<SortHeader
+									label="Claimed"
+									field="claimCount"
+									sortField={sortField}
+									sortDirection={sortDirection}
+									onSort={handleSort}
+								/>
+								<SortHeader
+									label="Upload reports"
+									field="uploadReportCount"
+									sortField={sortField}
+									sortDirection={sortDirection}
+									onSort={handleSort}
+								/>
+								<SortHeader
+									label="Claim reports"
+									field="claimReportCount"
+									sortField={sortField}
+									sortDirection={sortDirection}
+									onSort={handleSort}
+								/>
+								<SortHeader
+									label="Upload ratio"
+									field="uploadReportRatio"
+									sortField={sortField}
+									sortDirection={sortDirection}
+									onSort={handleSort}
+								/>
+								<SortHeader
+									label="Claim ratio"
+									field="claimReportRatio"
+									sortField={sortField}
+									sortDirection={sortDirection}
+									onSort={handleSort}
+								/>
+								<SortHeader
+									label="Ban score"
+									field="banScore"
+									sortField={sortField}
+									sortDirection={sortDirection}
+									onSort={handleSort}
+								/>
+								<th>Action</th>
+							</tr>
+						</thead>
+						<tbody>
+							{users.map((user) => (
+								<tr key={user._id}>
+									<td>
+										<Link
+											to="/admin/users/$userId"
+											params={{ userId: user._id }}
+										>
+											<div className="u-name">
 												{user.username || user.firstName || "Unknown"}
 											</div>
-											<div className="text-muted-foreground text-xs">
-												{user.telegramChatId}
-											</div>
-										</div>
-									</Link>
-								</td>
-								<td className="py-3 pr-4">{user.coins}</td>
-								<td className="py-3 pr-4">{user.uploadCount}</td>
-								<td className="py-3 pr-4">{user.claimCount}</td>
-								<td className="py-3 pr-4">
-									<span
+											<div className="u-id">{user.telegramChatId}</div>
+										</Link>
+									</td>
+									<td className="num">{user.coins}</td>
+									<td className="num">{user.uploadCount}</td>
+									<td className="num">{user.claimCount}</td>
+									<td
 										className={
-											user.uploadReportCount > 0
-												? "font-medium text-red-500"
-												: ""
+											user.uploadReportCount > 0 ? "num sev-red" : "num"
 										}
 									>
 										{user.uploadReportCount}
-									</span>
-								</td>
-								<td className="py-3 pr-4">
-									<span
+									</td>
+									<td
 										className={
-											user.claimReportCount > 0
-												? "font-medium text-orange-500"
-												: ""
+											user.claimReportCount > 0 ? "num sev-amber" : "num"
 										}
 									>
 										{user.claimReportCount}
-									</span>
-								</td>
-								<td className="py-3 pr-4">
-									<span
-										className={
-											user.uploadReportRatio > 1.5
-												? "font-bold text-red-600"
-												: user.uploadReportRatio > 1.0
-													? "font-medium text-orange-500"
-													: user.uploadReportRatio === Number.POSITIVE_INFINITY
-														? "font-bold text-red-600"
+									</td>
+									<td className={`num ${ratioClass(user.uploadReportRatio)}`}>
+										{formatRatio(user.uploadReportRatio)}
+									</td>
+									<td className={`num ${ratioClass(user.claimReportRatio)}`}>
+										{formatRatio(user.claimReportRatio)}
+									</td>
+									<td>
+										<span
+											className={`banscore num ${
+												!Number.isFinite(user.banScore) || user.banScore > 3
+													? "sev-red"
+													: user.banScore > 2
+														? "sev-amber"
 														: ""
-										}
-									>
-										{user.uploadReportRatio === Number.POSITIVE_INFINITY
-											? "∞"
-											: user.uploadReportRatio.toFixed(2)}
-									</span>
-								</td>
-								<td className="py-3 pr-4">
-									<span
-										className={
-											user.claimReportRatio > 1.5
-												? "font-bold text-red-600"
-												: user.claimReportRatio > 1.0
-													? "font-medium text-orange-500"
-													: user.claimReportRatio === Number.POSITIVE_INFINITY
-														? "font-bold text-red-600"
-														: ""
-										}
-									>
-										{user.claimReportRatio === Number.POSITIVE_INFINITY
-											? "∞"
-											: user.claimReportRatio.toFixed(2)}
-									</span>
-								</td>
-								<td className="py-3 pr-4">
-									<span
-										className={
-											user.banScore > 3.0
-												? "font-bold text-red-600"
-												: user.banScore > 2.0
-													? "font-medium text-orange-500"
-													: ""
-										}
-									>
-										{user.banScore === Number.POSITIVE_INFINITY
-											? "∞"
-											: user.banScore.toFixed(2)}
-									</span>
-								</td>
-								<td className="py-3">
-									{user.isBanned ? (
-										<Button
-											variant="outline"
-											size="sm"
-											onClick={() => unbanMutation.mutate(user._id)}
-											disabled={unbanMutation.isPending}
+											}`}
 										>
-											Unban
-										</Button>
-									) : (
-										<Button
-											variant="destructive"
-											size="sm"
-											onClick={() => banMutation.mutate(user._id)}
-											disabled={banMutation.isPending}
-										>
-											Ban
-										</Button>
-									)}
-								</td>
-							</tr>
-						))}
-					</tbody>
-				</table>
-			</div>
+											{formatRatio(user.banScore)}
+											<span className="micro" aria-hidden="true">
+												<span
+													style={{
+														width: `${scoreWidth(user.banScore)}%`,
+														background: scoreColor(user.banScore),
+													}}
+												/>
+											</span>
+										</span>
+									</td>
+									<td>
+										{user.isBanned ? (
+											<button
+												type="button"
+												className="btn btn-xs btn-quiet"
+												onClick={() => unbanMutation.mutate(user._id)}
+												disabled={unbanMutation.isPending}
+											>
+												Unban
+											</button>
+										) : (
+											<button
+												type="button"
+												className="btn btn-xs btn-danger"
+												onClick={() => banMutation.mutate(user._id)}
+												disabled={banMutation.isPending}
+											>
+												Ban
+											</button>
+										)}
+									</td>
+								</tr>
+							))}
+						</tbody>
+					</table>
+				</div>
+			</section>
 		</div>
+	);
+}
+
+function SortHeader({
+	label,
+	field,
+	sortField,
+	sortDirection,
+	onSort,
+}: {
+	label: string;
+	field: SortField;
+	sortField: SortField;
+	sortDirection: SortDirection;
+	onSort: (field: SortField) => void;
+}) {
+	const active = sortField === field;
+	return (
+		<th>
+			<button type="button" onClick={() => onSort(field)}>
+				<span className={active ? "active-sort" : undefined}>
+					{label}
+					{active ? (sortDirection === "asc" ? " ↑" : " ↓") : ""}
+				</span>
+			</button>
+		</th>
 	);
 }
