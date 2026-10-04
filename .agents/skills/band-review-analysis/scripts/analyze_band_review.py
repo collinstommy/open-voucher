@@ -13,16 +13,19 @@ from pathlib import Path
 
 REWARDS = {"5": 15, "10": 10, "20": 5, "0": 0}
 
+DEDUCTION_TYPES = ("admin_manual_deduction", "admin_report_deduction", "admin_expiry_deduction")
+
 QUERY = r'''const users = await ctx.db.query("users").collect();
 const targets = users.filter((u) => u.isBanned === true || (u.flaggedForReviewAt !== undefined && u.isBanned === false));
 const chats = new Set(targets.map((u) => u.telegramChatId));
 const allMessages = await ctx.db.query("messages").collect();
 return await Promise.all(targets.map(async (user) => {
-  const [uploads, reportsAgainst, reportsFiled, feedback] = await Promise.all([
+  const [uploads, reportsAgainst, reportsFiled, feedback, transactions] = await Promise.all([
     ctx.db.query("vouchers").withIndex("by_uploader_created", (q) => q.eq("uploaderId", user._id)).collect(),
     ctx.db.query("reports").withIndex("by_uploader", (q) => q.eq("uploaderId", user._id)).collect(),
     ctx.db.query("reports").withIndex("by_reporterId", (q) => q.eq("reporterId", user._id)).collect(),
     ctx.db.query("feedback").withIndex("by_user", (q) => q.eq("userId", user._id)).collect(),
+    ctx.db.query("transactions").withIndex("by_user", (q) => q.eq("userId", user._id)).collect(),
   ]);
   return {
     user: { _id: user._id, telegramChatId: user.telegramChatId, username: user.username, firstName: user.firstName, coins: user.coins, isBanned: user.isBanned, bannedAt: user.bannedAt, flaggedForReviewAt: user.flaggedForReviewAt, uploadCount: user.uploadCount ?? 0, claimCount: user.claimCount ?? 0, uploadReportCount: user.uploadReportCount ?? 0, claimReportCount: user.claimReportCount ?? 0 },
@@ -30,6 +33,7 @@ return await Promise.all(targets.map(async (user) => {
     reportsAgainst,
     reportsFiled,
     feedback,
+    transactions,
     messages: allMessages.filter((m) => chats.has(m.telegramChatId) && m.telegramChatId === user.telegramChatId),
   };
 }));'''
@@ -92,6 +96,15 @@ def analyze(case: dict) -> dict:
     reported_ids = {r["voucherId"] for r in against}
     reported_uploads = [v for v in uploads if v["_id"] in reported_ids]
     deduction = sum(REWARDS.get(v.get("type", "0"), 0) for v in reported_uploads)
+    transactions = case.get("transactions", [])
+    deduction_tx = [t for t in transactions if t.get("type") in DEDUCTION_TYPES]
+    deducted_total = sum(-t.get("amount", 0) for t in deduction_tx if t.get("amount", 0) < 0)
+    deducted_breakdown: dict[str, int] = {}
+    for t in deduction_tx:
+        if t.get("amount", 0) < 0:
+            key = t.get("type", "unknown")
+            deducted_breakdown[key] = deducted_breakdown.get(key, 0) + (-t["amount"])
+    remaining = max(0, deduction - deducted_total)
     before_uploads, after_uploads = count_after(uploads, cutoff)
     before_against, after_against = count_after(against, cutoff)
     before_filed, after_filed = count_after(filed, cutoff)
@@ -111,7 +124,53 @@ def analyze(case: dict) -> dict:
         suggestion = "Monitor closely; consider warning"
     else:
         suggestion = "Monitor"
-    return {"user": user, "uploads": uploads, "against": against, "filed": filed, "messages": messages, "feedback": feedback, "admin_messages": admin_messages, "cutoff": cutoff, "score": score, "confidence": confidence, "deduction": deduction, "reported_uploads": reported_uploads, "before_uploads": before_uploads, "after_uploads": after_uploads, "before_against": before_against, "after_against": after_against, "before_filed": before_filed, "after_filed": after_filed, "before_feedback": before_feedback, "after_feedback": after_feedback, "before_inbound": before_inbound, "after_inbound": after_inbound, "suggestion": suggestion}
+    return {"user": user, "uploads": uploads, "against": against, "filed": filed, "messages": messages, "feedback": feedback, "transactions": transactions, "deduction_tx": deduction_tx, "deducted_total": deducted_total, "deducted_breakdown": deducted_breakdown, "remaining": remaining, "admin_messages": admin_messages, "cutoff": cutoff, "score": score, "confidence": confidence, "deduction": deduction, "reported_uploads": reported_uploads, "before_uploads": before_uploads, "after_uploads": after_uploads, "before_against": before_against, "after_against": after_against, "before_filed": before_filed, "after_filed": after_filed, "before_feedback": before_feedback, "after_feedback": after_feedback, "before_inbound": before_inbound, "after_inbound": after_inbound, "suggestion": suggestion, "action_kind": action_kind(suggestion)}
+
+
+ACTION_META = {
+    "escalate": {"label": "ESCALATE", "rank": 0},
+    "warn": {"label": "WARN", "rank": 1},
+    "watch": {"label": "WATCH", "rank": 2},
+    "effective": {"label": "EFFECTIVE", "rank": 3},
+    "monitor": {"label": "MONITOR", "rank": 4},
+    "review": {"label": "REVIEW", "rank": 5},
+}
+
+
+def action_kind(suggestion: str) -> str:
+    if suggestion.startswith("Consider deduction"):
+        return "escalate"
+    if suggestion.startswith("Send warning"):
+        return "warn"
+    if suggestion.startswith("Monitor closely"):
+        return "watch"
+    if suggestion.startswith("Monitor; warning"):
+        return "effective"
+    if suggestion.startswith("Review support"):
+        return "review"
+    return "monitor"
+
+
+def action_tag(suggestion: str) -> str:
+    kind = action_kind(suggestion)
+    label = ACTION_META[kind]["label"]
+    return f'<span class="tag tag-{kind}">{cell(label)}</span><span class="action-text">{cell(suggestion)}</span>'
+
+
+DEDUCTION_SHORT = {
+    "admin_manual_deduction": "manual",
+    "admin_report_deduction": "report",
+    "admin_expiry_deduction": "expiry",
+}
+
+
+def deducted_cell(c: dict) -> str:
+    total = c.get("deducted_total", 0)
+    breakdown = c.get("deducted_breakdown", {})
+    if not breakdown:
+        return f"<strong>{cell(total)}</strong> <span class=\"muted\">coins</span>"
+    parts = ", ".join(f"{DEDUCTION_SHORT.get(k, k)} {v}" for k, v in sorted(breakdown.items()))
+    return f"<strong>{cell(total)}</strong> <span class=\"muted\">coins</span><small class=\"sub\">{cell(parts)}</small>"
 
 
 def cell(value: object) -> str:
@@ -120,8 +179,14 @@ def cell(value: object) -> str:
 
 def render(cases: list[dict]) -> str:
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-    flagged = sorted((c for c in cases if not c["user"]["isBanned"]), key=lambda c: (-c["score"], -len(c["against"])))
-    banned = sorted((c for c in cases if c["user"]["isBanned"]), key=lambda c: -(c["user"].get("bannedAt") or 0))
+    flagged = sorted(
+        (c for c in cases if not c["user"]["isBanned"]),
+        key=lambda c: (ACTION_META[c.get("action_kind", "monitor")]["rank"], -c["score"], -len(c["against"])),
+    )
+    banned = sorted(
+        (c for c in cases if c["user"]["isBanned"]),
+        key=lambda c: (ACTION_META[c.get("action_kind", "review")]["rank"], -(c["user"].get("bannedAt") or 0)),
+    )
 
     def rows(items: list[dict], banned_table: bool = False) -> str:
         output = []
@@ -134,8 +199,8 @@ def render(cases: list[dict]) -> str:
             if banned_table:
                 period = f"{c['before_inbound']} / {c['after_inbound']} inbound messages"
             status = "banned" if u["isBanned"] else "flagged"
-            output.append(f"<tr><td><strong>{cell(name)}</strong><small class=\"sub\">{cell(u.get('telegramChatId'))}</small></td><td><span class=\"pill {status}\">{cell(status)}</span></td><td><div class=\"score\"><strong>{cell(c['score'])}%</strong><span><i style=\"width:{min(c['score'], 100)}%\"></i></span></div><small>{c['confidence']}% confidence</small></td><td>{cell(len(c['uploads']))}</td><td><strong>{cell(len(c['against']))}</strong> <span class=\"muted\">/ {cell(len(c['filed']))}</span></td><td><strong>{cell(c['deduction'])}</strong> <span class=\"muted\">coins</span></td><td>{cell(period)}</td><td class=\"action\">{cell(c['suggestion'])}</td></tr>")
-        return "\n".join(output) or '<tr><td colspan="8">None</td></tr>'
+            output.append(f"<tr><td><strong>{cell(name)}</strong><small class=\"sub\">{cell(u.get('telegramChatId'))}</small></td><td><span class=\"pill {status}\">{cell(status)}</span></td><td><div class=\"score\"><strong>{cell(c['score'])}%</strong><span><i style=\"width:{min(c['score'], 100)}%\"></i></span></div><small>{c['confidence']}% confidence</small></td><td>{cell(len(c['uploads']))}</td><td><strong>{cell(len(c['against']))}</strong> <span class=\"muted\">/ {cell(len(c['filed']))}</span></td><td><strong>{cell(c['deduction'])}</strong> <span class=\"muted\">coins</span><small class=\"sub\">left {cell(c['remaining'])}</small></td><td>{deducted_cell(c)}</td><td>{cell(period)}</td><td class=\"action\">{action_tag(c['suggestion'])}</td></tr>")
+        return "\n".join(output) or '<tr><td colspan="9">None</td></tr>'
 
     detail_blocks = []
     for c in cases:
@@ -144,12 +209,13 @@ def render(cases: list[dict]) -> str:
         warning_lines = "".join(f"<li>{cell(ts(m.get('createdAt')))}: {cell(m.get('text') or '(no text)')}</li>" for m in c["admin_messages"]) or "<li>No admin messages recorded</li>"
         feedback_lines = "".join(f"<li>{cell(ts(f.get('createdAt')))} [{cell(f.get('type') or 'unspecified')}]: {cell(f.get('text') or '')}</li>" for f in sorted(c["feedback"], key=lambda x: x.get("createdAt", 0))) or "<li>No feedback records</li>"
         inbound_lines = "".join(f"<li>{cell(ts(m.get('createdAt')))}: {cell(m.get('text') or '(no text)')}</li>" for m in sorted((m for m in c["messages"] if m.get("direction") == "inbound" and m.get("isAdminMessage") is not True), key=lambda x: x.get("createdAt", 0))) or "<li>No inbound messages recorded</li>"
-        detail_blocks.append(f"<details><summary>{cell(name)} ({cell('banned' if u['isBanned'] else 'flagged')})</summary><p><b>Intervention:</b> {cell(ts(c['cutoff']))} | <b>Score:</b> {c['score']}% | <b>Estimated deduction:</b> {c['deduction']} coins</p><h4>Admin messages</h4><ul>{warning_lines}</ul><h4>Inbound Telegram messages</h4><ul>{inbound_lines}</ul><h4>Feedback and support records</h4><ul>{feedback_lines}</ul></details>")
-    summary = f"<div class=\"summary\"><div><span>Flagged</span><strong>{len(flagged)}</strong></div><div><span>Banned</span><strong>{len(banned)}</strong></div><div><span>Known warnings</span><strong>{sum(bool(c['admin_messages']) for c in cases)}</strong></div><div><span>Traceable deduction</span><strong>{sum(c['deduction'] for c in cases)} <em>coins</em></strong></div></div>"
+        deduction_lines = "".join(f"<li>{cell(ts(t.get('createdAt')))} [{cell(t.get('type'))}]: {cell(t.get('amount'))} coins</li>" for t in sorted(c.get("deduction_tx", []), key=lambda x: x.get("createdAt", 0))) or "<li>No deduction transactions recorded</li>"
+        detail_blocks.append(f"<details><summary>{cell(name)} ({cell('banned' if u['isBanned'] else 'flagged')})</summary><p><b>Intervention:</b> {cell(ts(c['cutoff']))} | <b>Score:</b> {c['score']}% | <b>Estimated deduction:</b> {c['deduction']} coins | <b>Already deducted:</b> {c['deducted_total']} coins | <b>Remaining:</b> {c['remaining']} coins</p><h4>Admin messages</h4><ul>{warning_lines}</ul><h4>Deduction transactions (admin_manual/report/expiry)</h4><ul>{deduction_lines}</ul><h4>Inbound Telegram messages</h4><ul>{inbound_lines}</ul><h4>Feedback and support records</h4><ul>{feedback_lines}</ul></details>")
+    summary = f"<div class=\"summary\"><div><span>Flagged</span><strong>{len(flagged)}</strong></div><div><span>Banned</span><strong>{len(banned)}</strong></div><div><span>Known warnings</span><strong>{sum(bool(c['admin_messages']) for c in cases)}</strong></div><div><span>Traceable deduction</span><strong>{sum(c['deduction'] for c in cases)} <em>coins</em></strong></div><div><span>Already deducted</span><strong>{sum(c['deducted_total'] for c in cases)} <em>coins</em></strong></div></div>"
     return f"""<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Band Review Analysis</title><style>
 :root{{--background:#fff;--foreground:#171717;--muted:#737373;--border:#e5e5e5;--surface:#fafafa;--primary:#171717;--warning:#b45309;--danger:#b42318;--green:#18794e;--radius:10px}}
-*{{box-sizing:border-box}}body{{margin:0;background:var(--background);color:var(--foreground);font:14px/1.5 Inter,Geist,ui-sans-serif,system-ui,sans-serif}}main{{max-width:1480px;margin:0 auto;padding:48px 28px 72px}}header{{border-bottom:1px solid var(--border);padding-bottom:28px;margin-bottom:24px;display:flex;justify-content:space-between;gap:24px;align-items:end}}.eyebrow{{color:var(--muted);font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;margin:0 0 8px}}h1{{font-size:clamp(28px,4vw,46px);letter-spacing:-.05em;line-height:1;margin:0}}h2{{font-size:20px;letter-spacing:-.03em;margin:36px 0 10px}}h4{{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:22px 0 7px}}.note{{color:var(--muted);font-size:12px;max-width:520px;margin:0;text-align:right}}.summary{{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:0 0 34px}}.summary div{{border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;background:linear-gradient(145deg,#fff,#fafafa)}}.summary span{{display:block;color:var(--muted);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em}}.summary strong{{display:block;font-size:28px;letter-spacing:-.05em;margin-top:6px}}.summary em{{font-size:12px;font-style:normal;color:var(--muted);letter-spacing:0}}.table-wrap{{border:1px solid var(--border);border-radius:var(--radius);overflow:auto;box-shadow:0 1px 2px #00000008}}table{{border-collapse:collapse;width:100%;min-width:1050px}}th,td{{border-bottom:1px solid var(--border);padding:12px 13px;text-align:left;vertical-align:middle}}th{{background:var(--surface);color:var(--muted);font-size:10px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;white-space:nowrap}}tbody tr:last-child td{{border-bottom:0}}tbody tr:hover{{background:#fcfcfc}}td:first-child{{min-width:150px}}.sub{{display:block;color:var(--muted);font-size:11px;margin-top:2px}}.muted,small{{color:var(--muted)}}.pill{{display:inline-flex;border:1px solid;padding:3px 8px;border-radius:999px;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}}.pill.flagged{{color:var(--warning);border-color:#f3c98b;background:#fffaf0}}.pill.banned{{color:var(--danger);border-color:#efb4ae;background:#fff7f6}}.score{{display:flex;align-items:center;gap:9px;min-width:105px}}.score strong{{font-size:16px;letter-spacing:-.03em}}.score span{{display:block;background:#eee;height:5px;border-radius:9px;overflow:hidden;width:54px}}.score i{{display:block;height:100%;background:var(--primary);border-radius:9px}}.action{{max-width:250px;color:#404040;font-size:12px}}details{{border:1px solid var(--border);border-radius:var(--radius);padding:0 16px;margin:9px 0;background:#fff}}details[open]{{box-shadow:0 4px 16px #00000008}}summary{{cursor:pointer;font-weight:700;padding:14px 0}}summary::marker{{color:var(--muted)}}details p{{border-top:1px solid var(--border);padding-top:13px;color:#404040}}ul{{padding-left:20px;margin:8px 0 18px}}li{{margin:7px 0;white-space:pre-wrap;color:#404040}}@media(max-width:700px){{main{{padding:28px 14px 48px}}header{{display:block}}.note{{text-align:left;margin-top:14px}}.summary{{grid-template-columns:repeat(2,1fr)}}.summary strong{{font-size:24px}}h2{{margin-top:28px}}}}
-</style></head><body><main><header><div><p class="eyebrow">Moderation console / read-only</p><h1>Band review</h1></div><p class="note">Generated {cell(now)}<br>Scores are heuristics, not proof of abuse.</p></header>{summary}<h2>Flagged users <small>review queue</small></h2><div class="table-wrap"><table><thead><tr><th>User</th><th>Status</th><th>Abuse score</th><th>Uploads</th><th>Upload / filed reports</th><th>Est. deduction</th><th>Before / after</th><th>Suggested action</th></tr></thead><tbody>{rows(flagged)}</tbody></table></div><h2>Banned users <small>follow-up signals</small></h2><div class="table-wrap"><table><thead><tr><th>User</th><th>Status</th><th>Abuse score</th><th>Uploads</th><th>Upload / filed reports</th><th>Est. deduction</th><th>Before / after ban</th><th>Suggested action</th></tr></thead><tbody>{rows(banned, True)}</tbody></table></div><h2>Case details</h2>{''.join(detail_blocks)}</main></body></html>"""
+*{{box-sizing:border-box}}body{{margin:0;background:var(--background);color:var(--foreground);font:14px/1.5 Inter,Geist,ui-sans-serif,system-ui,sans-serif}}main{{max-width:1480px;margin:0 auto;padding:48px 28px 72px}}header{{border-bottom:1px solid var(--border);padding-bottom:28px;margin-bottom:24px;display:flex;justify-content:space-between;gap:24px;align-items:end}}.eyebrow{{color:var(--muted);font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;margin:0 0 8px}}h1{{font-size:clamp(28px,4vw,46px);letter-spacing:-.05em;line-height:1;margin:0}}h2{{font-size:20px;letter-spacing:-.03em;margin:36px 0 10px}}h4{{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:22px 0 7px}}.note{{color:var(--muted);font-size:12px;max-width:520px;margin:0;text-align:right}}.summary{{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin:0 0 34px}}.summary div{{border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;background:linear-gradient(145deg,#fff,#fafafa)}}.summary span{{display:block;color:var(--muted);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em}}.summary strong{{display:block;font-size:28px;letter-spacing:-.05em;margin-top:6px}}.summary em{{font-size:12px;font-style:normal;color:var(--muted);letter-spacing:0}}.table-wrap{{border:1px solid var(--border);border-radius:var(--radius);overflow:auto;box-shadow:0 1px 2px #00000008}}table{{border-collapse:collapse;width:100%;min-width:1200px}}th,td{{border-bottom:1px solid var(--border);padding:12px 13px;text-align:left;vertical-align:middle}}th{{background:var(--surface);color:var(--muted);font-size:10px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;white-space:nowrap}}tbody tr:last-child td{{border-bottom:0}}tbody tr:hover{{background:#fcfcfc}}td:first-child{{min-width:150px}}.sub{{display:block;color:var(--muted);font-size:11px;margin-top:2px}}.muted,small{{color:var(--muted)}}.pill{{display:inline-flex;border:1px solid;padding:3px 8px;border-radius:999px;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}}.pill.flagged{{color:var(--warning);border-color:#f3c98b;background:#fffaf0}}.pill.banned{{color:var(--danger);border-color:#efb4ae;background:#fff7f6}}.score{{display:flex;align-items:center;gap:9px;min-width:105px}}.score strong{{font-size:16px;letter-spacing:-.03em}}.score span{{display:block;background:#eee;height:5px;border-radius:9px;overflow:hidden;width:54px}}.score i{{display:block;height:100%;background:var(--primary);border-radius:9px}}.action{{max-width:280px;color:#404040;font-size:12px}}.tag{{display:inline-flex;border:1px solid;padding:3px 8px;border-radius:999px;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px}}.tag-escalate{{color:#b42318;border-color:#efb4ae;background:#fff7f6}}.tag-warn{{color:#b45309;border-color:#f3c98b;background:#fffaf0}}.tag-watch{{color:#92400e;border-color:#fde68a;background:#fffbeb}}.tag-effective{{color:#18794e;border-color:#a6e9c5;background:#f0fdf4}}.tag-monitor{{color:#525252;border-color:#d4d4d4;background:#f5f5f5}}.tag-review{{color:#6d28d9;border-color:#c4b5fd;background:#f5f3ff}}.action-text{{display:block}}details{{border:1px solid var(--border);border-radius:var(--radius);padding:0 16px;margin:9px 0;background:#fff}}details[open]{{box-shadow:0 4px 16px #00000008}}summary{{cursor:pointer;font-weight:700;padding:14px 0}}summary::marker{{color:var(--muted)}}details p{{border-top:1px solid var(--border);padding-top:13px;color:#404040}}ul{{padding-left:20px;margin:8px 0 18px}}li{{margin:7px 0;white-space:pre-wrap;color:#404040}}@media(max-width:700px){{main{{padding:28px 14px 48px}}header{{display:block}}.note{{text-align:left;margin-top:14px}}.summary{{grid-template-columns:repeat(2,1fr)}}.summary strong{{font-size:24px}}h2{{margin-top:28px}}}}
+</style></head><body><main><header><div><p class="eyebrow">Moderation console / read-only</p><h1>Band review</h1></div><p class="note">Generated {cell(now)}<br>Scores are heuristics, not proof of abuse.</p></header>{summary}<h2>Flagged users <small>review queue</small></h2><div class="table-wrap"><table><thead><tr><th>User</th><th>Status</th><th>Abuse score</th><th>Uploads</th><th>Upload / filed reports</th><th>Est. deduction</th><th>Already deducted</th><th>Before / after</th><th>Suggested action</th></tr></thead><tbody>{rows(flagged)}</tbody></table></div><h2>Banned users <small>follow-up signals</small></h2><div class="table-wrap"><table><thead><tr><th>User</th><th>Status</th><th>Abuse score</th><th>Uploads</th><th>Upload / filed reports</th><th>Est. deduction</th><th>Already deducted</th><th>Before / after ban</th><th>Suggested action</th></tr></thead><tbody>{rows(banned, True)}</tbody></table></div><h2>Case details</h2>{''.join(detail_blocks)}</main></body></html>"""
 
 
 def main() -> None:
