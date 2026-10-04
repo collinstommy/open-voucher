@@ -6,10 +6,11 @@ import { CLAIM_COSTS, UPLOAD_REWARDS } from "../src/lib/constants";
 import { recalculateReportCounts } from "../src/lib/reportCounts";
 import { reportCountsTowardLimits } from "../src/lib/reportOutcome";
 import { internal } from "./_generated/api";
-import type { Id } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import {
 	internalMutation,
 	internalQuery,
+	type MutationCtx,
 	type QueryCtx,
 } from "./_generated/server";
 import { userMutation, userQuery } from "./auth";
@@ -36,6 +37,131 @@ function canReportClaimedVoucher(
 	now: number = Date.now(),
 ): boolean {
 	return getVoucherExpiryCalendarDay(expiryDate) >= getIrishCalendarDay(now);
+}
+
+type ReportSettlement = "refunded" | "replaced";
+
+type SettlementChange =
+	| { kind: "refunded" }
+	| { kind: "replaced"; replacementVoucherId: Id<"vouchers"> };
+
+type SettlementTarget =
+	| {
+			ok: true;
+			user: Doc<"users">;
+			voucher: Doc<"vouchers">;
+			report: Doc<"reports">;
+	  }
+	| {
+			ok: false;
+			status: "not_found" | "not_reported" | "not_yours";
+	  }
+	| {
+			ok: false;
+			status: "already_settled";
+			settlement: ReportSettlement;
+	  };
+
+// Atomic with the settlement patch below, so duplicate calls see the marker.
+async function loadUnsettledReport(
+	ctx: MutationCtx,
+	{ userId, voucherId }: { userId: Id<"users">; voucherId: Id<"vouchers"> },
+): Promise<SettlementTarget> {
+	const user = await ctx.db.get(userId);
+	const voucher = await ctx.db.get(voucherId);
+	if (!user || !voucher) return { ok: false, status: "not_found" };
+	if (voucher.claimerId !== userId) return { ok: false, status: "not_yours" };
+
+	const report = await ctx.db
+		.query("reports")
+		.withIndex("by_voucher", (q) => q.eq("voucherId", voucherId))
+		.filter((q) => q.eq(q.field("reporterId"), userId))
+		.first();
+	if (!report) return { ok: false, status: "not_reported" };
+	if (report.settlement) {
+		return {
+			ok: false,
+			status: "already_settled",
+			settlement: report.settlement,
+		};
+	}
+
+	// Pre-marker outcomes live in old data; converge them onto the marker.
+	const legacy = await legacySettlement(ctx, report);
+	if (legacy) {
+		await settleReport(ctx, report._id, legacy);
+		return { ok: false, status: "already_settled", settlement: legacy.kind };
+	}
+	return { ok: true, user, voucher, report };
+}
+
+// Pre-marker evidence: a replacement on the report, or a refund after it.
+async function legacySettlement(
+	ctx: MutationCtx,
+	report: Doc<"reports">,
+): Promise<SettlementChange | null> {
+	if (report.replacementVoucherId) {
+		return {
+			kind: "replaced",
+			replacementVoucherId: report.replacementVoucherId,
+		};
+	}
+	const refund = await ctx.db
+		.query("transactions")
+		.withIndex("by_voucher", (q) => q.eq("voucherId", report.voucherId))
+		.filter((q) =>
+			q.and(
+				q.eq(q.field("userId"), report.reporterId),
+				q.eq(q.field("type"), "refund"),
+				q.gte(q.field("createdAt"), report.createdAt),
+			),
+		)
+		.first();
+	return refund ? { kind: "refunded" } : null;
+}
+
+function settlementDeniedResult(
+	target: Extract<SettlementTarget, { ok: false }>,
+) {
+	if (target.status === "already_settled") {
+		return {
+			status: "already_settled" as const,
+			settlement: target.settlement,
+		};
+	}
+	return { status: target.status };
+}
+
+async function settleReport(
+	ctx: MutationCtx,
+	reportId: Id<"reports">,
+	change: SettlementChange,
+) {
+	const settledAt = Date.now();
+	if (change.kind === "replaced") {
+		await ctx.db.patch(reportId, {
+			settlement: "replaced",
+			replacementVoucherId: change.replacementVoucherId,
+			settledAt,
+		});
+		return;
+	}
+	await ctx.db.patch(reportId, { settlement: "refunded", settledAt });
+}
+
+async function refundAndSettleReport(
+	ctx: MutationCtx,
+	target: Extract<SettlementTarget, { ok: true }>,
+) {
+	const refundAmount = CLAIM_COSTS[target.voucher.type] ?? 0;
+	await applyCoinDelta(ctx, {
+		userId: target.user._id,
+		delta: refundAmount,
+		type: "refund",
+		voucherId: target.voucher._id,
+	});
+	await settleReport(ctx, target.report._id, { kind: "refunded" });
+	return refundAmount;
 }
 
 export const getVoucherByBarcode = internalQuery({
@@ -346,36 +472,37 @@ export const reportVoucher = internalMutation({
 			}
 		}
 
-		let reportId: Id<"reports"> | undefined;
 		if (voucher.status !== "reported") {
 			await ctx.db.patch(voucherId, { status: "reported" });
-			reportId = await ctx.db.insert("reports", {
-				voucherId,
-				reporterId: user._id,
-				uploaderId: voucher.uploaderId,
-				reason: "not_working",
-				outcome: "open",
-				createdAt: Date.now(),
-			});
+		}
 
-			await ctx.db.patch(user._id, { lastReportAt: now });
-			await recalculateReportCounts(ctx, [user._id, voucher.uploaderId]);
+		// The report is the unit of settlement, so always create one.
+		const reportId = await ctx.db.insert("reports", {
+			voucherId,
+			reporterId: user._id,
+			uploaderId: voucher.uploaderId,
+			reason: "not_working",
+			outcome: "open",
+			createdAt: Date.now(),
+		});
 
-			const uploader = await ctx.db.get(voucher.uploaderId);
-			if (uploader) {
-				// Send message to uploader asking if they used the voucher
-				await ctx.scheduler.runAfter(
-					0,
-					internal.telegram.sendUploaderReportMessage,
-					{
-						uploaderChatId: uploader.telegramChatId,
-						voucherId: voucher._id,
-						voucherType: voucher.type as "5" | "10" | "20",
-						imageStorageId: voucher.imageStorageId,
-						barcodeNumber: voucher.barcodeNumber,
-					},
-				);
-			}
+		await ctx.db.patch(user._id, { lastReportAt: now });
+		await recalculateReportCounts(ctx, [user._id, voucher.uploaderId]);
+
+		const uploader = await ctx.db.get(voucher.uploaderId);
+		if (uploader) {
+			// Send message to uploader asking if they used the voucher
+			await ctx.scheduler.runAfter(
+				0,
+				internal.telegram.sendUploaderReportMessage,
+				{
+					uploaderChatId: uploader.telegramChatId,
+					voucherId: voucher._id,
+					voucherType: voucher.type as "5" | "10" | "20",
+					imageStorageId: voucher.imageStorageId,
+					barcodeNumber: voucher.barcodeNumber,
+				},
+			);
 		}
 
 		const totalUploads = await ctx.db
@@ -454,7 +581,7 @@ export const reportVoucher = internalMutation({
 
 		return {
 			status: "reported",
-			reportId: reportId,
+			reportId,
 			message:
 				"Report received. You can request a replacement voucher if you need one.",
 		};
@@ -467,22 +594,11 @@ export const refundReportedVoucher = internalMutation({
 		voucherId: v.id("vouchers"),
 	},
 	handler: async (ctx, { userId, voucherId }) => {
-		const voucher = await ctx.db.get(voucherId);
-		if (!voucher) return { status: "not_found" };
+		const target = await loadUnsettledReport(ctx, { userId, voucherId });
+		if (!target.ok) return settlementDeniedResult(target);
 
-		const user = await ctx.db.get(userId);
-		if (!user) return { status: "not_found" };
-
-		const refundAmount = CLAIM_COSTS[voucher.type];
-
-		await applyCoinDelta(ctx, {
-			userId: user._id,
-			delta: refundAmount,
-			type: "refund",
-			voucherId,
-		});
-
-		return { status: "refunded", refundAmount };
+		const refundAmount = await refundAndSettleReport(ctx, target);
+		return { status: "refunded" as const, refundAmount };
 	},
 });
 
@@ -492,22 +608,18 @@ export const requestReplacement = internalMutation({
 		originalVoucherId: v.id("vouchers"),
 	},
 	handler: async (ctx, { userId, originalVoucherId }) => {
-		const originalVoucher = await ctx.db.get(originalVoucherId);
-		if (!originalVoucher) {
-			return { status: "not_found" };
-		}
-
-		const user = await ctx.db.get(userId);
-		if (!user) {
-			return { status: "not_found" };
-		}
+		const target = await loadUnsettledReport(ctx, {
+			userId,
+			voucherId: originalVoucherId,
+		});
+		if (!target.ok) return settlementDeniedResult(target);
 
 		const now = Date.now();
 
 		const replacement = await ctx.db
 			.query("vouchers")
 			.withIndex("by_status_type", (q) =>
-				q.eq("status", "available").eq("type", originalVoucher.type),
+				q.eq("status", "available").eq("type", target.voucher.type),
 			)
 			.filter((q) =>
 				q.or(
@@ -517,59 +629,39 @@ export const requestReplacement = internalMutation({
 			)
 			.first();
 
-		if (!replacement) {
-			await applyCoinDelta(ctx, {
-				userId,
-				delta: CLAIM_COSTS[originalVoucher.type],
-				type: "refund",
-				voucherId: originalVoucherId,
-			});
-			return { status: "refunded" };
-		}
+		const imageUrl = replacement
+			? await ctx.storage.getUrl(replacement.imageStorageId)
+			: null;
 
-		const imageUrl = await ctx.storage.getUrl(replacement.imageStorageId);
-		if (!imageUrl) {
-			await applyCoinDelta(ctx, {
-				userId,
-				delta: CLAIM_COSTS[originalVoucher.type],
-				type: "refund",
-				voucherId: originalVoucherId,
-			});
-			return {
-				status: "refunded",
-				message: "Replacement found but image missing. Coins refunded.",
-			};
+		if (!replacement || !imageUrl) {
+			await refundAndSettleReport(ctx, target);
+			return { status: "refunded" as const };
 		}
 
 		await ctx.db.patch(replacement._id, {
 			status: "claimed",
-			claimerId: user._id,
+			claimerId: target.user._id,
 			claimedAt: now,
 		});
 
-		await ctx.db.patch(user._id, {
-			claimCount: (user.claimCount || 0) + 1,
+		await ctx.db.patch(target.user._id, {
+			claimCount: (target.user.claimCount || 0) + 1,
 		});
 
-		const report = await ctx.db
-			.query("reports")
-			.withIndex("by_voucher", (q) => q.eq("voucherId", originalVoucherId))
-			.first();
-		if (report) {
-			await ctx.db.patch(report._id, {
-				replacementVoucherId: replacement._id,
-			});
-		}
+		await settleReport(ctx, target.report._id, {
+			kind: "replaced",
+			replacementVoucherId: replacement._id,
+		});
 
 		await applyCoinDelta(ctx, {
-			userId: user._id,
+			userId: target.user._id,
 			delta: 0,
 			type: "replacement_received",
 			voucherId: replacement._id,
 		});
 
 		return {
-			status: "replaced",
+			status: "replaced" as const,
 			voucher: {
 				_id: replacement._id,
 				type: replacement.type,

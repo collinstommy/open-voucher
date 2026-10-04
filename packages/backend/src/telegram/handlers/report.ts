@@ -127,7 +127,6 @@ on("report_confirm", async (c, event, bot) => {
 
 on("report_replacement_yes", async (c, event, bot) => {
 	await bot.answerCallback(c.callbackId);
-	await bot.editMessageText(c.chatId, c.messageId, c.messageText);
 
 	const user = await c.ctx.runQuery(internal.users.getUserByTelegramChatId, {
 		telegramChatId: c.telegramUserId,
@@ -136,15 +135,19 @@ on("report_replacement_yes", async (c, event, bot) => {
 		return;
 	}
 
-	const result = await c.ctx.runMutation(
-		internal.vouchers.requestReplacement,
-		{
-			userId: user._id,
-			originalVoucherId: event.voucherId as Id<"vouchers">,
-		},
-	);
+	const result = await c.ctx.runMutation(internal.vouchers.requestReplacement, {
+		userId: user._id,
+		originalVoucherId: event.voucherId as Id<"vouchers">,
+	});
 
-	if (result.status === "replaced" && result.voucher) {
+	if (result.status !== "replaced" && result.status !== "refunded") {
+		// Duplicate tap, forged callback, or failure: leave the prompt untouched.
+		return;
+	}
+
+	await bot.editMessageText(c.chatId, c.messageId, c.messageText);
+
+	if (result.status === "replaced") {
 		await bot.sendPhoto(
 			c.chatId,
 			result.voucher.imageUrl,
@@ -154,10 +157,7 @@ on("report_replacement_yes", async (c, event, bot) => {
 					[
 						{
 							text: "⚠️ Its not working",
-							callback_data: reportData(
-								"report_init",
-								result.voucher._id,
-							),
+							callback_data: reportData("report_init", result.voucher._id),
 						},
 					],
 				],
@@ -173,7 +173,6 @@ on("report_replacement_yes", async (c, event, bot) => {
 
 on("report_replacement_no", async (c, event, bot) => {
 	await bot.answerCallback(c.callbackId);
-	await bot.editMessageText(c.chatId, c.messageId, c.messageText);
 
 	const user = await c.ctx.runQuery(internal.users.getUserByTelegramChatId, {
 		telegramChatId: c.telegramUserId,
@@ -189,17 +188,17 @@ on("report_replacement_no", async (c, event, bot) => {
 			voucherId: event.voucherId as Id<"vouchers">,
 		},
 	);
-	if (refundResult.status === "refunded") {
-		await bot.sendMessage(
-			c.chatId,
-			"✅ Your coins have been refunded. Thank you for reporting!",
-		);
-	} else {
-		await bot.sendMessage(
-			c.chatId,
-			"⚠️ Unable to process refund. Please contact support.",
-		);
+
+	if (refundResult.status !== "refunded") {
+		// Duplicate tap, forged callback, or failure: leave the prompt untouched.
+		return;
 	}
+
+	await bot.editMessageText(c.chatId, c.messageId, c.messageText);
+	await bot.sendMessage(
+		c.chatId,
+		"✅ Your coins have been refunded. Thank you for reporting!",
+	);
 });
 
 on("report_cancel", async (c, _event, bot) => {

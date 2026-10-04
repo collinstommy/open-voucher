@@ -105,6 +105,11 @@ export default defineSchema({
 		uploaderId: v.id("users"),
 		reason: v.string(),
 		replacementVoucherId: v.optional(v.id("vouchers")),
+		// Once-only: refunded or replaced, never both and never twice.
+		settlement: v.optional(
+			v.union(v.literal("refunded"), v.literal("replaced")),
+		),
+		settledAt: v.optional(v.number()),
 		createdAt: v.number(),
 		outcome: v.optional(reportOutcome),
 		resolvedAt: v.optional(v.number()),
