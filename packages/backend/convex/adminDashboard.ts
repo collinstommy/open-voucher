@@ -3,34 +3,73 @@ import { runCleanup } from "../src/lib/voucherImageCleanup";
 import { adminMutation, adminQuery } from "./adminGuards";
 import { internalQuery } from "./_generated/server";
 
-export const getStats = adminQuery({
+const DAY_MS = 86_400_000;
+const RECENT_VOUCHER_WINDOW_MS = 31 * DAY_MS;
+const WEEKLY_WINDOW_MS = 12 * 7 * DAY_MS;
+
+/**
+ * Voucher inventory: available stock per type, read from the by_status_type
+ * index so it only touches in-stock documents. Cheap enough to run on every
+ * dashboard load; the expensive lifetime totals live in getLifetimeStats.
+ */
+export const getVoucherInventory = adminQuery({
+	args: {},
+	handler: async (ctx) => {
+		const now = Date.now();
+		const shelves = await Promise.all([
+			ctx.db
+				.query("vouchers")
+				.withIndex("by_status_type", (q) =>
+					q.eq("status", "available").eq("type", "5"),
+				)
+				.collect(),
+			ctx.db
+				.query("vouchers")
+				.withIndex("by_status_type", (q) =>
+					q.eq("status", "available").eq("type", "10"),
+				)
+				.collect(),
+			ctx.db
+				.query("vouchers")
+				.withIndex("by_status_type", (q) =>
+					q.eq("status", "available").eq("type", "20"),
+				)
+				.collect(),
+		]);
+
+		// status "available" alone isn't claimability: a voucher whose
+		// validFrom is in the future is still locked.
+		const vouchersByType = {
+			"5": shelves[0].filter((v) => !v.validFrom || v.validFrom <= now).length,
+			"10": shelves[1].filter((v) => !v.validFrom || v.validFrom <= now).length,
+			"20": shelves[2].filter((v) => !v.validFrom || v.validFrom <= now).length,
+		};
+
+		return { vouchersByType };
+	},
+});
+
+/**
+ * Lifetime totals across all vouchers and users. Expensive (full-table
+ * reads) — the dashboard loads this only behind an explicit button.
+ */
+export const getLifetimeStats = adminQuery({
 	args: {},
 	handler: async (ctx) => {
 		const [vouchers, users] = await Promise.all([
-			ctx.db.query("vouchers").collect(),
+			ctx.db
+				.query("vouchers")
+				.withIndex("by_creation_time", (q) =>
+					q.gte("_creationTime", Date.now() - RECENT_VOUCHER_WINDOW_MS),
+				)
+				.collect(),
 			ctx.db.query("users").collect(),
 		]);
 
-		const now = Date.now();
-		const availableVouchers = vouchers.filter(
-			(v) => v.status === "available" && (!v.validFrom || v.validFrom <= now),
-		);
-
-		const vouchersByType = {
-			"5": availableVouchers.filter((v) => v.type === "5").length,
-			"10": availableVouchers.filter((v) => v.type === "10").length,
-			"20": availableVouchers.filter((v) => v.type === "20").length,
-		};
-
-		const claimedCount = vouchers.filter((v) => v.status === "claimed").length;
-		const totalUploaded = vouchers.length;
-		const userCount = users.length;
-
 		return {
-			vouchersByType,
-			claimedCount,
-			totalUploaded,
-			userCount,
+			totalUploaded: vouchers.length,
+			claimedCount: vouchers.filter((v) => v.status === "claimed").length,
+			userCount: users.length,
 		};
 	},
 });
@@ -88,9 +127,16 @@ function formatWeekLabel(monday: Date): string {
 export const getWeeklyFailureStats = adminQuery({
 	args: {},
 	handler: async (ctx) => {
+		const since = Date.now() - WEEKLY_WINDOW_MS;
 		const [vouchers, failedUploads] = await Promise.all([
-			ctx.db.query("vouchers").collect(),
-			ctx.db.query("failedUploads").collect(),
+			ctx.db
+				.query("vouchers")
+				.withIndex("by_creation_time", (q) => q.gte("_creationTime", since))
+				.collect(),
+			ctx.db
+				.query("failedUploads")
+				.withIndex("by_creation_time", (q) => q.gte("_creationTime", since))
+				.collect(),
 		]);
 
 		const weeks = new Map<
@@ -216,7 +262,12 @@ export const getWeeklyVouchers = adminQuery({
 export const getWeeklyUploadAverage = adminQuery({
 	args: {},
 	handler: async (ctx) => {
-		const vouchers = await ctx.db.query("vouchers").collect();
+		const vouchers = await ctx.db
+			.query("vouchers")
+			.withIndex("by_creation_time", (q) =>
+				q.gte("_creationTime", Date.now() - WEEKLY_WINDOW_MS),
+			)
+			.collect();
 
 		const weeks = new Map<
 			string,

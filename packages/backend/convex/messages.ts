@@ -26,7 +26,7 @@ export const getUnknownInboundMessages = internalQuery({
 		since: v.optional(v.number()),
 	},
 	handler: async (ctx, { since }) => {
-		const inbound = filterBySince(await loadInboundMessages(ctx), since);
+		const inbound = filterBySince(await loadInboundMessages(ctx, since), since);
 		const messages = await enrichUnknownMessages(ctx, inbound);
 		return { messages };
 	},

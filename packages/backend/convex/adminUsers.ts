@@ -238,7 +238,7 @@ export const getUserDetails = adminQuery({
 
 		const claimedVouchers = await ctx.db
 			.query("vouchers")
-			.filter((q) => q.eq(q.field("claimerId"), userId))
+			.withIndex("by_claimer_claimed_at", (q) => q.eq("claimerId", userId))
 			.collect();
 
 		const uploadedVouchersWithDetails = await Promise.all(
@@ -553,7 +553,7 @@ export const clearUserData = internalMutation({
 
 		const claimedVouchers = await ctx.db
 			.query("vouchers")
-			.filter((q) => q.eq(q.field("claimerId"), userId))
+			.withIndex("by_claimer_claimed_at", (q) => q.eq("claimerId", userId))
 			.collect();
 
 		for (const voucher of claimedVouchers) {

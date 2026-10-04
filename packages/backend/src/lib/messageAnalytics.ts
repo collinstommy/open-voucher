@@ -25,11 +25,13 @@ export function filterBySince<T extends { createdAt: number }>(
 
 export { resolveMessageIntent } from "./messageIntent";
 
-export async function loadInboundMessages(ctx: QueryCtx) {
-	const messages = await ctx.db
-		.query("messages")
-		.withIndex("by_direction", (q) => q.eq("direction", "inbound"))
-		.collect();
+export async function loadInboundMessages(ctx: QueryCtx, since?: number) {
+	const messages = since
+		? await ctx.db
+				.query("messages")
+				.withIndex("by_creation_time", (q) => q.gte("_creationTime", since))
+				.collect()
+		: await ctx.db.query("messages").collect();
 	return messages.filter(isInboundUserMessage);
 }
 
@@ -82,7 +84,7 @@ export async function buildMessageAnalytics(
 	ctx: QueryCtx,
 	since: number | undefined,
 ) {
-	const inbound = filterBySince(await loadInboundMessages(ctx), since);
+	const inbound = filterBySince(await loadInboundMessages(ctx, since), since);
 	const counts = aggregateCounts(inbound);
 	const unknownMessages = await enrichUnknownMessages(ctx, inbound);
 
