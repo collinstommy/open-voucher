@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { applyCoinDelta } from "../src/lib/coinLedger";
 import { CLAIM_COSTS, UPLOAD_REWARDS } from "../src/lib/constants";
 import { recalculateReportCounts } from "../src/lib/reportCounts";
+import type { Id } from "./_generated/dataModel";
 import { adminMutation, adminQuery } from "./adminGuards";
 
 export const getTodaysVouchers = adminQuery({
@@ -111,6 +112,69 @@ export const expireVoucherAndDeductCoins = adminMutation({
 			deductedAmount: deductionAmount,
 			newBalance,
 		};
+	},
+});
+
+export const removeVoucherAndReverseCoins = adminMutation({
+	args: {
+		voucherId: v.id("vouchers"),
+	},
+	handler: async (ctx, { voucherId }) => {
+		const voucher = await ctx.db.get(voucherId);
+		if (!voucher) {
+			throw new Error("Voucher not found");
+		}
+		if (voucher.status === "removed") {
+			throw new Error("Voucher is already removed");
+		}
+
+		const ledger = await ctx.db
+			.query("transactions")
+			.withIndex("by_voucher", (q) => q.eq("voucherId", voucherId))
+			.collect();
+
+		const netByUser = new Map<Id<"users">, number>();
+		for (const entry of ledger) {
+			netByUser.set(
+				entry.userId,
+				(netByUser.get(entry.userId) ?? 0) + entry.amount,
+			);
+		}
+
+		const reversals: Array<{
+			userId: Id<"users">;
+			amount: number;
+			newBalance: number;
+		}> = [];
+		for (const [userId, net] of netByUser) {
+			if (net === 0) continue;
+			const { newBalance } = await applyCoinDelta(ctx, {
+				userId,
+				delta: -net,
+				type: "admin_removed",
+				voucherId,
+			});
+			reversals.push({ userId, amount: -net, newBalance });
+		}
+
+		await ctx.db.patch(voucherId, { status: "removed" });
+
+		const uploader = await ctx.db.get(voucher.uploaderId);
+		if (uploader) {
+			await ctx.db.patch(voucher.uploaderId, {
+				uploadCount: Math.max(0, (uploader.uploadCount ?? 0) - 1),
+			});
+		}
+		if (voucher.claimerId) {
+			const claimer = await ctx.db.get(voucher.claimerId);
+			if (claimer) {
+				await ctx.db.patch(voucher.claimerId, {
+					claimCount: Math.max(0, (claimer.claimCount ?? 0) - 1),
+				});
+			}
+		}
+
+		return { success: true, reversals };
 	},
 });
 

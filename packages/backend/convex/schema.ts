@@ -74,6 +74,7 @@ export default defineSchema({
 			v.literal("uploader_admitted_used"),
 			v.literal("uploader_denied"),
 			v.literal("invalidated"),
+			v.literal("removed"),
 		),
 		imageStorageId: v.id("_storage"),
 		barcodeNumber: v.optional(v.string()),
@@ -127,11 +128,14 @@ export default defineSchema({
 			v.literal("self_invalidated"),
 			v.literal("claim_returned"),
 			v.literal("replacement_received"),
+			v.literal("admin_removed"),
 		),
 		amount: v.number(),
 		voucherId: v.optional(v.id("vouchers")),
 		createdAt: v.number(),
-	}).index("by_user", ["userId"]),
+	})
+		.index("by_user", ["userId"])
+		.index("by_voucher", ["voucherId"]),
 
 	failedUploads: defineTable({
 		userId: v.id("users"),

@@ -1,5 +1,5 @@
-import type { MutationCtx } from "../../convex/_generated/server";
 import type { Id } from "../../convex/_generated/dataModel";
+import type { MutationCtx } from "../../convex/_generated/server";
 import { MIN_COINS } from "./constants";
 
 /**
@@ -20,7 +20,8 @@ export type TransactionType =
 	| "claim_reversed"
 	| "self_invalidated"
 	| "claim_returned"
-	| "replacement_received";
+	| "replacement_received"
+	| "admin_removed";
 
 export type ApplyCoinDeltaArgs = {
 	userId: Id<"users">;

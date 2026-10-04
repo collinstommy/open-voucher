@@ -288,6 +288,15 @@ function UserDetailPage() {
 		onSuccess: () => queryClient.invalidateQueries(),
 	});
 
+	const removeVoucherMutation = useMutation({
+		mutationFn: (voucherId: Id<"vouchers">) =>
+			convex.mutation(api.adminVouchers.removeVoucherAndReverseCoins, {
+				token: token!,
+				voucherId,
+			}),
+		onSuccess: () => queryClient.invalidateQueries(),
+	});
+
 	const reverseClaimMutation = useMutation({
 		mutationFn: (voucherId: Id<"vouchers">) =>
 			convex.mutation(api.adminVouchers.reverseClaim, {
@@ -309,7 +318,7 @@ function UserDetailPage() {
 
 	const amountExceedsBalance =
 		deductAmount.trim() !== "" &&
-		Number(deductAmount) > (user?.coins ?? Infinity);
+		Number(deductAmount) > (user?.coins ?? Number.POSITIVE_INFINITY);
 	const stats = data?.stats;
 	const uploadedVouchers = [...(data?.uploadedVouchers ?? [])].sort(
 		(a, b) => b.createdAt - a.createdAt,
@@ -375,12 +384,12 @@ function UserDetailPage() {
 								{user.username || user.firstName || "Unknown User"}
 							</h1>
 							{user.isBanned && (
-								<span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
+								<span className="rounded-full bg-red-100 px-2 py-0.5 font-medium text-red-700 text-xs">
 									Banned
 								</span>
 							)}
 							{user.flaggedForReviewAt && !user.isBanned && (
-								<span className="rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-700">
+								<span className="rounded-full bg-yellow-100 px-2 py-0.5 font-medium text-xs text-yellow-700">
 									Flagged for Review
 								</span>
 							)}
@@ -555,16 +564,16 @@ function UserDetailPage() {
 							</Button>
 						</div>
 						{deductError && (
-							<p className="mt-2 text-sm text-red-500">{deductError}</p>
+							<p className="mt-2 text-red-500 text-sm">{deductError}</p>
 						)}
 						{!deductError && amountExceedsBalance && (
-							<p className="mt-2 text-sm text-red-500">
+							<p className="mt-2 text-red-500 text-sm">
 								Amount exceeds the user's balance of {user?.coins ?? 0} coin
 								{(user?.coins ?? 0) === 1 ? "" : "s"}
 							</p>
 						)}
 						{deductCoinsMutation.isError && (
-							<p className="mt-2 text-sm text-red-500">
+							<p className="mt-2 text-red-500 text-sm">
 								{deductCoinsMutation.error?.message ||
 									"Failed to deduct coins. Please try again."}
 							</p>
@@ -775,19 +784,41 @@ function UserDetailPage() {
 												</Link>
 											</div>
 										)}
-										{voucher.status !== "expired" && (
-											<div className="mt-3">
+										{voucher.status !== "removed" && (
+											<div className="mt-3 flex flex-wrap gap-2">
+												{voucher.status !== "expired" && (
+													<Button
+														size="sm"
+														variant="destructive"
+														onClick={() =>
+															expireVoucherMutation.mutate(
+																voucher._id as Id<"vouchers">,
+															)
+														}
+														disabled={expireVoucherMutation.isPending}
+													>
+														Expire & Deduct Coins
+													</Button>
+												)}
 												<Button
 													size="sm"
-													variant="destructive"
-													onClick={() =>
-														expireVoucherMutation.mutate(
-															voucher._id as Id<"vouchers">,
-														)
-													}
-													disabled={expireVoucherMutation.isPending}
+													variant="outline"
+													onClick={() => {
+														const claimerNote = voucher.claimer
+															? "The uploader and the claimer each get a reversing coin entry, so both balances go back to where they were for this voucher."
+															: "The uploader gets a reversing coin entry, so their balance goes back to where it was for this voucher.";
+														const confirmed = window.confirm(
+															`Remove this voucher from their lists?\n\n${claimerNote}\n\nThe voucher is kept so this barcode cannot be uploaded again.`,
+														);
+														if (confirmed) {
+															removeVoucherMutation.mutate(
+																voucher._id as Id<"vouchers">,
+															);
+														}
+													}}
+													disabled={removeVoucherMutation.isPending}
 												>
-													Expire & Deduct Coins
+													Remove & reverse coins
 												</Button>
 											</div>
 										)}
