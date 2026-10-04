@@ -11,28 +11,35 @@ export const Route = createFileRoute("/admin/settings")({
 function SettingsComponent() {
 	const { token } = useAdminAuth();
 	const { data: imageUrl } = useQuery(
-		convexQuery(api.adminFeedback.getSampleVoucherImageUrl, token ? { token } : "skip"),
+		convexQuery(
+			api.adminFeedback.getSampleVoucherImageUrl,
+			token ? { token } : "skip",
+		),
 	);
 
 	return (
-		<div className="grid gap-6">
-			<section className="rounded-lg border p-4">
-				<h2 className="mb-4 font-medium">Sample Voucher Image</h2>
-				{imageUrl === undefined ? (
-					<div className="text-muted-foreground text-sm">Loading...</div>
-				) : imageUrl ? (
-					<img
-						src={imageUrl}
-						alt="Sample Voucher"
-						className="h-96 w-full rounded border object-contain bg-muted"
-					/>
-				) : (
-					<div className="bg-muted flex h-96 w-full items-center justify-center rounded">
-						<span className="text-muted-foreground text-sm">
-							No sample voucher image set
-						</span>
-					</div>
-				)}
+		<div className="stack">
+			<div className="masthead">
+				<div>
+					<h1 className="display">Settings</h1>
+					<p className="lede">The sample voucher image used by the bot.</p>
+				</div>
+			</div>
+			<section className="panel">
+				<div className="panel-head">
+					<h2>Sample voucher image</h2>
+				</div>
+				<div className="panel-body">
+					{imageUrl === undefined ? (
+						<p className="muted">Loading...</p>
+					) : imageUrl ? (
+						<div className="sample">
+							<img src={imageUrl} alt="Sample voucher" />
+						</div>
+					) : (
+						<div className="empty">No sample voucher image set</div>
+					)}
+				</div>
 			</section>
 		</div>
 	);

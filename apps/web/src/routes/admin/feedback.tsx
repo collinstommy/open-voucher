@@ -5,7 +5,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useConvex } from "convex/react";
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
 import { formatDateTime } from "@/lib/utils";
 
@@ -34,166 +33,169 @@ function FeedbackPage() {
 		}: {
 			feedbackId: Id<"feedback">;
 			status: string;
-		}) =>
-			convex.mutation(api.adminFeedback.updateFeedbackStatus, {
-				token: token!,
+		}) => {
+			if (!token) {
+				throw new Error("Not signed in");
+			}
+			return convex.mutation(api.adminFeedback.updateFeedbackStatus, {
+				token,
 				feedbackId,
 				status,
-			}),
+			});
+		},
 		onSuccess: () => queryClient.invalidateQueries(),
 	});
 
-	if (isLoading) {
-		return <div className="text-muted-foreground">Loading feedback...</div>;
-	}
-
-	if (error) {
-		return <div className="text-red-500">Error loading feedback</div>;
-	}
-
 	const allFeedback = data?.feedback ?? [];
-	const filteredByType = allFeedback.filter((f) => f.type === typeFilter);
+	const filteredByType = allFeedback.filter((item) => item.type === typeFilter);
 	const feedback =
 		statusFilter === "open"
-			? filteredByType.filter((f) => f.status !== "archived")
-			: filteredByType.filter((f) => f.status === "archived");
-
-	const newCount = feedback.filter((f) => f.status === "new").length;
+			? filteredByType.filter((item) => item.status !== "archived")
+			: filteredByType.filter((item) => item.status === "archived");
+	const newCount = feedback.filter((item) => item.status === "new").length;
 
 	return (
-		<div>
-			<div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-				<h1 className="font-semibold text-xl">
-					{typeFilter === "feedback" ? "Feedback" : "Support"} (
-					{feedback.length})
-					{statusFilter === "open" && newCount > 0 && (
-						<span className="ml-2 rounded bg-blue-500 px-2 py-1 text-sm text-white">
-							{newCount} new
-						</span>
-					)}
-				</h1>
-				<div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-					<div className="flex items-center gap-2">
-						<Button
-							variant={typeFilter === "feedback" ? "default" : "outline"}
-							size="sm"
-							onClick={() => setTypeFilter("feedback")}
-						>
-							Feedback
-						</Button>
-						<Button
-							variant={typeFilter === "support" ? "default" : "outline"}
-							size="sm"
-							onClick={() => setTypeFilter("support")}
-						>
-							Support
-						</Button>
+		<div className="stack">
+			<div className="masthead">
+				<div>
+					<h1 className="display">
+						{typeFilter === "feedback" ? "Feedback" : "Support"}
+					</h1>
+					<p className="lede">
+						Messages people sent through the bot, newest first.
+					</p>
+				</div>
+				{!isLoading && !error && (
+					<div className="stamp">
+						<b className="num">{feedback.length}</b> shown
+						{statusFilter === "open" && newCount > 0 && (
+							<>
+								<br />
+								{newCount} new
+							</>
+						)}
 					</div>
-					<select
-						value={statusFilter}
-						onChange={(e) =>
-							setStatusFilter(e.target.value as "open" | "archived")
-						}
-						className="rounded border px-3 py-1.5 text-sm"
+				)}
+			</div>
+
+			<div className="toolbar split">
+				<div className="chips">
+					<button
+						type="button"
+						className="chip"
+						aria-pressed={typeFilter === "feedback"}
+						onClick={() => setTypeFilter("feedback")}
 					>
-						<option value="open">Open</option>
-						<option value="archived">Archived</option>
-					</select>
+						Feedback
+					</button>
+					<button
+						type="button"
+						className="chip"
+						aria-pressed={typeFilter === "support"}
+						onClick={() => setTypeFilter("support")}
+					>
+						Support
+					</button>
+				</div>
+				<div className="chips">
+					<button
+						type="button"
+						className="chip"
+						aria-pressed={statusFilter === "open"}
+						onClick={() => setStatusFilter("open")}
+					>
+						Open
+					</button>
+					<button
+						type="button"
+						className="chip"
+						aria-pressed={statusFilter === "archived"}
+						onClick={() => setStatusFilter("archived")}
+					>
+						Archived
+					</button>
 				</div>
 			</div>
 
-			{feedback.length === 0 ? (
-				<div className="py-12 text-center text-muted-foreground">
+			{isLoading ? (
+				<p className="muted">Loading feedback...</p>
+			) : error ? (
+				<p className="warn">Error loading feedback</p>
+			) : feedback.length === 0 ? (
+				<div className="empty">
 					{typeFilter === "feedback"
 						? "No feedback yet"
 						: "No support messages yet"}
 				</div>
 			) : (
-				<div className="space-y-4">
+				<div>
 					{feedback.map((item) => (
-						<div
+						<article
 							key={item._id}
-							className={`rounded-lg border p-4 ${
-								item.status === "new"
-									? "border-blue-500 bg-blue-50 dark:bg-blue-950"
-									: ""
-							} ${
-								item.type === "support"
-									? "border-amber-200 bg-amber-50 dark:bg-amber-950/30"
-									: ""
+							className={`msg${item.status === "new" ? "fresh" : ""}${
+								item.type === "support" ? "support" : ""
 							}`}
 						>
-							<div className="mb-3 flex items-start justify-between">
-								<div>
-									<div className="flex items-center gap-2">
-										{item.user?.id ? (
-											<Link
-												to="/admin/users/$userId"
-												params={{ userId: item.user.id }}
-												className="font-medium hover:text-blue-600 hover:underline"
-											>
-												{item.user?.username ||
-													item.user?.firstName ||
-													"Unknown User"}
-											</Link>
-										) : (
-											<span className="font-medium">
-												{item.user?.username ||
-													item.user?.firstName ||
-													"Unknown User"}
-											</span>
-										)}
-										{item.type === "support" && (
-											<span className="rounded bg-amber-500 px-2 py-1 text-white text-xs">
-												Support
-											</span>
-										)}
-									</div>
-									<div className="text-muted-foreground text-xs">
-										{item.user?.telegramChatId} •{" "}
-										{formatDateTime(item.createdAt)}
-									</div>
-								</div>
-								<div className="flex gap-2">
-									{item.status === "new" && (
-										<Button
-											variant="outline"
-											size="sm"
-											onClick={() =>
-												updateStatusMutation.mutate({
-													feedbackId: item._id,
-													status: "read",
-												})
-											}
-											disabled={updateStatusMutation.isPending}
-										>
-											Mark Read
-										</Button>
-									)}
-									{item.status === "read" && (
-										<Button
-											variant="outline"
-											size="sm"
-											onClick={() =>
-												updateStatusMutation.mutate({
-													feedbackId: item._id,
-													status: "archived",
-												})
-											}
-											disabled={updateStatusMutation.isPending}
-										>
-											Archive
-										</Button>
-									)}
-									{item.status === "archived" && (
-										<span className="text-muted-foreground text-sm">
-											Archived
-										</span>
-									)}
-								</div>
+							<div className="msg-head">
+								{item.user?.id ? (
+									<Link
+										className="msg-user"
+										to="/admin/users/$userId"
+										params={{ userId: item.user.id }}
+									>
+										{item.user.username ||
+											item.user.firstName ||
+											"Unknown user"}
+									</Link>
+								) : (
+									<span className="msg-user">
+										{item.user?.username ||
+											item.user?.firstName ||
+											"Unknown user"}
+									</span>
+								)}
+								<span className="msg-meta">
+									{item.user?.telegramChatId} · {formatDateTime(item.createdAt)}
+								</span>
+								{item.type === "support" && (
+									<span className="intent">Support</span>
+								)}
+								{item.status === "new" && (
+									<button
+										type="button"
+										className="btn btn-xs"
+										onClick={() =>
+											updateStatusMutation.mutate({
+												feedbackId: item._id,
+												status: "read",
+											})
+										}
+										disabled={updateStatusMutation.isPending}
+									>
+										Mark read
+									</button>
+								)}
+								{item.status === "read" && (
+									<button
+										type="button"
+										className="btn btn-xs btn-quiet"
+										onClick={() =>
+											updateStatusMutation.mutate({
+												feedbackId: item._id,
+												status: "archived",
+											})
+										}
+										disabled={updateStatusMutation.isPending}
+									>
+										Archive
+									</button>
+								)}
+								{item.status === "archived" && (
+									<span className="intent">Archived</span>
+								)}
 							</div>
-							<p className="whitespace-pre-wrap">{item.text}</p>
-						</div>
+							<p className="msg-text">{item.text}</p>
+						</article>
 					))}
 				</div>
 			)}

@@ -1,13 +1,9 @@
-import { useAdminAuth } from "@/hooks/useAdminAuth";
-
 import { convexQuery } from "@convex-dev/react-query";
 import { api } from "@open-voucher/backend/convex/_generated/api";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { CheckIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
+import { CheckIcon, ChevronDownIcon } from "lucide-react";
 import { useCallback, useState } from "react";
-import { Button } from "@/components/ui/button";
-import { formatDateTime } from "@/lib/utils";
 import {
 	DropdownMenu,
 	DropdownMenuCheckboxItem,
@@ -15,6 +11,8 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useAdminAuth } from "@/hooks/useAdminAuth";
+import { formatDateTime } from "@/lib/utils";
 
 export const Route = createFileRoute("/admin/failed-uploads")({
 	component: FailedUploadsPage,
@@ -33,9 +31,7 @@ function FailedUploadsPage() {
 	const { data, isLoading, error } = useQuery(
 		convexQuery(
 			api.adminFeedback.getFailedUploads,
-			token
-				? { token, excludeReasons: [...excludedReasons], page }
-				: "skip",
+			token ? { token, excludeReasons: [...excludedReasons], page } : "skip",
 		),
 	);
 
@@ -44,21 +40,18 @@ function FailedUploadsPage() {
 	const total = data?.total ?? 0;
 	const hasMore = data?.hasMore ?? false;
 
-	const toggleReason = useCallback(
-		(reason: string) => {
-			setExcludedReasons((prev) => {
-				const next = new Set(prev);
-				if (next.has(reason)) {
-					next.delete(reason);
-				} else {
-					next.add(reason);
-				}
-				return next;
-			});
-			setPage(1);
-		},
-		[],
-	);
+	const toggleReason = useCallback((reason: string) => {
+		setExcludedReasons((prev) => {
+			const next = new Set(prev);
+			if (next.has(reason)) {
+				next.delete(reason);
+			} else {
+				next.add(reason);
+			}
+			return next;
+		});
+		setPage(1);
+	}, []);
 
 	const selectAll = () => {
 		setExcludedReasons(new Set());
@@ -69,50 +62,45 @@ function FailedUploadsPage() {
 		setPage(1);
 	};
 
-	if (isLoading) {
-		return (
-			<div className="text-muted-foreground">Loading failed uploads...</div>
-		);
-	}
-
-	if (error) {
-		return <div className="text-red-500">Error loading failed uploads</div>;
-	}
-
-	if (failedUploads.length === 0) {
-		return (
-			<div>
-				<div className="mb-6 flex items-center justify-between">
-					<h1 className="text-xl font-semibold">Failed Uploads (0)</h1>
-				</div>
-				<div className="text-muted-foreground py-12 text-center">
-					No failed uploads
-				</div>
-			</div>
-		);
-	}
-
-	const totalPages = Math.ceil(total / (data?.pageSize ?? 12));
+	const totalPages = Math.max(1, Math.ceil(total / (data?.pageSize ?? 12)));
+	const shownLabel =
+		total > failedUploads.length
+			? `${failedUploads.length} of ${total}`
+			: String(total);
 
 	return (
 		<div>
-			<div className="mb-6 flex items-center justify-between">
-				<h1 className="text-xl font-semibold">
-					Failed Uploads ({total > failedUploads.length ? `${failedUploads.length} of ${total}` : total})
-				</h1>
+			<div className="masthead">
+				<div>
+					<h1 className="display">Failed Uploads</h1>
+					<p className="lede">Uploads the bot could not read, newest first.</p>
+				</div>
+				{!isLoading && !error && (
+					<div className="stamp">
+						<b className="num">{shownLabel}</b>
+						<br />
+						page {page} of {totalPages}
+					</div>
+				)}
+			</div>
+
+			<div className="toolbar">
 				<DropdownMenu>
 					<DropdownMenuTrigger asChild>
-						<Button variant="outline" size="sm">
+						<button type="button" className="btn">
 							Filter
 							{excludedReasons.size > 0 ? (
-								<span className="bg-primary text-primary-foreground ml-1 rounded-full px-1.5 text-xs">
-									{allReasons.length - excludedReasons.size}
+								<span className="num">
+									{Math.max(allReasons.length - excludedReasons.size, 0)}
 								</span>
 							) : null}
 							<ChevronDownIcon className="size-4" />
-						</Button>
+						</button>
 					</DropdownMenuTrigger>
-					<DropdownMenuContent align="end" className="w-64">
+					<DropdownMenuContent
+						align="end"
+						className="w-64 border-[rgba(196,214,236,0.16)] bg-[#171C25] text-[#E9EDF3]"
+					>
 						{allReasons.map((reason) => (
 							<DropdownMenuCheckboxItem
 								key={reason}
@@ -124,106 +112,114 @@ function FailedUploadsPage() {
 						))}
 						<DropdownMenuSeparator />
 						<button
-							className="focus:bg-accent focus:text-accent-foreground relative flex w-full cursor-default items-center gap-2 rounded-sm px-2 py-1.5 pl-8 text-sm outline-hidden select-none"
+							type="button"
+							className="relative flex w-full cursor-default items-center gap-2 rounded-sm px-2 py-1.5 pl-8 text-left text-sm"
 							onClick={selectAll}
 						>
 							<CheckIcon className="pointer-events-none absolute left-2 size-4 text-transparent" />
-							Select All
+							Select all
 						</button>
 						<button
-							className="focus:bg-accent focus:text-accent-foreground relative flex w-full cursor-default items-center gap-2 rounded-sm px-2 py-1.5 pl-8 text-sm outline-hidden select-none"
+							type="button"
+							className="relative flex w-full cursor-default items-center gap-2 rounded-sm px-2 py-1.5 pl-8 text-left text-sm"
 							onClick={deselectAll}
 						>
-							Deselect All
+							Deselect all
 						</button>
 					</DropdownMenuContent>
 				</DropdownMenu>
 			</div>
-			<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-				{failedUploads.map((failedUpload) => (
-					<div
-						key={failedUpload._id}
-						className="rounded-lg border border-red-200 p-4"
-					>
-						{failedUpload.imageUrl ? (
-							<img
-								src={failedUpload.imageUrl}
-								alt="Failed voucher"
-								className="mb-3 h-96 w-full rounded border object-contain bg-muted"
-							/>
-						) : (
-							<div className="bg-muted mb-3 flex h-96 w-full items-center justify-center rounded">
-								<span className="text-muted-foreground text-xs">No image</span>
+
+			{isLoading ? (
+				<p className="muted">Loading failed uploads...</p>
+			) : error ? (
+				<p className="warn">Error loading failed uploads</p>
+			) : failedUploads.length === 0 ? (
+				<div className="empty">No failed uploads</div>
+			) : (
+				<div className="grid">
+					{failedUploads.map((failedUpload) => (
+						<article key={failedUpload._id} className="vcard">
+							<div className="vmedia">
+								{failedUpload.imageUrl ? (
+									<img src={failedUpload.imageUrl} alt="Failed voucher" />
+								) : (
+									<span className="muted">No image</span>
+								)}
 							</div>
-						)}
-						<div className="mb-3">
-							<div className="mb-2 font-medium text-white">
-								{failedUpload.extractedType
-									? `€${failedUpload.extractedType} Voucher (Failed)`
-									: "Failed Upload"}
-							</div>
-							<div className="text-muted-foreground mb-1 text-xs font-mono">
-								User ID: {failedUpload.userId}
-							</div>
-							<div className="mb-1 text-xs">
-								Username:{" "}
-								<Link
-									to="/admin/users/$userId"
-									params={{ userId: failedUpload.userId }}
-									className="text-blue-600 hover:text-blue-800 hover:underline"
-								>
-									{failedUpload.username || failedUpload.firstName || "Unknown"}
-								</Link>
-							</div>
-							<div className="mb-2 rounded bg-orange-100 p-2">
-								<div className="text-xs font-semibold text-orange-900 mb-1">
-									Failure Reason:
+							<div className="vbody">
+								<div className="vhead">
+									<h2 className="display vvalue num">
+										{failedUpload.extractedType
+											? `€${failedUpload.extractedType}`
+											: "—"}
+										<span>Voucher</span>
+									</h2>
+									<span className="status s-failed">
+										<i />
+										failed
+									</span>
 								</div>
-								<div className="text-sm text-orange-800">
-									{failedUpload.failureReason}
+								<p className="vuploader">
+									Uploaded by{" "}
+									<Link
+										to="/admin/users/$userId"
+										params={{ userId: failedUpload.userId }}
+									>
+										<b>
+											{failedUpload.username ||
+												failedUpload.firstName ||
+												"Unknown"}
+										</b>
+									</Link>
+								</p>
+								<div className="reason">
+									<div className="k">Failure reason</div>
+									<div className="v">{failedUpload.failureReason}</div>
 								</div>
-							</div>
-							{failedUpload.errorMessage && (
-								<div className="mb-2 rounded bg-red-100 p-2">
-									<div className="text-xs font-semibold text-red-900 mb-1">
-										System Error:
+								{failedUpload.errorMessage && (
+									<div className="reason plain">
+										<div className="k">System error</div>
+										<div className="v">{failedUpload.errorMessage}</div>
 									</div>
-									<div className="text-xs font-mono text-red-800 whitespace-pre-wrap break-all">
-										{failedUpload.errorMessage}
+								)}
+								<dl className="ledger">
+									<div>
+										<dt>User ID</dt>
+										<dd className="mono">{failedUpload.userId}</dd>
 									</div>
-								</div>
-							)}
-							<div className="text-muted-foreground text-sm">
-								Failed at{" "}
-								{formatDateTime(failedUpload._creationTime)}
+									<div>
+										<dt>Failed at</dt>
+										<dd>{formatDateTime(failedUpload._creationTime)}</dd>
+									</div>
+								</dl>
 							</div>
-						</div>
-					</div>
-				))}
-			</div>
+						</article>
+					))}
+				</div>
+			)}
+
 			{totalPages > 1 && (
-				<div className="mt-6 flex items-center justify-center gap-3">
-					<Button
-						variant="outline"
-						size="sm"
+				<div className="pager">
+					<button
+						type="button"
+						className="btn btn-quiet"
 						disabled={page <= 1}
 						onClick={() => setPage((p) => p - 1)}
 					>
-						<ChevronLeftIcon className="size-4" />
 						Previous
-					</Button>
-					<span className="text-muted-foreground text-sm">
+					</button>
+					<span className="now">
 						Page {page} of {totalPages}
 					</span>
-					<Button
-						variant="outline"
-						size="sm"
+					<button
+						type="button"
+						className="btn"
 						disabled={!hasMore}
 						onClick={() => setPage((p) => p + 1)}
 					>
 						Next
-						<ChevronRightIcon className="size-4" />
-					</Button>
+					</button>
 				</div>
 			)}
 		</div>

@@ -1,7 +1,5 @@
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { useAdminAuth } from "@/hooks/useAdminAuth";
 import { useState } from "react";
+import { useAdminAuth } from "@/hooks/useAdminAuth";
 
 interface AdminAppProps {
 	children: React.ReactNode;
@@ -31,32 +29,39 @@ export function AdminApp({ children }: AdminAppProps) {
 
 	if (isLoading) {
 		return (
-			<div className="flex min-h-screen items-center justify-center">
-				<div className="text-muted-foreground">Loading...</div>
+			<div className="admin-shell">
+				<div className="gate">
+					<p className="muted">Loading...</p>
+				</div>
 			</div>
 		);
 	}
 
 	if (!isValid) {
 		return (
-			<div className="flex min-h-screen items-center justify-center">
-				<div className="w-full max-w-sm space-y-4">
-					<h1 className="text-center text-2xl font-semibold">Admin Login</h1>
-					<form onSubmit={handleSubmit} className="space-y-4">
-						<Input
-							type="password"
-							placeholder="Password"
-							value={password}
-							onChange={(e) => setPassword(e.target.value)}
-							disabled={isSubmitting}
-						/>
-						<Button type="submit" className="w-full" disabled={isSubmitting}>
-							{isSubmitting ? "Logging in..." : "Login"}
-						</Button>
-						{error && (
-							<p className="text-center text-sm text-red-500">{error}</p>
-						)}
-					</form>
+			<div className="admin-shell">
+				<div className="gate">
+					<div className="gate-card">
+						<h1>Admin login</h1>
+						<form onSubmit={handleSubmit}>
+							<input
+								className="input"
+								type="password"
+								placeholder="Password"
+								value={password}
+								onChange={(e) => setPassword(e.target.value)}
+								disabled={isSubmitting}
+							/>
+							<button
+								type="submit"
+								className="btn btn-gold"
+								disabled={isSubmitting}
+							>
+								{isSubmitting ? "Logging in..." : "Log in"}
+							</button>
+							{error && <p className="warn">{error}</p>}
+						</form>
+					</div>
 				</div>
 			</div>
 		);

@@ -70,6 +70,53 @@ export const Route = createFileRoute("/admin/analytics")({
 	component: AnalyticsPage,
 });
 
+function formatCount(value: number) {
+	return value.toLocaleString("en-IE");
+}
+
+function labeledRows(
+	record: Record<string, number>,
+	labels: Record<string, string>,
+) {
+	return Object.entries(record)
+		.map(([key, count]): [string, number] => [labels[key] ?? key, count])
+		.sort((a, b) => b[1] - a[1]);
+}
+
+function BarList({
+	rows,
+	tone,
+}: {
+	rows: [string, number][];
+	tone?: "blue" | "green";
+}) {
+	const max = Math.max(1, ...rows.map(([, count]) => count));
+	if (rows.length === 0) {
+		return <p className="muted">Nothing in this period.</p>;
+	}
+	return (
+		<div className={tone ? `barlist solo bl-${tone}` : "barlist"}>
+			{rows.map(([label, count]) => (
+				<div className="bl-row" key={label}>
+					<div className="bl-top">
+						<span className="bl-label">{label}</span>
+						<span className="bl-count num">{formatCount(count)}</span>
+					</div>
+					<div className="bl-track">
+						{count > 0 && (
+							<span
+								style={{
+									width: `${Math.max(1.5, (count / max) * 100)}%`,
+								}}
+							/>
+						)}
+					</div>
+				</div>
+			))}
+		</div>
+	);
+}
+
 function AnalyticsPage() {
 	const { token } = useAdminAuth();
 	const [sinceDays, setSinceDays] = useState<"all" | "30">("30");
@@ -99,180 +146,220 @@ function AnalyticsPage() {
 		),
 	);
 
-	if (isLoading) {
-		return <div className="text-muted-foreground">Loading analytics...</div>;
-	}
-
-	if (error) {
-		return (
-			<div className="text-red-500">
-				Error loading analytics
-				{error instanceof Error ? `: ${error.message}` : ""}
-			</div>
-		);
-	}
-
 	const dashboardCounts: Record<string, number> = data?.dashboardCounts ?? {};
 	const unknownMessages = data?.unknownMessages ?? [];
+	const inbound = data?.totalInbound ?? 0;
+	const unknownCount = data?.unknownCount ?? 0;
+	const commandTotal = Object.values(dashboardCounts).reduce(
+		(sum, count) => sum + count,
+		0,
+	);
+	const unknownShare =
+		inbound > 0 ? Math.round((unknownCount / inbound) * 1000) / 10 : 0;
+	const rangeLabel = sinceDays === "30" ? "Last 30 days" : "All time";
 
 	return (
-		<div>
-			<div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+		<div className="stack">
+			<div className="masthead">
 				<div>
-					<h1 className="font-semibold text-xl">Analytics</h1>
-					<p className="mt-1 text-muted-foreground text-sm">
-						{data?.totalInbound ?? 0} inbound messages
-						{sinceDays === "30" ? " (last 30 days)" : " (all time)"}
+					<h1 className="display">Analytics</h1>
+					<p className="lede">
+						What people asked the bot for, and what it did about it.
 					</p>
 				</div>
-				<select
-					value={sinceDays}
-					onChange={(e) => setSinceDays(e.target.value as "all" | "30")}
-					className="rounded-md border border-input bg-background px-3 py-1.5 text-foreground text-sm"
-				>
-					<option value="30">Last 30 days</option>
-					<option value="all">All time</option>
-				</select>
+				<div className="masthead-side">
+					<fieldset className="seg">
+						<legend className="sr-only">Time range</legend>
+						<button
+							type="button"
+							aria-pressed={sinceDays === "30"}
+							onClick={() => setSinceDays("30")}
+						>
+							Last 30 days
+						</button>
+						<button
+							type="button"
+							aria-pressed={sinceDays === "all"}
+							onClick={() => setSinceDays("all")}
+						>
+							All time
+						</button>
+					</fieldset>
+				</div>
 			</div>
 
-			<section className="mb-8 rounded-lg border p-4">
-				<h2 className="mb-4 font-medium">Transaction totals by type</h2>
-				{transactionLoading ? (
-					<div className="text-muted-foreground text-sm">Loading...</div>
-				) : (
-					<>
-						<div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-						{Object.entries(transactionData?.totals ?? {}).map(
-							([type, count]: [string, number]) => (
-								<div key={type} className="rounded-md border p-3">
-									<div className="mb-1 text-muted-foreground text-xs">
-										{TRANSACTION_LABELS[type] ?? type}
-									</div>
-									<div className="font-semibold text-2xl">{count}</div>
-								</div>
-							),
-						)}
+			{isLoading ? (
+				<p className="muted">Loading analytics...</p>
+			) : error ? (
+				<p className="warn">
+					Error loading analytics
+					{error instanceof Error ? `: ${error.message}` : ""}
+				</p>
+			) : (
+				<div className="stack">
+					<div className="stats">
+						<div className="stat">
+							<div className="k">Inbound messages</div>
+							<div className="v num">{formatCount(inbound)}</div>
+							<div className="n">
+								{formatCount(commandTotal)} were known commands
+							</div>
 						</div>
-						{transactionData && (
-							<div className="mt-3 text-muted-foreground text-xs">
-								{transactionData.totalCount} total transactions
+						<div className="stat">
+							<div className="k">Transactions</div>
+							<div className="v num">
+								{formatCount(transactionData?.totalCount ?? 0)}
 							</div>
-						)}
-						{transactionData && (
-							<div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 dark:border-amber-900 dark:bg-amber-950/30">
-								<div className="mb-1 text-muted-foreground text-xs">
-									Vouchers reported as not working
-								</div>
-								<div className="font-semibold text-2xl">
-									{transactionData.reportedNotWorkingCount}
-								</div>
-							</div>
-						)}
-					</>
-				)}
-			</section>
-
-			<section className="mb-8 rounded-lg border p-4">
-				<h2 className="mb-4 font-medium">Known commands</h2>
-				<div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-				{Object.entries(dashboardCounts).map(([intent, count]: [string, number]) => (
-					<div key={intent} className="rounded-md border p-3">
-						<div className="mb-1 text-muted-foreground text-xs">
-							{INTENT_LABELS[intent] ?? intent}
+							<div className="n">coins moved between users</div>
 						</div>
-						<div className="font-semibold text-2xl">{count}</div>
-					</div>
-				))}
-				</div>
-				<div className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-3 dark:border-amber-900 dark:bg-amber-950/30">
-					<div className="text-muted-foreground text-xs">
-						Unknown / free text
-					</div>
-					<div className="font-semibold text-2xl">
-						{data?.unknownCount ?? 0}
-					</div>
-				</div>
-			</section>
-
-			<section className="mb-8 rounded-lg border p-4">
-				<h2 className="mb-4 font-medium">App events</h2>
-				{analyticsLoading ? (
-					<div className="text-muted-foreground text-sm">Loading...</div>
-				) : (
-					<div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-					{Object.entries(analyticsData?.counts ?? {}).map(
-						([action, count]: [string, number]) => (
-							<div key={action} className="rounded-md border p-3">
-								<div className="mb-1 text-muted-foreground text-xs">
-									{ANALYTICS_LABELS[action] ?? action}
-								</div>
-								<div className="font-semibold text-2xl">{count}</div>
+						<div className="stat accent-red">
+							<div className="k">Reported not working</div>
+							<div className="v num">
+								{formatCount(transactionData?.reportedNotWorkingCount ?? 0)}
 							</div>
-						),
+							<div className="n">{rangeLabel}</div>
+						</div>
+						<div className="stat accent-gold">
+							<div className="k">Unknown / free text</div>
+							<div className="v num">{formatCount(unknownCount)}</div>
+							<div className="n">
+								{inbound > 0
+									? `${unknownShare}% of inbound messages`
+									: "No inbound messages"}
+							</div>
+						</div>
+					</div>
+
+					<section className="panel">
+						<div className="panel-head">
+							<h2>Transaction totals by type</h2>
+							{transactionData && (
+								<span className="note">
+									{formatCount(transactionData.totalCount)} total · {rangeLabel}
+								</span>
+							)}
+						</div>
+						<div className="panel-body">
+							{transactionLoading ? (
+								<p className="muted">Loading...</p>
+							) : (
+								<BarList
+									rows={labeledRows(
+										transactionData?.totals ?? {},
+										TRANSACTION_LABELS,
+									)}
+								/>
+							)}
+						</div>
+					</section>
+
+					{transactionData && (
+						<div className="alert-strip">
+							<div>
+								<div className="k">Vouchers reported as not working</div>
+								<div className="v num">
+									{formatCount(transactionData.reportedNotWorkingCount)}
+								</div>
+							</div>
+							<p className="copy">
+								Users told the bot these vouchers would not scan or were refused
+								at the till.
+							</p>
+						</div>
 					)}
-					</div>
-				)}
-				{analyticsData && (
-					<div className="mt-3 text-muted-foreground text-xs">
-						{analyticsData.total} total events
-					</div>
-				)}
-			</section>
 
-			<section>
-				<h2 className="mb-4 font-medium">
-					Unknown messages ({unknownMessages.length})
-				</h2>
-				{unknownMessages.length === 0 ? (
-					<div className="py-12 text-center text-muted-foreground">
-						No unknown messages in this period
-					</div>
-				) : (
-					<div className="space-y-4">
-						{unknownMessages.map((item) => (
-							<div key={item._id} className="rounded-lg border p-4">
-								<div className="mb-2 flex items-start justify-between gap-4">
-									<div>
-										{item.user?.id ? (
-											<Link
-												to="/admin/users/$userId"
-												params={{
-													userId: item.user.id,
-												}}
-												className="font-medium hover:text-blue-600 hover:underline"
-											>
-												{item.user.username ||
-													item.user.firstName ||
-													"Unknown user"}
-											</Link>
-										) : (
-											<span className="font-medium">Unknown user</span>
-										)}
-										<div className="text-muted-foreground text-xs">
-											{item.telegramChatId} • {formatDateTime(item.createdAt)}
-										</div>
-										{item.classifiedIntent && (
-											<div className="mt-1 text-xs">
-												<span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-slate-700">
+					<section className="panel">
+						<div className="panel-head">
+							<h2>Commands & app events</h2>
+							<span className="note">
+								{formatCount(commandTotal)} commands
+								{analyticsData
+									? ` · ${formatCount(analyticsData.total)} events`
+									: ""}
+							</span>
+						</div>
+						<div className="panel-body">
+							<div className="two-col">
+								<div>
+									<p className="eyebrow" style={{ marginBottom: 12 }}>
+										Bot commands
+									</p>
+									<BarList
+										tone="blue"
+										rows={labeledRows(dashboardCounts, INTENT_LABELS)}
+									/>
+								</div>
+								<div>
+									<p className="eyebrow" style={{ marginBottom: 12 }}>
+										App events
+									</p>
+									{analyticsLoading ? (
+										<p className="muted">Loading...</p>
+									) : (
+										<BarList
+											tone="green"
+											rows={labeledRows(
+												analyticsData?.counts ?? {},
+												ANALYTICS_LABELS,
+											)}
+										/>
+									)}
+								</div>
+							</div>
+						</div>
+					</section>
+
+					<section className="panel">
+						<div className="panel-head">
+							<h2>Unknown messages</h2>
+							<span className="note">
+								{formatCount(unknownMessages.length)} in this period
+							</span>
+						</div>
+						<div className="panel-body">
+							{unknownMessages.length === 0 ? (
+								<p className="muted">No unknown messages in this period</p>
+							) : (
+								unknownMessages.map((item) => (
+									<div className="msg" key={item._id}>
+										<div className="msg-head">
+											{item.user?.id ? (
+												<Link
+													className="msg-user"
+													to="/admin/users/$userId"
+													params={{ userId: item.user.id }}
+												>
+													{item.user.username ||
+														item.user.firstName ||
+														"Unknown user"}
+												</Link>
+											) : (
+												<span className="msg-user">Unknown user</span>
+											)}
+											<span className="msg-meta">
+												{item.telegramChatId} · {formatDateTime(item.createdAt)}
+											</span>
+											{item.classifiedIntent && (
+												<span className="intent">
 													{CLASSIFIED_INTENT_LABELS[item.classifiedIntent] ??
 														item.classifiedIntent}
 													{item.classifiedConfidence !== undefined &&
 														item.classifiedConfidence !== null && (
-															<span className="ml-1 text-slate-500">
+															<span>
 																{Math.round(item.classifiedConfidence * 100)}%
 															</span>
 														)}
 												</span>
-											</div>
-										)}
+											)}
+										</div>
+										<p className="msg-text">{item.text || "(empty)"}</p>
 									</div>
-								</div>
-								<p className="whitespace-pre-wrap">{item.text || "(empty)"}</p>
-							</div>
-						))}
-					</div>
-				)}
-			</section>
+								))
+							)}
+						</div>
+					</section>
+				</div>
+			)}
 		</div>
 	);
 }
