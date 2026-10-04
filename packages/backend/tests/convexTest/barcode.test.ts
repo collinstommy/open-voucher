@@ -1,4 +1,5 @@
 import { convexTest } from "convex-test";
+import aggregateTest from "@convex-dev/aggregate/test";
 import { describe, expect, test, vi } from "vitest";
 import { internal } from "../../convex/_generated/api";
 import schema from "../../convex/schema";
@@ -50,6 +51,7 @@ describe("storeVoucherFromOcr barcode spaces", () => {
 	test("stores the barcode without spaces", async () => {
 		vi.useFakeTimers();
 		const t = convexTest(schema, modules);
+		aggregateTest.register(t, "voucherAgg");
 		const userId = await createUser(t, { telegramChatId: "123456", coins: 0 });
 		const imageStorageId = await t.run(async (ctx) => {
 			return await ctx.storage.store(new Blob(["fake-image"]));
@@ -77,6 +79,7 @@ describe("storeVoucherFromOcr barcode spaces", () => {
 	test("rejects a spaced barcode when the digits-only value is already stored", async () => {
 		vi.useFakeTimers();
 		const t = convexTest(schema, modules);
+		aggregateTest.register(t, "voucherAgg");
 		const userId = await createUser(t, { telegramChatId: "123456", coins: 0 });
 		const firstImage = await t.run(async (ctx) => {
 			return await ctx.storage.store(new Blob(["first"]));
@@ -129,6 +132,7 @@ describe("storeVoucherFromOcr barcode spaces", () => {
 	])("rejects %s when %s is already stored", async (uploadBarcode, storedBarcode) => {
 		vi.useFakeTimers();
 		const t = convexTest(schema, modules);
+		aggregateTest.register(t, "voucherAgg");
 		const userId = await createUser(t, {
 			telegramChatId: "123456",
 			coins: 0,

@@ -3,6 +3,7 @@
  * Verifies that known commands do not trigger the Gemini-based classifier.
  */
 import { convexTest } from "convex-test";
+import aggregateTest from "@convex-dev/aggregate/test";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { internal } from "../../convex/_generated/api";
 import schema from "../../convex/schema";
@@ -78,6 +79,7 @@ describe("Known message classification", () => {
 
 	test("does not call Gemini for 'help' command", async () => {
 		const t = convexTest(schema, modules);
+		aggregateTest.register(t, "voucherAgg");
 		const chatId = "123456";
 		await createUser(t, { telegramChatId: chatId, coins: 100 });
 
@@ -101,6 +103,7 @@ describe("Known message classification", () => {
 
 	test("does not call Gemini for '10' voucher claim", async () => {
 		const t = convexTest(schema, modules);
+		aggregateTest.register(t, "voucherAgg");
 		const chatId = "123456";
 		await createUser(t, { telegramChatId: chatId, coins: 100 });
 
@@ -124,6 +127,7 @@ describe("Known message classification", () => {
 
 	test("does not call Gemini for '/balance' command", async () => {
 		const t = convexTest(schema, modules);
+		aggregateTest.register(t, "voucherAgg");
 		const chatId = "123456";
 		await createUser(t, { telegramChatId: chatId, coins: 42 });
 

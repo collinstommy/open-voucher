@@ -2,6 +2,7 @@
  * Help Callback Menu Tests
  */
 import { convexTest } from "convex-test";
+import aggregateTest from "@convex-dev/aggregate/test";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { internal } from "../../convex/_generated/api";
 import schema from "../../convex/schema";
@@ -78,6 +79,7 @@ describe("Help Command", () => {
 
 	test("help command shows slim inline keyboard menu", async () => {
 		const t = convexTest(schema, modules);
+		aggregateTest.register(t, "voucherAgg");
 		const chatId = "123456";
 
 		await createUser(t, { telegramChatId: chatId, coins: 100 });
@@ -124,6 +126,7 @@ describe("Account command", () => {
 
 	test("account command sends My Account web_app button", async () => {
 		const t = convexTest(schema, modules);
+		aggregateTest.register(t, "voucherAgg");
 		const chatId = "123456";
 
 		await createUser(t, { telegramChatId: chatId, coins: 100 });
@@ -157,6 +160,7 @@ describe("Help Callback Responses", () => {
 
 	test("balance callback shows user coin balance", async () => {
 		const t = convexTest(schema, modules);
+		aggregateTest.register(t, "voucherAgg");
 		const chatId = "123456";
 		const userId = await createUser(t, { telegramChatId: chatId, coins: 42 });
 
@@ -173,6 +177,7 @@ describe("Help Callback Responses", () => {
 
 	test("upload callback shows instruction text on how to upload", async () => {
 		const t = convexTest(schema, modules);
+		aggregateTest.register(t, "voucherAgg");
 		const chatId = "123456";
 		await createUser(t, { telegramChatId: chatId, coins: 100 });
 
@@ -189,6 +194,7 @@ describe("Help Callback Responses", () => {
 
 	test("claim callback shows instruction text on how to claim", async () => {
 		const t = convexTest(schema, modules);
+		aggregateTest.register(t, "voucherAgg");
 		const chatId = "123456";
 		await createUser(t, { telegramChatId: chatId, coins: 100 });
 
@@ -208,6 +214,7 @@ describe("Help Callback Responses", () => {
 describe("getAvailableVoucherCount", () => {
 	test("returns correct counts per type", async () => {
 		const t = convexTest(schema, modules);
+		aggregateTest.register(t, "voucherAgg");
 		const chatId = "123456";
 		const userId = await createUser(t, { telegramChatId: chatId, coins: 100 });
 

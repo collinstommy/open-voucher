@@ -1,4 +1,5 @@
 import { v } from "convex/values";
+import { trackVoucherInsert } from "./aggregates";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { action, internalMutation, query } from "./_generated/server";
@@ -116,6 +117,10 @@ export const insertSeedVoucher = internalMutation({
 			barcodeNumber: barcode,
 			createdAt: Date.now(),
 		});
+		const voucher = await ctx.db.get(voucherId);
+		if (voucher) {
+			await trackVoucherInsert(ctx, voucher);
+		}
 
 		return {
 			voucherId,

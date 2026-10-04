@@ -3,6 +3,8 @@
  */
 
 import { convexTest } from "convex-test";
+import aggregateTest from "@convex-dev/aggregate/test";
+import { voucherAggregate } from "../../convex/aggregates";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { internal } from "../../convex/_generated/api";
 import schema from "../../convex/schema";
@@ -258,6 +260,7 @@ describe("Voucher Upload Flow", () => {
 
 	test("upload voucher creates processing voucher via Telegram webhook", async () => {
 		const t = convexTest(schema, modules);
+		aggregateTest.register(t, "voucherAgg");
 		const chatId = "123456";
 
 		// Create a user
@@ -308,6 +311,7 @@ describe("Voucher Claim Flow", () => {
 
 	test("claim voucher deducts coins via Telegram webhook", async () => {
 		const t = convexTest(schema, modules);
+		aggregateTest.register(t, "voucherAgg");
 		const chatId = "123456";
 
 		// Create user with coins
@@ -348,6 +352,7 @@ describe("Voucher Claim Flow", () => {
 
 	test("claim with insufficient coins fails via Telegram webhook", async () => {
 		const t = convexTest(schema, modules);
+		aggregateTest.register(t, "voucherAgg");
 		const chatId = "123456";
 
 		const userId = await createUser(t, { telegramChatId: chatId, coins: 5 });
@@ -418,6 +423,7 @@ describe("Voucher Claim Flow", () => {
 		);
 
 		const t = convexTest(schema, modules);
+		aggregateTest.register(t, "voucherAgg");
 		const chatId = "123456";
 
 		const userId = await createUser(t, { telegramChatId: chatId, coins: 20 });
@@ -467,6 +473,7 @@ describe("Voucher Claim Flow", () => {
 
 	test("claim fails when no voucher available via Telegram webhook", async () => {
 		const t = convexTest(schema, modules);
+		aggregateTest.register(t, "voucherAgg");
 		const chatId = "123456";
 
 		await createUser(t, { telegramChatId: chatId, coins: 20 });
@@ -493,6 +500,7 @@ describe("Voucher Claim Flow", () => {
 describe("Voucher Expiration Flow", () => {
 	test("expireOldVouchers marks past vouchers as expired", async () => {
 		const t = convexTest(schema, modules);
+		aggregateTest.register(t, "voucherAgg");
 		const uploaderChatId = "222222";
 
 		const uploaderId = await createUser(t, {
@@ -537,6 +545,7 @@ describe("Voucher Expiration Flow", () => {
 
 	test("requestVoucher does not return expired vouchers", async () => {
 		const t = convexTest(schema, modules);
+		aggregateTest.register(t, "voucherAgg");
 		const uploaderChatId = "222222";
 		const claimerChatId = "333333";
 
@@ -588,6 +597,7 @@ describe("OCR Flow with Mocked Gemini", () => {
 	test("valid voucher OCR awards coins to uploader", async () => {
 		setupFetchMock("valid_10");
 		const t = convexTest(schema, modules);
+		aggregateTest.register(t, "voucherAgg");
 
 		// Create user
 		const userId = await createUser(t, { telegramChatId: "123456", coins: 0 });
@@ -598,7 +608,7 @@ describe("OCR Flow with Mocked Gemini", () => {
 		});
 
 		await t.run(async (ctx) => {
-			return await ctx.db.insert("vouchers", {
+			const voucherId = await ctx.db.insert("vouchers", {
 				type: "0",
 				status: "processing",
 				imageStorageId,
@@ -606,6 +616,11 @@ describe("OCR Flow with Mocked Gemini", () => {
 				expiryDate: 0,
 				createdAt: Date.now(),
 			});
+			const doc = await ctx.db.get(voucherId);
+			if (doc) {
+				await voucherAggregate.insertIfDoesNotExist(ctx, doc);
+			}
+			return voucherId;
 		});
 
 		// Simulate OCR completing with valid result
@@ -642,6 +657,7 @@ describe("OCR Flow with Mocked Gemini", () => {
 	test("expired voucher OCR fails and notifies user", async () => {
 		setupFetchMock("expired");
 		const t = convexTest(schema, modules);
+		aggregateTest.register(t, "voucherAgg");
 
 		// Create user
 		const userId = await createUser(t, { telegramChatId: "123456", coins: 0 });
@@ -652,7 +668,7 @@ describe("OCR Flow with Mocked Gemini", () => {
 		});
 
 		await t.run(async (ctx) => {
-			return await ctx.db.insert("vouchers", {
+			const voucherId = await ctx.db.insert("vouchers", {
 				type: "0",
 				status: "processing",
 				imageStorageId,
@@ -660,6 +676,11 @@ describe("OCR Flow with Mocked Gemini", () => {
 				expiryDate: 0,
 				createdAt: Date.now(),
 			});
+			const doc = await ctx.db.get(voucherId);
+			if (doc) {
+				await voucherAggregate.insertIfDoesNotExist(ctx, doc);
+			}
+			return voucherId;
 		});
 
 		// Simulate OCR with expired date
@@ -695,6 +716,7 @@ describe("OCR Flow with Mocked Gemini", () => {
 
 	test("test vouchers expiring today are rejected after 9 PM", async () => {
 		const t = convexTest(schema, modules);
+		aggregateTest.register(t, "voucherAgg");
 		const chatId = "12345";
 
 		const todayStr = "2025-12-21";
@@ -757,6 +779,7 @@ describe("OCR Flow with Mocked Gemini", () => {
 		vi.stubEnv("TELEGRAM_BOT_TOKEN", "test-bot-token");
 		vi.useFakeTimers({ now: Date.now() });
 		const t = convexTest(schema, modules);
+		aggregateTest.register(t, "voucherAgg");
 
 		// Create existing user (already signed up)
 		const userId = await createUser(t, { telegramChatId: chatId, coins: 0 });

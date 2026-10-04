@@ -3,6 +3,7 @@
  */
 
 import { convexTest } from "convex-test";
+import aggregateTest from "@convex-dev/aggregate/test";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { internal } from "../../convex/_generated/api";
 import schema from "../../convex/schema";
@@ -117,6 +118,7 @@ describe("Rate Limiting Flow", () => {
 
 	test("upload limit (10 per 24h) blocks subsequent uploads", async () => {
 		const t = convexTest(schema, modules);
+		aggregateTest.register(t, "voucherAgg");
 		const chatId = "11223344";
 
 		const userId = await createUser(t, { telegramChatId: chatId, coins: 100 });
@@ -165,6 +167,7 @@ describe("Rate Limiting Flow", () => {
 
 	test("claim limit (5 per 24h) blocks subsequent claims", async () => {
 		const t = convexTest(schema, modules);
+		aggregateTest.register(t, "voucherAgg");
 		const claimerChatId = "55667788";
 		const uploaderChatId = "99887766";
 

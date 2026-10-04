@@ -1,4 +1,5 @@
 import { convexTest } from "convex-test";
+import aggregateTest from "@convex-dev/aggregate/test";
 import { describe, expect, test } from "vitest";
 import { buildMessageAnalytics } from "../../src/lib/messageAnalytics";
 import schema from "../../convex/schema";
@@ -7,6 +8,7 @@ import { modules } from "../test.setup";
 describe("getMessageAnalytics", () => {
 	test("returns counts and unknown messages for admin", async () => {
 		const t = convexTest(schema, modules);
+		aggregateTest.register(t, "voucherAgg");
 		const token = "test-admin-token";
 		const now = Date.now();
 

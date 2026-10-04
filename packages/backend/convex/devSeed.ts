@@ -1,4 +1,5 @@
 import { v } from "convex/values";
+import { trackVoucherDelete, trackVoucherInsert } from "./aggregates";
 import { internalAction, internalMutation } from "./_generated/server";
 
 const DAY_MS = 86_400_000;
@@ -135,6 +136,13 @@ export const seedDevVouchers = internalMutation({
 				claimedAt: claimed ? now - DAY_MS : undefined,
 				createdAt: now - spec.createdDaysAgo * DAY_MS,
 			});
+			const insertedVoucher = await ctx.db
+				.query("vouchers")
+				.withIndex("by_barcode", (q) => q.eq("barcodeNumber", spec.barcode))
+				.first();
+			if (insertedVoucher) {
+				await trackVoucherInsert(ctx, insertedVoucher);
+			}
 			inserted.push({
 				barcode: spec.barcode,
 				status: spec.status,
@@ -165,6 +173,7 @@ export const clearSeedVouchers = internalMutation({
 				continue;
 			}
 			await ctx.storage.delete(voucher.imageStorageId);
+			await trackVoucherDelete(ctx, voucher);
 			await ctx.db.delete(voucher._id);
 			deleted.push(barcode);
 		}

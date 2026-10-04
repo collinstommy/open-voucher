@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Coin, report, and admin-action audit</title>
+<style>
+  :root {
+    --bg: #f3efe6;
+    --paper: #fffdf8;
+    --ink: #1c1915;
+    --muted: #5e584e;
+    --line: #e3d9c6;
+    --p0: #9a3412;
+    --p0bg: #fde8dc;
+    --p1: #92400e;
+    --p1bg: #fbf0dc;
+    --p2: #3f4f2a;
+    --p2bg: #e7eedc;
+    --ok: #1f4d3a;
+    --okbg: #e5f2ea;
+    --code: #f6f1e7;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 17px/1.55 "Iowan Old Style", Palatino, Georgia, serif;
+  }
+  a { color: inherit; }
+  header.top {
+    padding: 48px 24px 28px;
+    max-width: 920px;
+    margin: 0 auto;
+  }
+  header.top p.kicker {
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    font: 12px/1.4 ui-sans-serif, system-ui, sans-serif;
+    color: var(--muted);
+    margin: 0 0 12px;
+  }
+  h1 {
+    font-size: 42px;
+    line-height: 1.05;
+    font-weight: 600;
+    margin: 0 0 16px;
+  }
+  .verdict {
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-left: 6px solid var(--p0);
+    padding: 16px 18px;
+    margin: 0;
+  }
+  main {
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 0 24px 80px;
+  }
+  nav.toc {
+    background: var(--paper);
+    border: 1px solid var(--line);
+    padding: 14px 18px;
+    margin: 22px 0 8px;
+    font: 14px/1.45 ui-sans-serif, system-ui, sans-serif;
+  }
+  nav.toc ol { margin: 8px 0 0; padding-left: 18px; }
+  nav.toc a { text-decoration: none; }
+  nav.toc a:hover { text-decoration: underline; }
+  h2 {
+    font-size: 28px;
+    line-height: 1.15;
+    margin: 42px 0 12px;
+  }
+  h3 {
+    font-size: 20px;
+    margin: 28px 0 8px;
+  }
+  p { margin: 0 0 12px; }
+  ul, ol { margin: 0 0 14px; padding-left: 22px; }
+  li { margin: 4px 0; }
+  code, .file {
+    font: 13px/1.45 ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    background: var(--code);
+    padding: 1px 5px;
+  }
+  .meta {
+    font: 13px/1.4 ui-sans-serif, system-ui, sans-serif;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+  .sev {
+    display: inline-block;
+    font: 11px/1 ui-sans-serif, system-ui, sans-serif;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 4px 7px;
+    border-radius: 99px;
+    vertical-align: 2px;
+  }
+  .sev.p0 { background: var(--p0bg); color: var(--p0); }
+  .sev.p1 { background: var(--p1bg); color: var(--p1); }
+  .sev.p2 { background: var(--p2bg); color: var(--p2); }
+  .sev.ok { background: var(--okbg); color: var(--ok); }
+  article.issue {
+    background: var(--paper);
+    border: 1px solid var(--line);
+    padding: 18px 18px 8px;
+    margin: 16px 0;
+  }
+  article.issue h3 { margin-top: 8px; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 8px 0 16px;
+    font: 14px/1.4 ui-sans-serif, system-ui, sans-serif;
+    background: var(--paper);
+  }
+  th, td {
+    text-align: left;
+    padding: 7px 8px;
+    border-bottom: 1px solid var(--line);
+    vertical-align: top;
+  }
+  th {
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 650;
+  }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .note {
+    font: 14px/1.45 ui-sans-serif, system-ui, sans-serif;
+    color: var(--muted);
+  }
+  .fix {
+    background: #f7f4ec;
+    border-top: 1px solid var(--line);
+    margin: 12px -18px 0;
+    padding: 12px 18px 4px;
+  }
+  .fix strong { font: 12px/1 ui-sans-serif, system-ui, sans-serif; letter-spacing: 0.08em; text-transform: uppercase; }
+  footer {
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 0 24px 48px;
+    color: var(--muted);
+    font: 14px/1.45 ui-sans-serif, system-ui, sans-serif;
+  }
+</style>
+</head>
+<body>
+<header class="top">
+  <p class="kicker">Open Voucher · code audit · 4 Oct 2026</p>
+  <h1>Refunds, deductions, and reports do not settle as one story.</h1>
+  <p class="verdict">A user's coin balance matches the sum of their transaction rows. That check can pass while the economy is still wrong. Claimer refunds, uploader clawbacks, replacements, and pool-status changes are separate switches. Several of them can fire twice, and several of them use the sticker price instead of what this voucher's ledger still owes.</p>
+</header>
+<main>
+  <nav class="toc">
+    <strong>Contents</strong>
+    <ol>
+      <li><a href="#model">The model the code is aiming at</a></li>
+      <li><a href="#holds">What already holds</a></li>
+      <li><a href="#prices">Prices</a></li>
+      <li><a href="#issues">Issues, with worked examples</a></li>
+      <li><a href="#buttons">What each admin button actually does</a></li>
+      <li><a href="#shape">A shape for the fix</a></li>
+      <li><a href="#scope">What this audit did not do</a></li>
+    </ol>
+  </nav>
+
+  <h2 id="model">The model the code is aiming at</h2>
+  <p>Coins are created when someone uploads or signs up, and destroyed when someone claims. A €10 voucher pays the uploader 10 and charges the claimer 10, so a healthy claim changes who holds the coins and leaves the total supply alone.</p>
+  <p>Every balance change is supposed to go through <code>applyCoinDelta</code> in <span class="file">packages/backend/src/lib/coinLedger.ts</span>. It floors the balance at 0 and writes a transaction for the change that actually happened. After that, <code>sum(transactions.amount)</code> for a user equals <code>users.coins</code>.</p>
+  <p>That invariant is about one account. It says nothing about whether a reported voucher was paid for twice, or whether the uploader still holds a reward for a voucher that was refunded to the claimer.</p>
+  <p>A voucher is settled when all three of these are true:</p>
+  <ol>
+    <li>The claimer has been made whole once: coins back, or one replacement voucher, not both.</li>
+    <li>The uploader's reward has been taken back once, if the voucher was bad. Left in place, if it was good or simply expired unused.</li>
+    <li>The voucher's pool status matches that decision, and the claimer id is cleared when it goes back on the shelf.</li>
+  </ol>
+  <p>Today those three live in different rows, and most buttons only do one of them.</p>
+
+  <h2 id="holds">What already holds</h2>
+  <ul>
+    <li><span class="sev ok">Sound</span> Signup, upload reward, claim spend, user return, failed photo delivery, and admin "Make Available" on a plain claimed voucher all go through <code>applyCoinDelta</code>. A plain claim cannot be refunded twice, because the first refund sets status back to <code>available</code> and clears <code>claimerId</code>.</li>
+    <li><span class="sev ok">Sound</span> <code>removeVoucherAndReverseCoins</code> refuses a second run, and it reverses the net of the rows on that voucher. Expire-then-remove does not take the uploader's reward a second time, as long as the expiry deduction was recorded on that same voucher. The test in <span class="file">packages/backend/tests/convexTest/removeVoucher.test.ts</span> covers that case.</li>
+    <li><span class="sev ok">Sound</span> Upload reward and claim cost are the same number for each type. A paired "refund the claimer, claw back the uploader" is zero-sum.</li>
+    <li><span class="sev ok">Sound</span> Clearing or admitting a report keeps the report row and drops it out of <code>uploadReportCount</code> / <code>claimReportCount</code> via <code>recalculateReportCounts</code>.</li>
+    <li><span class="sev ok">Sound</span> The manual deduct form on the user page refuses an amount above the current balance.</li>
+  </ul>
+
+  <h2 id="prices">Prices</h2>
+  <table>
+    <thead>
+      <tr><th>Voucher</th><th class="num">Upload reward</th><th class="num">Claim cost</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>€5</td><td class="num">15</td><td class="num">15</td></tr>
+      <tr><td>€10</td><td class="num">10</td><td class="num">10</td></tr>
+      <tr><td>€20</td><td class="num">5</td><td class="num">5</td></tr>
+    </tbody>
+  </table>
+  <p class="note">Worked examples below use a €10 voucher so the arithmetic stays obvious. The same shape applies to €5 and €20, with 15 and 5 coins.</p>
+
+  <h2 id="issues">Issues, with worked examples</h2>
+
+  <article class="issue" id="i1">
+    <p class="meta"><span class="sev p0">P0</span> · money can be created · bot callbacks</p>
+    <h3>1. A report can pay the claimer twice</h3>
+    <p><code>refundReportedVoucher</code> and <code>requestReplacement</code> in <span class="file">packages/backend/convex/vouchers.ts</span> do not look at each other. Neither checks that this user claimed the voucher, that a report exists, or that this voucher was already compensated. Both write <code>type: "refund"</code> for the full claim cost. The replacement writes <code>replacement_received</code> with amount 0 on the <em>other</em> voucher.</p>
+    <p>The Telegram buttons are the only guard. <code>report_replacement_yes</code> and <code>report_replacement_no</code> edit the message and then run the mutation. Those are not one atomic step. Two taps, or a second webhook delivery while the first send is still in flight, both get through. <span class="file">packages/backend/convex/http.ts</span> waits for the whole callback before it returns 200, which is exactly when Telegram retries.</p>
+    <p>There is a type <code>report_refund</code> in the schema and in both UIs. Nothing writes it. Report refunds and "the photo failed to send" refunds share the bucket <code>refund</code>.</p>
+    <table>
+      <caption class="note">€10. Claimer paid 10, then both buttons run.</caption>
+      <thead>
+        <tr><th>Step</th><th>Claimer coins</th><th>What they hold</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>After claim</td><td class="num">−10</td><td>Voucher A</td></tr>
+        <tr><td>"No thanks" refund</td><td class="num">0</td><td>Nothing</td></tr>
+        <tr><td>"Yes" replacement, same report</td><td class="num">0</td><td>Voucher B, unpaid</td></tr>
+      </tbody>
+    </table>
+    <p>Supply is then the two upload rewards, and the claimer's payment has been printed back. A clean claim of B would have left supply unchanged. This path leaves supply 20 coins high, and the claimer holds a voucher they no longer paid for.</p>
+    <p>The same functions mint coins even with no prior spend. The tests expect that: <code>refundReportedVoucher</code> takes a claimer from 10 to 20 with no <code>claim_spend</code> row. That is the function working as written.</p>
+    <p>If no replacement is in stock, <code>requestReplacement</code> refunds and returns. Calling it again refunds again. The handler also tells the user their coins were refunded for every non-replacement result, including <code>not_found</code>.</p>
+    <div class="fix">
+      <p><strong>Fix</strong></p>
+      <p>Put one settlement on the report: <code>none</code>, <code>refunded</code>, or <code>replaced</code>. Both mutations return the existing settlement if it is already set. Write <code>report_refund</code> on the original voucher, and point <code>replacementVoucherId</code> at the new one. Do this in the mutation, not in the button handler.</p>
+    </div>
+  </article>
+
+  <article class="issue" id="i2">
+    <p class="meta"><span class="sev p0">P0</span> · claimer keeps a dead voucher and the coins stay spent</p>
+    <h3>2. Replacements skip the expiry rule and prefer the oldest voucher</h3>
+    <p><code>requestVoucher</code> only offers vouchers with <code>expiryDate &gt; now</code>, then picks the one that expires soonest. <code>requestReplacement</code> queries <code>available</code> plus <code>validFrom</code>, then calls <code>.first()</code>. No expiry check. Index order on <code>by_status_type</code> is oldest first.</p>
+    <p>The nightly cron (<code>expireOldVouchers</code>, 01:01 UTC) is what flips past-expiry vouchers off <code>available</code>. Until it runs, and whenever it misses, those rows are still <code>available</code>. A replacement is likely to be one of them.</p>
+    <p>My Claims only lists <code>status === "claimed"</code> and <code>expiryDate &gt; now</code>. An expired replacement is claimed, hidden, and cannot be returned from the app. The claimer already paid on the original. They do not get a refund, because a replacement was "found".</p>
+    <div class="fix">
+      <p><strong>Fix</strong></p>
+      <p>Use the same availability filter as a claim: not expired, already valid, soonest expiry first. If none qualify, refund once and record that settlement.</p>
+    </div>
+  </article>
+
+  <article class="issue" id="i3">
+    <p class="meta"><span class="sev p0">P0</span> · admin remove · replacements</p>
+    <h3>3. "Remove &amp; reverse" refunds a claim that was already settled by a replacement</h3>
+    <p><code>removeVoucherAndReverseCoins</code> sums transactions where <code>voucherId</code> is this voucher, then applies the opposite. A replacement records a 0-coin row on the new voucher, not on the original. The original still shows <code>claim_spend −10</code>. Remove sees −10 and gives the claimer 10 back. They keep voucher B.</p>
+    <table>
+      <thead>
+        <tr><th></th><th class="num">Uploader A</th><th class="num">Uploader B</th><th class="num">Claimer</th><th>Holds</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>A and B uploaded, A claimed</td><td class="num">+10</td><td class="num">+10</td><td class="num">−10</td><td>A</td></tr>
+        <tr><td>Replacement B issued</td><td class="num">+10</td><td class="num">+10</td><td class="num">−10</td><td>B</td></tr>
+        <tr><td>Fair settlement</td><td class="num">0</td><td class="num">+10</td><td class="num">−10</td><td>B</td></tr>
+        <tr><td>What Remove does to A</td><td class="num">0</td><td class="num">+10</td><td class="num">0</td><td>B</td></tr>
+      </tbody>
+    </table>
+    <p>The confirm dialog makes this worse. If <code>claimerId</code> is set, it always says both people get a reversing entry. On a replacement voucher the claimer's net is 0, so they get nothing, lose B, and the original −10 stays. Removing the replacement strands them. Removing the original pays them and lets them keep B.</p>
+    <p>Manual report deductions never get a <code>voucherId</code> (<code>deductUserCoins</code>), so Remove cannot see them and will not undo them. A "Reports" deduction plus Remove is two punishments.</p>
+    <div class="fix">
+      <p><strong>Fix</strong></p>
+      <p>Treat Remove as a tombstone so the barcode cannot be uploaded again. Reverse coins only for value that is still unsettled on this voucher. If the claimer already holds <code>replacementVoucherId</code>, their original spend stays spent. Say the actual coin deltas in the confirm dialog, including "no coin change".</p>
+    </div>
+  </article>
+
+  <article class="issue" id="i4">
+    <p class="meta"><span class="sev p0">P0</span> · sticker price, not the ledger · user return and Make Available</p>
+    <h3>4. Returning a replacement pays the claim cost, even when the spend lives on a different voucher</h3>
+    <p><code>returnClaimedVoucher</code> and <code>reverseClaim</code> add <code>CLAIM_COSTS[type]</code>. They do not read the ledger. For a normal claim that matches the one <code>claim_spend</code> row, and the status guard stops a second refund. That path is fine.</p>
+    <p>A replacement is <code>claimed</code>, shows in My Claims, and shows a coin value of 10. "Return to pool" adds 10. That is fair when the original spend is still outstanding: −10 on A, +10 on B, net zero, B back in the pool.</p>
+    <p>It is a mint when the original was also refunded (issue 1), or when an admin then presses Make Available on B as well. Make Available is the same flat credit, under the name <code>claim_reversed</code>.</p>
+    <div class="fix">
+      <p><strong>Fix</strong></p>
+      <p>Refund the unsettled net for this claim, once. A replacement's unsettled net is 0 unless you deliberately want "return B" to unwind the original spend. If you do, unwind that original row, and mark both vouchers settled so a later refund cannot fire.</p>
+    </div>
+  </article>
+
+  <article class="issue" id="i5">
+    <p class="meta"><span class="sev p1">P1</span> · the structural hole · every bad voucher</p>
+    <h3>5. The uploader keeps the reward unless they confess</h3>
+    <p>The claimer is offered a refund or a replacement immediately, before the uploader answers. <code>confirmUploaderUsedVoucher</code> is the only automatic clawback. It subtracts <code>UPLOAD_REWARDS[type]</code> and sets the report outcome to <code>uploader_admitted</code>, which drops the report out of the counts.</p>
+    <p><code>recordUploaderDenied</code> writes a 0-coin <code>uploader_denied</code> row, sets that outcome, and leaves the reward in place. Silence does the same: the report stays <code>open</code> and the reward stays. Admin "Expire &amp; Clear" and "Available &amp; Clear" also leave both balances alone.</p>
+    <table>
+      <caption class="note">Claimer already refunded. Uploader does not admit.</caption>
+      <thead>
+        <tr><th></th><th class="num">Uploader</th><th class="num">Claimer</th><th>Voucher</th><th class="num">Supply vs a clean unused upload</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Uploaded, claimed, refunded, denied or ignored</td><td class="num">+10</td><td class="num">0</td><td>Dead</td><td class="num">+10</td></tr>
+        <tr><td>Same, but they got a replacement from B</td><td class="num">+10</td><td class="num">−10</td><td>A dead, holds B</td><td class="num">+10</td></tr>
+      </tbody>
+    </table>
+    <p>Each bad voucher that is not confessed mints its reward for good. A chain of reported replacements mints one reward per link. The claimer is whole. The supply is not.</p>
+    <p>Admit itself is not guarded. The mutation does not check status. A second delivery, or a double tap before the button disappears, subtracts the reward again. Deny and admit can also race: the last write wins the status, and the deduction still happens.</p>
+    <div class="fix">
+      <p><strong>Fix</strong></p>
+      <p>Decide the policy in one place. If the claimer was made whole, claw the upload reward once, unless an admin explicitly says the report was false. Record <code>uploaderClawback</code> on the voucher or report and refuse a second one. Denial can dispute that, but it should be a recorded decision, not a silent keep.</p>
+    </div>
+  </article>
+
+  <article class="issue" id="i6">
+    <p class="meta"><span class="sev p1">P1</span> · stacks on top of other penalties · admin upload card</p>
+    <h3>6. "Expire &amp; Deduct" takes the sticker reward again, on almost any status</h3>
+    <p><code>expireVoucherAndDeductCoins</code> rejects only <code>expired</code>. The button is hidden for <code>removed</code> and <code>expired</code>, and shown for everything else: available, claimed, reported, invalidated, <code>uploader_admitted_used</code>, <code>uploader_denied</code>. It always subtracts the full upload reward. It does not read <code>self_invalidated</code>, <code>uploader_refund</code>, or an earlier admin deduction. It does not refund the claimer, clear <code>claimerId</code>, or close the report.</p>
+    <p>There is no confirm dialog. One click.</p>
+    <p>Worked case. Uploader admits (−10, balance back to where it was before the upload). They still have other coins. Admin then presses Expire &amp; Deduct. Another −10 leaves the account. The report row stays <code>open</code> if they had not admitted, or stays admitted while the voucher is now <code>expired</code>. The user page still shows the report, and the stat counter may already have dropped it.</p>
+    <p>The other face of the same button: the cron expires unused vouchers and lets the uploader keep the reward. Once status is <code>expired</code>, Expire &amp; Deduct throws and the button disappears. The penalty path vanishes for the vouchers the cron already retired. Remove is still there, and Remove will claw that reward, because the ledger net is still +10.</p>
+    <p>The mutation returns <code>deductedAmount</code> as the full reward even when the balance floor reduced it. The screen ignores the return value today. A caller that displayed it would overstate the deduction.</p>
+    <div class="fix">
+      <p><strong>Fix</strong></p>
+      <p>Split the button. "Mark expired" only changes status. "Claw back upload reward" runs once, for the unsettled reward, and shows the real amount. Hide it when a clawback row already exists. Confirm before either write. Leave the cron's "keep the reward on natural expiry" as its own rule, and say so on vouchers the cron already expired.</p>
+    </div>
+  </article>
+
+  <article class="issue" id="i7">
+    <p class="meta"><span class="sev p1">P1</span> · pool status and coins disagree · report cards</p>
+    <h3>7. "Available &amp; Clear" puts the voucher back on the shelf without settling either person</h3>
+    <p><code>clearReportAndUpdateVoucher</code> sets the voucher to <code>expired</code> or <code>available</code>, sets the report outcome to <code>admin_cleared</code>, and recounts. It does not change coins. It does not clear <code>claimerId</code> or <code>claimedAt</code>. It can be run again and flip the status back.</p>
+    <p>"Expire &amp; Clear" and "Expire &amp; Deduct" share the word expire. One takes coins. The other does not.</p>
+    <p>After Available &amp; Clear the voucher matches <code>requestVoucher</code>'s query (<code>status === "available"</code>, expiry still in the future). The next person can be charged for it. The original claimer id is still on the row until that claim overwrites it, so it still counts toward the original claimer's 5-a-day limit. Their Telegram photo of the barcode is still on their phone. If they were already refunded, they have the coins and the barcode, and someone else is about to pay for the same barcode.</p>
+    <p>The report then drops out of the counts. The header stat goes down. The tab still lists the card, with no outcome on it, because <code>getUserDetails</code> does not return <code>outcome</code>, <code>resolvedAt</code>, or <code>replacementVoucherId</code>.</p>
+    <div class="fix">
+      <p><strong>Fix</strong></p>
+      <p>Split into "Dismiss report" (outcome only) and "Put back in the pool". The pool action clears <code>claimerId</code> and <code>claimedAt</code>, and it should refuse while the claimer is unpaid and still the holder, or while they were refunded and the barcode may still be live. Show the outcome on the card so a cleared report is obvious.</p>
+    </div>
+  </article>
+
+  <article class="issue" id="i8">
+    <p class="meta"><span class="sev p1">P1</span> · admin claimed tab</p>
+    <h3>8. "Make Available" is a refund button shown on rows it cannot refund</h3>
+    <p>The Claimed tab lists every voucher with this user as <code>claimerId</code>, whatever the status. Reported, expired, removed, admitted, denied, and a voucher put back in the pool by Available &amp; Clear all appear. Every card gets Make Available.</p>
+    <p><code>reverseClaim</code> requires <code>status === "claimed"</code>. On a reported voucher the mutation throws. The page never reads <code>isError</code> for this mutation, or for expire, remove, or clear. The click ends and the card looks unchanged.</p>
+    <p>When it does work, there is no confirm, and the label does not say that coins move. On a plain claim the amount is right. On a replacement it is the mint in issue 4.</p>
+    <div class="fix">
+      <p><strong>Fix</strong></p>
+      <p>Show the button only for <code>claimed</code>. Label it "Return to pool and refund N coins", with N taken from the unsettled spend. Confirm. Show the error if the mutation throws. Other statuses need their own actions, or no action.</p>
+    </div>
+  </article>
+
+  <article class="issue" id="i9">
+    <p class="meta"><span class="sev p1">P1</span> · the floor hides unpaid penalties</p>
+    <h3>9. A short balance turns a full penalty into a smaller one, and then forgets the rest</h3>
+    <p><code>applyCoinDelta</code> floors at 0 and stores the smaller delta. The user's balance still matches their ledger. The voucher can still be fully killed.</p>
+    <p>The floor on "I used this" is intentional (<span class="file">docs/superpowers/specs/2026-05-25-self-invalidate-voucher-design.md</span>). The hole is what happens around it. The confirm says the full coin value will be deducted. If they uploaded a €5 (15 coins), spent those coins on other claims, and then mark the upload used, the ledger writes 0, the voucher leaves the pool, and nothing records the 15 that was not collected. Expire &amp; Deduct on that same voucher will try to take 15 again later, from whatever they have earned since.</p>
+    <p>Admin Expire &amp; Deduct uses the same floor and does not warn. The manual deduct form is the only place that blocks an amount above the balance.</p>
+    <div class="fix">
+      <p><strong>Fix</strong></p>
+      <p>Either refuse the action unless the full amount can be taken, or store the uncollected remainder on the voucher and block further claims until it is paid. Stop issuing a second full penalty on top of a partial one. Tell the user the amount that will actually move.</p>
+    </div>
+  </article>
+
+  <article class="issue" id="i10">
+    <p class="meta"><span class="sev p1">P1</span> · admin analytics and the user transaction list</p>
+    <h3>10. The reports of these actions are mislabeled, and they count rows rather than coins</h3>
+    <p><code>getTransactionTotalsByType</code> counts transactions. The analytics stat says that number is "coins moved between users". Coins are not moved between users. Upload and signup create them. Claims and penalties destroy them. Refunds create them again. A lot of the rows are amount 0 (<code>replacement_received</code>, <code>uploader_denied</code>, and clamped deductions that moved nothing).</p>
+    <p>The labels in <span class="file">apps/web/src/routes/admin/analytics.tsx</span> are swapped:</p>
+    <table>
+      <thead>
+        <tr><th>Stored type</th><th>Who writes it</th><th>Label on the analytics page</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>claim_returned</code></td><td>User, "Return to pool"</td><td>Admin claim returned</td></tr>
+        <tr><td><code>claim_reversed</code></td><td>Admin, "Make Available"</td><td>User returned</td></tr>
+      </tbody>
+    </table>
+    <p><code>uploader_refund</code> is a deduction (the uploader admitted they used it). The analytics label is "Uploader refund", and the user app falls through to the same words. It reads like money given back. The amount is negative, which is the only clue.</p>
+    <p><code>report_refund</code> is labeled in both UIs and never written.</p>
+    <p>The user app shows the last 25 rows (<code>getTransactionHistory</code>). A balance cannot be rebuilt from that list. The admin user page does load the full ledger, then mixes it with report rows that have no outcome and no link to the voucher's settlement. A refund, a 0-coin replacement, and a report on the same voucher look like three unrelated events.</p>
+    <p>The stat chips use <code>uploadReportCount</code> and <code>claimReportCount</code>, which skip <code>admin_cleared</code> and <code>uploader_admitted</code>. The tab badges count every report row. The two numbers disagree, and the cards do not say why.</p>
+    <div class="fix">
+      <p><strong>Fix</strong></p>
+      <p>Show count and sum of <code>amount</code> separately. Drop 0-coin markers from the money chart, or put them in an events chart. Swap the two claim labels back. Rename <code>uploader_refund</code> in the UI to something like "Upload reward taken back". On the user page, group by voucher: report outcome, claimer settlement, uploader clawback, net coins.</p>
+    </div>
+  </article>
+
+  <article class="issue" id="i11">
+    <p class="meta"><span class="sev p2">P2</span> · stats drift if the backfill is run</p>
+    <h3>11. Recounting users from scratch undoes Remove</h3>
+    <p><code>backfillUserStats</code> increments <code>uploadCount</code> for every voucher row, including <code>removed</code>, and increments <code>claimCount</code> whenever <code>claimerId</code> is set. Remove decrements those counters and leaves <code>claimerId</code> in place. A later backfill puts the removed voucher back into both counts. Refunded reports also keep <code>claimerId</code>, so they stay in the claim count, which may be what you want for "they did claim it" and is not what Remove just recorded.</p>
+    <div class="fix">
+      <p><strong>Fix</strong></p>
+      <p>Define the counters once. If Remove means "this upload no longer counts", the backfill has to skip <code>removed</code>. If a refunded claim still counts, say that, and stop decrementing it in one path and not the other (<code>refundFailedClaimDelivery</code> and user return decrement; a report refund does not).</p>
+    </div>
+  </article>
+
+  <article class="issue" id="i12">
+    <p class="meta"><span class="sev p2">P2</span> · deduction form</p>
+    <h3>12. "Reports" deduct is a label, not a settlement</h3>
+    <p>The two chips, Reports and Manual, only pick <code>admin_report_deduction</code> or <code>admin_manual_deduction</code>. The amount is free text. The row has no voucher id, does not close any report, and does not reduce <code>uploadReportCount</code>. An admin can deduct "for reports", then Expire &amp; Deduct the same uploads, then Remove them. Each step still looks available.</p>
+    <div class="fix">
+      <p><strong>Fix</strong></p>
+      <p>Keep a free-text manual adjustment, with a note. Build the report penalty as "claw back these vouchers", which uses the once-only clawback from issue 5 and marks those reports.</p>
+    </div>
+  </article>
+
+  <h2 id="buttons">What each admin button actually does</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Control</th>
+        <th>Where</th>
+        <th>Coins</th>
+        <th>Voucher and report</th>
+        <th>Guard</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Deduct coins · Reports / Manual</td>
+        <td>User, Transactions</td>
+        <td>Subtracts the typed amount, floored at 0. No voucher id.</td>
+        <td>No report change.</td>
+        <td>UI blocks amount above balance. Confirm dialog. Mutation itself floors.</td>
+      </tr>
+      <tr>
+        <td>Expire &amp; Deduct</td>
+        <td>Uploaded card</td>
+        <td>Subtracts the full upload reward, again, floored at 0.</td>
+        <td>Status <code>expired</code>. Claimer id kept. Report left as it was.</td>
+        <td>Hidden if expired or removed. No confirm. No "already clawed" check.</td>
+      </tr>
+      <tr>
+        <td>Remove &amp; reverse coins</td>
+        <td>Uploaded card</td>
+        <td>Opposite of this voucher's ledger net, per user. Skips nets of 0.</td>
+        <td>Status <code>removed</code>. Barcode kept. Claimer id kept. Counts decremented.</td>
+        <td>Second remove throws. Confirm text overstates who gets coins.</td>
+      </tr>
+      <tr>
+        <td>Make Available</td>
+        <td>Claimed card, every status</td>
+        <td>Adds the claim cost. Type <code>claim_reversed</code>.</td>
+        <td>Status <code>available</code>, claimer cleared, claim count −1.</td>
+        <td>Throws unless status is <code>claimed</code>. No confirm. Error not shown.</td>
+      </tr>
+      <tr>
+        <td>Expire &amp; Clear</td>
+        <td>Both report tabs</td>
+        <td>None.</td>
+        <td>Status <code>expired</code>. Report <code>admin_cleared</code>. Counts drop. Claimer id kept.</td>
+        <td>No confirm. Can be pressed again.</td>
+      </tr>
+      <tr>
+        <td>Available &amp; Clear</td>
+        <td>Both report tabs</td>
+        <td>None.</td>
+        <td>Status <code>available</code>, so it can be claimed again. Report cleared. Claimer id kept.</td>
+        <td>No confirm.</td>
+      </tr>
+      <tr>
+        <td>I used this</td>
+        <td>Mini app, My Uploads</td>
+        <td>Subtracts the upload reward, floored at 0. Type <code>self_invalidated</code>.</td>
+        <td>Status <code>invalidated</code>.</td>
+        <td>Only while <code>available</code>. Confirm promises the full amount.</td>
+      </tr>
+      <tr>
+        <td>Return to pool</td>
+        <td>Mini app, My Claims</td>
+        <td>Adds the claim cost. Type <code>claim_returned</code>.</td>
+        <td>Status <code>available</code>, claimer cleared.</td>
+        <td>Only while <code>claimed</code> and not after 9pm on expiry day. Does not know about replacements.</td>
+      </tr>
+      <tr>
+        <td>Yes, send a replacement / No thanks</td>
+        <td>Telegram, after a report</td>
+        <td>Replacement is free (0-coin row on the new voucher). No thanks adds the claim cost on the old one. Either can run more than once.</td>
+        <td>Original stays <code>reported</code>. Report stays <code>open</code> unless the uploader later answers.</td>
+        <td>Button removal is not atomic with the write.</td>
+      </tr>
+      <tr>
+        <td>Uploader admits / denies</td>
+        <td>Telegram</td>
+        <td>Admit subtracts the upload reward (<code>uploader_refund</code>). Deny writes 0.</td>
+        <td>Admit: <code>uploader_admitted_used</code>, reports stop counting. Deny: <code>uploader_denied</code>, reports still count.</td>
+        <td>No status check. Second admit charges again.</td>
+      </tr>
+      <tr>
+        <td>Nightly expire</td>
+        <td>Cron 01:01 UTC</td>
+        <td>None. Reward kept.</td>
+        <td><code>available</code> and past expiry become <code>expired</code>. Claimed and reported rows are left alone.</td>
+        <td>After this, Expire &amp; Deduct can no longer be pressed.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2 id="shape">A shape for the fix</h2>
+  <p>One settlement per reported claim, written inside the mutation that moves the money.</p>
+  <ul>
+    <li><code>claimerSettlement</code>: <code>none</code>, <code>refunded</code>, or <code>replaced</code> (with the replacement id). A second call returns the first result.</li>
+    <li><code>uploaderClawback</code>: <code>none</code> or the amount actually taken, plus any uncollected remainder. A second clawback does nothing.</li>
+    <li>Pool status is a separate write. It clears <code>claimerId</code> when the voucher goes back out. It does not move coins.</li>
+  </ul>
+  <p>Buttons worth splitting:</p>
+  <ul>
+    <li>Expire &amp; Deduct → "Mark expired" and "Take back the upload reward".</li>
+    <li>Remove &amp; reverse → "Remove from the pool" (tombstone) and, only if something is still unsettled, "Undo the remaining coins", with the real numbers in the confirm.</li>
+    <li>Expire &amp; Clear / Available &amp; Clear → "Dismiss report" and "Put back in the pool".</li>
+    <li>Make Available → one button, only on a live claim, named for the refund it performs.</li>
+    <li>Reports deduct → a chooser of vouchers to claw back, not a free amount with a report-flavoured type.</li>
+  </ul>
+  <p>Replacement selection should call the same helper as a normal claim. Analytics should sum <code>amount</code> and use the labels that match the writers. The user page should show, per voucher, the report outcome and the two settlement fields, so the transaction list is a detail view rather than the only view.</p>
+  <p>Tests to add before changing the writers: second refund is a no-op; refund then replacement is a no-op; replacement cannot be an expired voucher; Remove after a replacement does not pay the claimer; Expire &amp; Deduct after admit does not charge again; Available &amp; Clear does not leave <code>claimerId</code> set; analytics labels match <code>claim_returned</code> and <code>claim_reversed</code>.</p>
+
+  <h2 id="scope">What this audit did not do</h2>
+  <p>This is from the current code and its tests. I did not reconcile production balances, so I cannot say how many live vouchers already have two compensation rows or an unclawed reward. A read-only pass can count those without changing data: users whose transaction sum differs from <code>coins</code>, vouchers with more than one positive refund-like row for the same user, and originals that have both a <code>refund</code> and a replacement.</p>
+  <p>I also left timezone edges alone (report rate-limit midnight versus Irish dates, the 9pm return rule). They are real, and they are not what unbalances the books.</p>
+</main>
+<footer>
+  Sources: <span class="file">packages/backend/src/lib/coinLedger.ts</span>,
+  <span class="file">packages/backend/convex/vouchers.ts</span>,
+  <span class="file">packages/backend/convex/adminVouchers.ts</span>,
+  <span class="file">packages/backend/convex/adminUsers.ts</span>,
+  <span class="file">packages/backend/convex/adminAnalytics.ts</span>,
+  <span class="file">packages/backend/src/telegram/handlers/report.ts</span>,
+  <span class="file">packages/backend/src/telegram/handlers/uploader.ts</span>,
+  <span class="file">apps/web/src/routes/admin/users/$userId.tsx</span>,
+  <span class="file">apps/web/src/routes/admin/analytics.tsx</span>,
+  <span class="file">apps/web/src/routes/app/transactions.tsx</span>.
+  Diagnosis only. No code was changed.
+</footer>
+</body>
+</html>

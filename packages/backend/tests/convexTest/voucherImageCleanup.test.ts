@@ -6,6 +6,7 @@
  */
 
 import { convexTest } from "convex-test";
+import aggregateTest from "@convex-dev/aggregate/test";
 import { describe, expect, test } from "vitest";
 import schema from "../../convex/schema";
 import {
@@ -22,6 +23,7 @@ describe("Voucher Image Cleanup", () => {
 	describe("Marking phase - only marks vouchers with expiryDate 90+ days ago", () => {
 		test("marks voucher expired 91 days ago", async () => {
 			const t = convexTest(schema, modules);
+			aggregateTest.register(t, "voucherAgg");
 			const userId = await createUser(t, { telegramChatId: "111" });
 			const now = Date.now();
 
@@ -42,6 +44,7 @@ describe("Voucher Image Cleanup", () => {
 
 		test("does NOT mark voucher expired 89 days ago", async () => {
 			const t = convexTest(schema, modules);
+			aggregateTest.register(t, "voucherAgg");
 			const userId = await createUser(t, { telegramChatId: "222" });
 			const now = Date.now();
 
@@ -61,6 +64,7 @@ describe("Voucher Image Cleanup", () => {
 
 		test("does NOT mark voucher expired 90 days ago (boundary)", async () => {
 			const t = convexTest(schema, modules);
+			aggregateTest.register(t, "voucherAgg");
 			const userId = await createUser(t, { telegramChatId: "223" });
 			const now = Date.now();
 
@@ -80,6 +84,7 @@ describe("Voucher Image Cleanup", () => {
 
 		test("does NOT mark available voucher expired 100 days ago", async () => {
 			const t = convexTest(schema, modules);
+			aggregateTest.register(t, "voucherAgg");
 			const userId = await createUser(t, { telegramChatId: "333" });
 			const now = Date.now();
 
@@ -99,6 +104,7 @@ describe("Voucher Image Cleanup", () => {
 
 		test("DOES mark claimed voucher expired 100 days ago", async () => {
 			const t = convexTest(schema, modules);
+			aggregateTest.register(t, "voucherAgg");
 			const userId = await createUser(t, { telegramChatId: "444" });
 			const now = Date.now();
 
@@ -119,6 +125,7 @@ describe("Voucher Image Cleanup", () => {
 
 		test("DOES mark uploader_admitted_used voucher expired 100 days ago", async () => {
 			const t = convexTest(schema, modules);
+			aggregateTest.register(t, "voucherAgg");
 			const userId = await createUser(t, { telegramChatId: "445" });
 			const now = Date.now();
 
@@ -139,6 +146,7 @@ describe("Voucher Image Cleanup", () => {
 
 		test("does NOT mark voucher already marked for deletion", async () => {
 			const t = convexTest(schema, modules);
+			aggregateTest.register(t, "voucherAgg");
 			const userId = await createUser(t, { telegramChatId: "555" });
 			const now = Date.now();
 
@@ -164,6 +172,7 @@ describe("Voucher Image Cleanup", () => {
 
 		test("does NOT mark voucher with image already deleted", async () => {
 			const t = convexTest(schema, modules);
+			aggregateTest.register(t, "voucherAgg");
 			const userId = await createUser(t, { telegramChatId: "666" });
 			const now = Date.now();
 
@@ -189,6 +198,7 @@ describe("Voucher Image Cleanup", () => {
 
 		test("mark phase respects batch limit", async () => {
 			const t = convexTest(schema, modules);
+			aggregateTest.register(t, "voucherAgg");
 			const userId = await createUser(t, { telegramChatId: "777" });
 			const now = Date.now();
 
@@ -212,6 +222,7 @@ describe("Voucher Image Cleanup", () => {
 	describe("Deletion phase - only deletes images marked 30+ days ago", () => {
 		test("deletes image marked 31 days ago", async () => {
 			const t = convexTest(schema, modules);
+			aggregateTest.register(t, "voucherAgg");
 			const userId = await createUser(t, { telegramChatId: "888" });
 			const now = Date.now();
 
@@ -243,6 +254,7 @@ describe("Voucher Image Cleanup", () => {
 
 		test("does NOT delete image marked 29 days ago", async () => {
 			const t = convexTest(schema, modules);
+			aggregateTest.register(t, "voucherAgg");
 			const userId = await createUser(t, { telegramChatId: "999" });
 			const now = Date.now();
 
@@ -268,6 +280,7 @@ describe("Voucher Image Cleanup", () => {
 
 		test("does NOT delete image marked 30 days ago (boundary)", async () => {
 			const t = convexTest(schema, modules);
+			aggregateTest.register(t, "voucherAgg");
 			const userId = await createUser(t, { telegramChatId: "990" });
 			const now = Date.now();
 
@@ -293,6 +306,7 @@ describe("Voucher Image Cleanup", () => {
 
 		test("does NOT delete image already deleted", async () => {
 			const t = convexTest(schema, modules);
+			aggregateTest.register(t, "voucherAgg");
 			const userId = await createUser(t, { telegramChatId: "991" });
 			const now = Date.now();
 
@@ -319,6 +333,7 @@ describe("Voucher Image Cleanup", () => {
 
 		test("does NOT delete unmarked voucher", async () => {
 			const t = convexTest(schema, modules);
+			aggregateTest.register(t, "voucherAgg");
 			const userId = await createUser(t, { telegramChatId: "992" });
 			const now = Date.now();
 
@@ -340,6 +355,7 @@ describe("Voucher Image Cleanup", () => {
 	describe("Cross-reference checks prevent deletion", () => {
 		test("skips deletion when another voucher uses same image", async () => {
 			const t = convexTest(schema, modules);
+			aggregateTest.register(t, "voucherAgg");
 			const userId = await createUser(t, { telegramChatId: "993" });
 			const now = Date.now();
 
@@ -384,6 +400,7 @@ describe("Voucher Image Cleanup", () => {
 
 		test("skips deletion when failed upload uses same image", async () => {
 			const t = convexTest(schema, modules);
+			aggregateTest.register(t, "voucherAgg");
 			const userId = await createUser(t, { telegramChatId: "994" });
 			const now = Date.now();
 
@@ -426,6 +443,7 @@ describe("Voucher Image Cleanup", () => {
 	describe("Actual deletion removes image from storage", () => {
 		test("deletes image and sets imageDeletedAt", async () => {
 			const t = convexTest(schema, modules);
+			aggregateTest.register(t, "voucherAgg");
 			const userId = await createUser(t, { telegramChatId: "995" });
 			const now = Date.now();
 
@@ -467,6 +485,7 @@ describe("Voucher Image Cleanup", () => {
 
 		test("marks voucher deleted when storage file is already gone", async () => {
 			const t = convexTest(schema, modules);
+			aggregateTest.register(t, "voucherAgg");
 			const userId = await createUser(t, { telegramChatId: "997" });
 			const now = Date.now();
 
@@ -505,6 +524,7 @@ describe("Voucher Image Cleanup", () => {
 	describe("Marking mutation sets imageMarkedForDeletionAt", () => {
 		test("marks multiple vouchers at once", async () => {
 			const t = convexTest(schema, modules);
+			aggregateTest.register(t, "voucherAgg");
 			const userId = await createUser(t, { telegramChatId: "996" });
 			const now = Date.now();
 

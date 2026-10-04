@@ -3,6 +3,7 @@
  */
 
 import { convexTest } from "convex-test";
+import aggregateTest from "@convex-dev/aggregate/test";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { internal } from "../../convex/_generated/api";
 import schema from "../../convex/schema";
@@ -73,6 +74,7 @@ describe("Reminder Flow", () => {
 		const futureExpiry = now + sevenDaysMs;
 
 		const t = convexTest(schema, modules);
+		aggregateTest.register(t, "voucherAgg");
 
 		const claimerId = await createUser(t, {
 			telegramChatId: "claimer123",
@@ -156,6 +158,7 @@ describe("Reminder Flow", () => {
 		const futureExpiry = now + sevenDaysMs;
 
 		const t = convexTest(schema, modules);
+		aggregateTest.register(t, "voucherAgg");
 
 		const needsReminderId = await createUser(t, {
 			telegramChatId: "needs_reminder",

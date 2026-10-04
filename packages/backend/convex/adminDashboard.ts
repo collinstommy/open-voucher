@@ -1,36 +1,27 @@
 import { v } from "convex/values";
 import { runCleanup } from "../src/lib/voucherImageCleanup";
 import { adminMutation, adminQuery } from "./adminGuards";
+import { voucherAggregate } from "./aggregates";
 import { internalQuery } from "./_generated/server";
 
 export const getStats = adminQuery({
 	args: {},
 	handler: async (ctx) => {
-		const [vouchers, users] = await Promise.all([
-			ctx.db.query("vouchers").collect(),
-			ctx.db.query("users").collect(),
+		const users = await ctx.db.query("users").collect();
+
+		const [five, ten, twenty, claimedCount, totalUploaded] = await Promise.all([
+			voucherAggregate.count(ctx, { bounds: { prefix: ["available", "5"] } }),
+			voucherAggregate.count(ctx, { bounds: { prefix: ["available", "10"] } }),
+			voucherAggregate.count(ctx, { bounds: { prefix: ["available", "20"] } }),
+			voucherAggregate.count(ctx, { bounds: { prefix: ["claimed"] } }),
+			voucherAggregate.count(ctx),
 		]);
 
-		const now = Date.now();
-		const availableVouchers = vouchers.filter(
-			(v) => v.status === "available" && (!v.validFrom || v.validFrom <= now),
-		);
-
-		const vouchersByType = {
-			"5": availableVouchers.filter((v) => v.type === "5").length,
-			"10": availableVouchers.filter((v) => v.type === "10").length,
-			"20": availableVouchers.filter((v) => v.type === "20").length,
-		};
-
-		const claimedCount = vouchers.filter((v) => v.status === "claimed").length;
-		const totalUploaded = vouchers.length;
-		const userCount = users.length;
-
 		return {
-			vouchersByType,
+			vouchersByType: { "5": five, "10": ten, "20": twenty },
 			claimedCount,
 			totalUploaded,
-			userCount,
+			userCount: users.length,
 		};
 	},
 });
@@ -214,8 +205,10 @@ export const getWeeklyVouchers = adminQuery({
 });
 
 export const getWeeklyUploadAverage = adminQuery({
-	args: {},
-	handler: async (ctx) => {
+	args: {
+		range: v.union(v.literal("recent"), v.literal("all")),
+	},
+	handler: async (ctx, { range }) => {
 		const vouchers = await ctx.db.query("vouchers").collect();
 
 		const weeks = new Map<
@@ -249,14 +242,15 @@ export const getWeeklyUploadAverage = adminQuery({
 			});
 		}
 
-		const sorted = Array.from(weeks.values())
-			.sort((a, b) => a.weekStart.localeCompare(b.weekStart))
-			.slice(-12);
-		const total = sorted.reduce((sum, w) => sum + w.uploaded, 0);
+		const sorted = Array.from(weeks.values()).sort((a, b) =>
+			a.weekStart.localeCompare(b.weekStart),
+		);
+		const scoped = range === "recent" ? sorted.slice(-12) : sorted;
+		const total = scoped.reduce((sum, w) => sum + w.uploaded, 0);
 		const average =
-			sorted.length > 0 ? Math.round((total / sorted.length) * 10) / 10 : 0;
+			scoped.length > 0 ? Math.round((total / scoped.length) * 10) / 10 : 0;
 
-		return { weeks: sorted, average };
+		return { weeks: scoped, average };
 	},
 });
 

@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { applyCoinDelta } from "../src/lib/coinLedger";
 import { reportCountsTowardLimits } from "../src/lib/reportOutcome";
+import { trackVoucherDelete } from "./aggregates";
 import { internalMutation, internalQuery } from "./_generated/server";
 import { adminMutation, adminQuery } from "./adminGuards";
 
@@ -548,6 +549,7 @@ export const clearUserData = internalMutation({
 			.collect();
 
 		for (const voucher of uploadedVouchers) {
+			await trackVoucherDelete(ctx, voucher);
 			await ctx.db.delete(voucher._id);
 		}
 
@@ -557,6 +559,7 @@ export const clearUserData = internalMutation({
 			.collect();
 
 		for (const voucher of claimedVouchers) {
+			await trackVoucherDelete(ctx, voucher);
 			await ctx.db.delete(voucher._id);
 		}
 

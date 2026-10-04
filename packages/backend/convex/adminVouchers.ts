@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { applyCoinDelta } from "../src/lib/coinLedger";
 import { CLAIM_COSTS, UPLOAD_REWARDS } from "../src/lib/constants";
 import { recalculateReportCounts } from "../src/lib/reportCounts";
+import { trackVoucherPatch } from "./aggregates";
 import type { Id } from "./_generated/dataModel";
 import { adminMutation, adminQuery } from "./adminGuards";
 
@@ -99,6 +100,7 @@ export const expireVoucherAndDeductCoins = adminMutation({
 		const deductionAmount = UPLOAD_REWARDS[voucher.type] ?? 0;
 
 		await ctx.db.patch(voucherId, { status: "expired" });
+		await trackVoucherPatch(ctx, voucherId, voucher);
 
 		const { newBalance } = await applyCoinDelta(ctx, {
 			userId: voucher.uploaderId,
@@ -158,6 +160,7 @@ export const removeVoucherAndReverseCoins = adminMutation({
 		}
 
 		await ctx.db.patch(voucherId, { status: "removed" });
+		await trackVoucherPatch(ctx, voucherId, voucher);
 
 		const uploader = await ctx.db.get(voucher.uploaderId);
 		if (uploader) {
@@ -208,6 +211,7 @@ export const reverseClaim = adminMutation({
 			claimerId: undefined,
 			claimedAt: undefined,
 		});
+		await trackVoucherPatch(ctx, voucherId, voucher);
 
 		const { newBalance } = await applyCoinDelta(ctx, {
 			userId: voucher.claimerId,
@@ -245,6 +249,7 @@ export const clearReportAndUpdateVoucher = adminMutation({
 		}
 
 		await ctx.db.patch(report.voucherId, { status: newVoucherStatus });
+		await trackVoucherPatch(ctx, report.voucherId, voucher);
 
 		await ctx.db.patch(reportId, {
 			outcome: "admin_cleared",

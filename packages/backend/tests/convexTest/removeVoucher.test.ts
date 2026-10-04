@@ -1,4 +1,5 @@
 import { convexTest } from "convex-test";
+import aggregateTest from "@convex-dev/aggregate/test";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
@@ -35,6 +36,7 @@ describe("removeVoucherAndReverseCoins", () => {
 
 	test("reverses the upload reward and hides the voucher from the uploader", async () => {
 		const t = convexTest(schema, modules);
+		aggregateTest.register(t, "voucherAgg");
 		const uploaderId = await createUser(t, {
 			telegramChatId: "uploader",
 			coins: 10,
@@ -85,6 +87,7 @@ describe("removeVoucherAndReverseCoins", () => {
 
 	test("puts the claimer's spend back as well", async () => {
 		const t = convexTest(schema, modules);
+		aggregateTest.register(t, "voucherAgg");
 		const uploaderId = await createUser(t, {
 			telegramChatId: "uploader",
 			coins: 10,
@@ -140,6 +143,7 @@ describe("removeVoucherAndReverseCoins", () => {
 
 	test("does not deduct the uploader again when expiry already took the reward", async () => {
 		const t = convexTest(schema, modules);
+		aggregateTest.register(t, "voucherAgg");
 		const uploaderId = await createUser(t, {
 			telegramChatId: "uploader",
 			coins: 0,
@@ -174,6 +178,7 @@ describe("removeVoucherAndReverseCoins", () => {
 
 	test("rejects a second removal", async () => {
 		const t = convexTest(schema, modules);
+		aggregateTest.register(t, "voucherAgg");
 		const uploaderId = await createUser(t, {
 			telegramChatId: "uploader",
 			coins: 0,

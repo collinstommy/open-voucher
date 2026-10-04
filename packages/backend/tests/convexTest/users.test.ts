@@ -3,6 +3,7 @@
  */
 
 import { convexTest } from "convex-test";
+import aggregateTest from "@convex-dev/aggregate/test";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { internal } from "../../convex/_generated/api";
 import schema from "../../convex/schema";
@@ -72,6 +73,7 @@ describe("User Signup Flow", () => {
 
 	test("new user is created via Telegram message", async () => {
 		const t = convexTest(schema, modules);
+		aggregateTest.register(t, "voucherAgg");
 		const chatId = "123456789";
 		const username = "testuser";
 		const firstName = "Test";
@@ -103,6 +105,7 @@ describe("User Signup Flow", () => {
 
 	test("existing user is recognized and redirected properly", async () => {
 		const t = convexTest(schema, modules);
+		aggregateTest.register(t, "voucherAgg");
 		const chatId = "987654321";
 		const username = "existinguser";
 
@@ -137,6 +140,7 @@ describe("User Signup Flow", () => {
 
 	test("user receives signup bonus and transaction is recorded", async () => {
 		const t = convexTest(schema, modules);
+		aggregateTest.register(t, "voucherAgg");
 		const chatId = "111222333";
 		const SIGNUP_BONUS = 10; // Matches constants.ts
 
@@ -176,6 +180,7 @@ describe("User Signup Flow", () => {
 
 	test("onboarding step is set after signup", async () => {
 		const t = convexTest(schema, modules);
+		aggregateTest.register(t, "voucherAgg");
 		const chatId = "333444555";
 
 		await t.action(internal.telegram.handleTelegramMessage, {
@@ -194,6 +199,7 @@ describe("User Signup Flow", () => {
 
 	test("multiple new users can sign up independently", async () => {
 		const t = convexTest(schema, modules);
+		aggregateTest.register(t, "voucherAgg");
 
 		await t.action(internal.telegram.handleTelegramMessage, {
 			message: createTelegramMessage({ text: "/start", chatId: "user1" }),
@@ -217,6 +223,7 @@ describe("User Signup Flow", () => {
 
 	test("returns existing user data when creating duplicate user", async () => {
 		const t = convexTest(schema, modules);
+		aggregateTest.register(t, "voucherAgg");
 		const chatId = "duplicate123";
 
 		const result1 = await t.mutation(internal.users.createUser, {

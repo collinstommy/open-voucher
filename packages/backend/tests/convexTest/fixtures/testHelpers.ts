@@ -1,3 +1,4 @@
+import { voucherAggregate } from "../../../convex/aggregates";
 import type { Id } from "../../../convex/_generated/dataModel";
 
 export interface MockGeminiParams {
@@ -197,7 +198,14 @@ export async function createUser(
 export interface CreateVoucherParams {
 	type: string;
 	uploaderId: Id<"users">;
-	status?: "available" | "claimed" | "processing" | "expired" | "uploader_admitted_used" | "uploader_denied" | "reported";
+	status?:
+		| "available"
+		| "claimed"
+		| "processing"
+		| "expired"
+		| "uploader_admitted_used"
+		| "uploader_denied"
+		| "reported";
 	imageStorageId?: Id<"_storage">;
 	expiryDate?: number;
 	validFrom?: number;
@@ -212,7 +220,7 @@ export async function createVoucher(
 	params: CreateVoucherParams,
 ): Promise<Id<"vouchers">> {
 	return await t.run(async (ctx: any) => {
-		return await ctx.db.insert("vouchers", {
+		const voucherId = await ctx.db.insert("vouchers", {
 			type: params.type,
 			status: params.status ?? "available",
 			imageStorageId:
@@ -225,6 +233,9 @@ export async function createVoucher(
 			claimerId: params.claimerId,
 			createdAt: params.createdAt ?? Date.now(),
 		});
+		const doc = await ctx.db.get(voucherId);
+		await voucherAggregate.insertIfDoesNotExist(ctx, doc);
+		return voucherId;
 	});
 }
 

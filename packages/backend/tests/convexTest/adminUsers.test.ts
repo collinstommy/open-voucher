@@ -3,6 +3,7 @@
  */
 
 import { convexTest } from "convex-test";
+import aggregateTest from "@convex-dev/aggregate/test";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { api } from "../../convex/_generated/api";
 import schema from "../../convex/schema";
@@ -20,6 +21,7 @@ describe("deductUserCoins", () => {
 
 	test("deducts coins and records a ledger transaction atomically", async () => {
 		const t = convexTest(schema, modules);
+		aggregateTest.register(t, "voucherAgg");
 		const userId = await createUser(t, {
 			telegramChatId: "deduct1",
 			coins: 50,
@@ -59,6 +61,7 @@ describe("deductUserCoins", () => {
 
 	test("clamps the balance at MIN_COINS and records the effective deduction", async () => {
 		const t = convexTest(schema, modules);
+		aggregateTest.register(t, "voucherAgg");
 		const userId = await createUser(t, {
 			telegramChatId: "deduct2",
 			coins: 5,
@@ -93,6 +96,7 @@ describe("deductUserCoins", () => {
 
 	test("rejects zero or negative amounts", async () => {
 		const t = convexTest(schema, modules);
+		aggregateTest.register(t, "voucherAgg");
 		const userId = await createUser(t, {
 			telegramChatId: "deduct3",
 			coins: 10,
@@ -120,6 +124,7 @@ describe("deductUserCoins", () => {
 
 	test("rejects non-integer amounts without changing balance", async () => {
 		const t = convexTest(schema, modules);
+		aggregateTest.register(t, "voucherAgg");
 		const userId = await createUser(t, {
 			telegramChatId: "deduct4",
 			coins: 10,
@@ -143,6 +148,7 @@ describe("deductUserCoins", () => {
 
 	test("throws when the user does not exist", async () => {
 		const t = convexTest(schema, modules);
+		aggregateTest.register(t, "voucherAgg");
 		const userId = await createUser(t, {
 			telegramChatId: "deduct5",
 			coins: 10,
@@ -166,6 +172,7 @@ describe("deductUserCoins", () => {
 
 	test("requires a valid admin session", async () => {
 		const t = convexTest(schema, modules);
+		aggregateTest.register(t, "voucherAgg");
 		const userId = await createUser(t, {
 			telegramChatId: "deduct6",
 			coins: 10,
@@ -183,6 +190,7 @@ describe("deductUserCoins", () => {
 
 	test("records a reports deduction with the admin_report_deduction type", async () => {
 		const t = convexTest(schema, modules);
+		aggregateTest.register(t, "voucherAgg");
 		const userId = await createUser(t, {
 			telegramChatId: "deduct7",
 			coins: 30,
@@ -218,6 +226,7 @@ describe("deductUserCoins", () => {
 
 	test("rejects an unknown deduction type", async () => {
 		const t = convexTest(schema, modules);
+		aggregateTest.register(t, "voucherAgg");
 		const userId = await createUser(t, {
 			telegramChatId: "deduct8",
 			coins: 10,

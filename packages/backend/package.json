@@ -26,6 +26,7 @@
 		"vitest": "^4.0.15"
 	},
 	"dependencies": {
+		"@convex-dev/aggregate": "0.2.2",
 		"@telegram-apps/init-data-node": "^2.0.10",
 		"convex": "1.42.3",
 		"convex-helpers": "^0.1.108",

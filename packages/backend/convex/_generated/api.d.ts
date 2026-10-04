@@ -17,6 +17,7 @@ import type * as adminGuards from "../adminGuards.js";
 import type * as adminSession from "../adminSession.js";
 import type * as adminUsers from "../adminUsers.js";
 import type * as adminVouchers from "../adminVouchers.js";
+import type * as aggregates from "../aggregates.js";
 import type * as analytics from "../analytics.js";
 import type * as auth from "../auth.js";
 import type * as crons from "../crons.js";
@@ -50,6 +51,7 @@ declare const fullApi: ApiFromModules<{
   adminSession: typeof adminSession;
   adminUsers: typeof adminUsers;
   adminVouchers: typeof adminVouchers;
+  aggregates: typeof aggregates;
   analytics: typeof analytics;
   auth: typeof auth;
   crons: typeof crons;
@@ -94,4 +96,6 @@ export declare const internal: FilterApi<
   FunctionReference<any, "internal">
 >;
 
-export declare const components: {};
+export declare const components: {
+  voucherAgg: import("@convex-dev/aggregate/_generated/component.js").ComponentApi<"voucherAgg">;
+};

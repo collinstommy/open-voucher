@@ -5,6 +5,7 @@ import { applyCoinDelta } from "../src/lib/coinLedger";
 import { CLAIM_COSTS, UPLOAD_REWARDS } from "../src/lib/constants";
 import { recalculateReportCounts } from "../src/lib/reportCounts";
 import { reportCountsTowardLimits } from "../src/lib/reportOutcome";
+import { trackVoucherPatch, voucherAggregate } from "./aggregates";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import {
@@ -179,6 +180,7 @@ export const requestVoucher = internalMutation({
 			claimerId: userId,
 			claimedAt: now,
 		});
+		await trackVoucherPatch(ctx, voucher._id, voucher);
 
 		return {
 			success: true,
@@ -225,6 +227,7 @@ export const refundFailedClaimDelivery = internalMutation({
 			claimerId: undefined,
 			claimedAt: undefined,
 		});
+		await trackVoucherPatch(ctx, voucherId, voucher);
 
 		return { refunded: true, refundAmount };
 	},
@@ -349,6 +352,7 @@ export const reportVoucher = internalMutation({
 		let reportId: Id<"reports"> | undefined;
 		if (voucher.status !== "reported") {
 			await ctx.db.patch(voucherId, { status: "reported" });
+			await trackVoucherPatch(ctx, voucherId, voucher);
 			reportId = await ctx.db.insert("reports", {
 				voucherId,
 				reporterId: user._id,
@@ -546,6 +550,7 @@ export const requestReplacement = internalMutation({
 			claimerId: user._id,
 			claimedAt: now,
 		});
+		await trackVoucherPatch(ctx, replacement._id, replacement);
 
 		await ctx.db.patch(user._id, {
 			claimCount: (user.claimCount || 0) + 1,
@@ -594,6 +599,7 @@ export const expireOldVouchers = internalMutation({
 		for (const voucher of availableVouchers) {
 			if (voucher.expiryDate < now) {
 				await ctx.db.patch(voucher._id, { status: "expired" });
+				await trackVoucherPatch(ctx, voucher._id, voucher);
 				console.log(`Expired voucher: ${voucher._id}`);
 				expiredCount++;
 			}
@@ -608,16 +614,13 @@ export const expireOldVouchers = internalMutation({
 });
 
 async function countAvailableVouchersByType(ctx: QueryCtx) {
-	const availableVouchers = await ctx.db
-		.query("vouchers")
-		.withIndex("by_status_type", (q) => q.eq("status", "available"))
-		.collect();
+	const [five, ten, twenty] = await Promise.all([
+		voucherAggregate.count(ctx, { bounds: { prefix: ["available", "5"] } }),
+		voucherAggregate.count(ctx, { bounds: { prefix: ["available", "10"] } }),
+		voucherAggregate.count(ctx, { bounds: { prefix: ["available", "20"] } }),
+	]);
 
-	const counts: Record<string, number> = { "5": 0, "10": 0, "20": 0 };
-	for (const v of availableVouchers) {
-		counts[v.type] = (counts[v.type] || 0) + 1;
-	}
-	return counts;
+	return { "5": five, "10": ten, "20": twenty } as Record<string, number>;
 }
 
 export const getAvailableVoucherCount = internalQuery({
@@ -672,6 +675,7 @@ export const invalidateMyUpload = userMutation({
 			throw new Error("This voucher has already been claimed");
 
 		await ctx.db.patch(voucherId, { status: "invalidated" });
+		await trackVoucherPatch(ctx, voucherId, voucher);
 
 		const deduction = UPLOAD_REWARDS[voucher.type] || 0;
 		const { newBalance } = await applyCoinDelta(ctx, {
@@ -751,6 +755,7 @@ export const returnClaimedVoucher = userMutation({
 			claimerId: undefined,
 			claimedAt: undefined,
 		});
+		await trackVoucherPatch(ctx, voucherId, voucher);
 
 		const user = await ctx.db.get(userId);
 		await applyCoinDelta(ctx, {
@@ -793,6 +798,7 @@ export const confirmUploaderUsedVoucher = internalMutation({
 		});
 
 		await ctx.db.patch(voucherId, { status: "uploader_admitted_used" });
+		await trackVoucherPatch(ctx, voucherId);
 
 		const reports = await ctx.db
 			.query("reports")
@@ -827,6 +833,7 @@ export const recordUploaderDenied = internalMutation({
 	},
 	handler: async (ctx, { uploaderId, voucherId }) => {
 		await ctx.db.patch(voucherId, { status: "uploader_denied" });
+		await trackVoucherPatch(ctx, voucherId);
 
 		const reports = await ctx.db
 			.query("reports")

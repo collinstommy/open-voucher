@@ -58,6 +58,7 @@ function HomeComponent() {
 	const convex = useConvex();
 	const queryClient = useQueryClient();
 	const [range, setRange] = useState<"all" | "30days">("30days");
+	const [uploadRange, setUploadRange] = useState<"recent" | "all">("recent");
 	const [dryRun, setDryRun] = useState(true);
 	const [cleanupResult, setCleanupResult] = useState<CleanupResult | null>(
 		null,
@@ -86,7 +87,7 @@ function HomeComponent() {
 	const weeklyUploadAverage = useQuery(
 		convexQuery(
 			api.adminDashboard.getWeeklyUploadAverage,
-			token ? { token } : "skip",
+			token ? { token, range: uploadRange } : "skip",
 		),
 	);
 
@@ -305,6 +306,23 @@ function HomeComponent() {
 							{uploadWeeks.length}-week average {uploadAverage}/week
 						</span>
 					)}
+					<fieldset className="seg">
+						<legend className="sr-only">Time range</legend>
+						<button
+							type="button"
+							aria-pressed={uploadRange === "recent"}
+							onClick={() => setUploadRange("recent")}
+						>
+							Last 12 weeks
+						</button>
+						<button
+							type="button"
+							aria-pressed={uploadRange === "all"}
+							onClick={() => setUploadRange("all")}
+						>
+							All time
+						</button>
+					</fieldset>
 				</div>
 				{weeklyUploadAverage.isLoading ? (
 					<div className="panel-body">
@@ -375,8 +393,10 @@ function HomeComponent() {
 				{uploadWeeks.length > 0 && (
 					<div className="panel-foot">
 						<span>
-							<b>{uploadAverage}</b> average uploads per week across the
-							last {uploadWeeks.length} weeks
+							<b>{uploadAverage}</b> average uploads per week
+							{uploadRange === "recent"
+								? ` across the last ${uploadWeeks.length} weeks`
+								: " across all time"}
 						</span>
 					</div>
 				)}

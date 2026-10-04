@@ -3,6 +3,7 @@
  */
 
 import { convexTest } from "convex-test";
+import aggregateTest from "@convex-dev/aggregate/test";
 import dayjs from "dayjs";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { api, internal } from "../../convex/_generated/api";
@@ -119,6 +120,7 @@ describe("Report Flow", () => {
 
 	test("rejects reports for vouchers that expired before today", async () => {
 		const t = convexTest(schema, modules);
+		aggregateTest.register(t, "voucherAgg");
 
 		const uploaderId = await createUser(t, {
 			telegramChatId: "uploader_expired_report",
@@ -157,6 +159,7 @@ describe("Report Flow", () => {
 
 	test("allows reports for vouchers expiring today", async () => {
 		const t = convexTest(schema, modules);
+		aggregateTest.register(t, "voucherAgg");
 
 		const uploaderId = await createUser(t, {
 			telegramChatId: "uploader_today_report",
@@ -195,6 +198,7 @@ describe("Report Flow", () => {
 
 	test("requestReplacement refunds coins or records replacement_received", async () => {
 		const t = convexTest(schema, modules);
+		aggregateTest.register(t, "voucherAgg");
 
 		const uploaderId = await createUser(t, {
 			telegramChatId: "uploader123",
@@ -303,6 +307,7 @@ describe("Report Flow", () => {
 
 	test("refundReportedVoucher refunds coins and records transaction", async () => {
 		const t = convexTest(schema, modules);
+		aggregateTest.register(t, "voucherAgg");
 
 		const uploaderId = await createUser(t, {
 			telegramChatId: "uploader999",
@@ -370,6 +375,7 @@ describe("Ban Flow", () => {
 	test("uploader gets flagged when 3 of last 5 uploads reported", async () => {
 		vi.useFakeTimers();
 		const t = convexTest(schema, modules);
+		aggregateTest.register(t, "voucherAgg");
 		const uploaderChatId = "uploader_ban_test";
 		const reporterChatId = "reporter_test";
 
@@ -440,6 +446,7 @@ describe("Ban Flow", () => {
 	test("banned user gets a ban message when trying to interact", async () => {
 		vi.useFakeTimers();
 		const t = convexTest(schema, modules);
+		aggregateTest.register(t, "voucherAgg");
 		const uploaderChatId = "uploader_ban_test";
 		const reporterChatId = "reporter_test";
 
@@ -491,6 +498,7 @@ describe("Ban Flow Tests", () => {
 	test("reporter flagged when 3+ of last 5 claims are reported", async () => {
 		vi.useFakeTimers();
 		const t = convexTest(schema, modules);
+		aggregateTest.register(t, "voucherAgg");
 		const now = Date.now();
 
 		const uploaderId = await createUser(t, {
@@ -571,6 +579,7 @@ describe("Ban Flow Tests", () => {
 	test("uploader flagged when 3+ of last 5 uploads are reported", async () => {
 		vi.useFakeTimers();
 		const t = convexTest(schema, modules);
+		aggregateTest.register(t, "voucherAgg");
 		const now = Date.now();
 
 		const uploaderId = await createUser(t, {
@@ -635,6 +644,7 @@ describe("Ban Flow Tests", () => {
 	test("high volume uploader (20+ uploads) flagged when 5+ of last 10 uploads are reported", async () => {
 		vi.useFakeTimers();
 		const t = convexTest(schema, modules);
+		aggregateTest.register(t, "voucherAgg");
 		const now = Date.now();
 
 		const uploaderId = await createUser(t, {
@@ -695,6 +705,7 @@ describe("Ban Flow Tests", () => {
 	test("uploader NOT banned when reports come from banned users", async () => {
 		vi.useFakeTimers();
 		const t = convexTest(schema, modules);
+		aggregateTest.register(t, "voucherAgg");
 		const now = Date.now();
 
 		// Create uploader
@@ -758,6 +769,7 @@ describe("Ban Flow Tests", () => {
 	test("uploader admission keeps the report and still flags at threshold", async () => {
 		vi.useFakeTimers();
 		const t = convexTest(schema, modules);
+		aggregateTest.register(t, "voucherAgg");
 		const now = Date.now();
 
 		const uploaderId = await createUser(t, {
@@ -854,6 +866,7 @@ describe("Uploader report callbacks", () => {
 
 	test("sendUploaderReportMessage sends voucher image with barcode suffix", async () => {
 		const t = convexTest(schema, modules);
+		aggregateTest.register(t, "voucherAgg");
 		const uploaderChatId = "uploader_report_photo";
 
 		const uploaderId = await createUser(t, {
@@ -892,6 +905,7 @@ describe("Uploader report callbacks", () => {
 
 	test("uploader_admitted ignores clicks from non-uploader", async () => {
 		const t = convexTest(schema, modules);
+		aggregateTest.register(t, "voucherAgg");
 		const uploaderChatId = "uploader_cb";
 		const attackerChatId = "attacker_cb";
 
@@ -948,6 +962,7 @@ describe("Report Confirmation Flow", () => {
 
 	test("clicking No cancels report and removes inline keyboard", async () => {
 		const t = convexTest(schema, modules);
+		aggregateTest.register(t, "voucherAgg");
 		const chatId = "123456789";
 		const messageId = 100;
 
@@ -1009,6 +1024,7 @@ describe("Report Confirmation Flow", () => {
 
 	test("clicking Yes confirms report and removes inline keyboard", async () => {
 		const t = convexTest(schema, modules);
+		aggregateTest.register(t, "voucherAgg");
 		const chatId = "123456789";
 		const messageId = 100;
 
@@ -1084,6 +1100,7 @@ describe("Review System", () => {
 
 	test("getFlaggedUsers returns only flagged non-banned users", async () => {
 		const t = convexTest(schema, modules);
+		aggregateTest.register(t, "voucherAgg");
 
 		const flaggedUserId = await createUser(t, {
 			telegramChatId: "flagged1",
@@ -1111,6 +1128,7 @@ describe("Review System", () => {
 
 	test("banUser bans user and preserves flag", async () => {
 		const t = convexTest(schema, modules);
+		aggregateTest.register(t, "voucherAgg");
 
 		const userId = await createUser(t, {
 			telegramChatId: "toban",
@@ -1135,6 +1153,7 @@ describe("Review System", () => {
 
 	test("flagForReview flags an unflagged user", async () => {
 		const t = convexTest(schema, modules);
+		aggregateTest.register(t, "voucherAgg");
 
 		const userId = await createUser(t, {
 			telegramChatId: "toflag",
@@ -1156,6 +1175,7 @@ describe("Review System", () => {
 
 	test("unbanUser unbans user and preserves flag", async () => {
 		const t = convexTest(schema, modules);
+		aggregateTest.register(t, "voucherAgg");
 
 		const userId = await createUser(t, {
 			telegramChatId: "tounban",
@@ -1182,6 +1202,7 @@ describe("Review System", () => {
 
 	test("dismissFlag clears flag without banning", async () => {
 		const t = convexTest(schema, modules);
+		aggregateTest.register(t, "voucherAgg");
 
 		const userId = await createUser(t, {
 			telegramChatId: "todismiss",
@@ -1205,6 +1226,7 @@ describe("Review System", () => {
 
 	test("already flagged user is not re-flagged", async () => {
 		const t = convexTest(schema, modules);
+		aggregateTest.register(t, "voucherAgg");
 		const now = Date.now();
 
 		const uploaderId = await createUser(t, {
@@ -1265,6 +1287,7 @@ describe("Report count recalculation", () => {
 
 	test("reportVoucher recalculates both uploader and reporter counts", async () => {
 		const t = convexTest(schema, modules);
+		aggregateTest.register(t, "voucherAgg");
 		const now = Date.now();
 		const uploaderId = await createUser(t, {
 			telegramChatId: "recalc_uploader_1",
@@ -1299,6 +1322,7 @@ describe("Report count recalculation", () => {
 
 	test("type 0 vouchers now count toward uploadReportCount", async () => {
 		const t = convexTest(schema, modules);
+		aggregateTest.register(t, "voucherAgg");
 		const now = Date.now();
 		const uploaderId = await createUser(t, {
 			telegramChatId: "recalc_uploader_type0",
@@ -1331,6 +1355,7 @@ describe("Report count recalculation", () => {
 
 	test("confirmUploaderUsedVoucher keeps the report and drops it from counts", async () => {
 		const t = convexTest(schema, modules);
+		aggregateTest.register(t, "voucherAgg");
 		const now = Date.now();
 		const uploaderId = await createUser(t, {
 			telegramChatId: "recalc_admit_uploader",
@@ -1401,6 +1426,7 @@ describe("Report count recalculation", () => {
 
 	test("recordUploaderDenied keeps the report in the counts", async () => {
 		const t = convexTest(schema, modules);
+		aggregateTest.register(t, "voucherAgg");
 		const now = Date.now();
 		const uploaderId = await createUser(t, {
 			telegramChatId: "recalc_deny_uploader",
@@ -1448,6 +1474,7 @@ describe("Report count recalculation", () => {
 
 	test("clearReportAndUpdateVoucher keeps the report and drops it from counts", async () => {
 		const t = convexTest(schema, modules);
+		aggregateTest.register(t, "voucherAgg");
 		const now = Date.now();
 		vi.stubEnv("ADMIN_PASSWORD", "test-admin-password");
 
@@ -1505,6 +1532,7 @@ describe("Report count recalculation", () => {
 
 	test("multiple reports accumulate and recount correctly", async () => {
 		const t = convexTest(schema, modules);
+		aggregateTest.register(t, "voucherAgg");
 		const now = Date.now();
 		const uploaderId = await createUser(t, {
 			telegramChatId: "recalc_multi_uploader",

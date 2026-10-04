@@ -4,6 +4,7 @@ import { firstMatchingBarcode, stripBarcodeSpaces } from "../src/lib/barcode";
 import { applyCoinDelta } from "../src/lib/coinLedger";
 import { UPLOAD_REWARDS } from "../src/lib/constants";
 import { callGeminiApi } from "../src/lib/gemini";
+import { trackVoucherInsert } from "./aggregates";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import {
@@ -1092,6 +1093,10 @@ export const storeVoucherFromOcr = internalMutation({
 			ocrRawResponse: rawResponse,
 			createdAt: nowMs,
 		});
+		const voucher = await ctx.db.get(voucherId);
+		if (voucher) {
+			await trackVoucherInsert(ctx, voucher);
+		}
 
 		const reward = UPLOAD_REWARDS[type];
 		const { newBalance } = await applyCoinDelta(ctx, {

@@ -1,0 +1,14 @@
+{
+	// Don't watch/index build artifacts — .turbo alone was 152MB of files
+	"files.watcherExclude": {
+		"**/.turbo/**": true,
+		"**/node_modules/**": true,
+		"**/convex/_generated/**": true
+	},
+	"search.exclude": {
+		"**/.turbo": true,
+		"**/node_modules": true,
+		"**/convex/_generated": true,
+		"**/bun.lock": true
+	}
+}

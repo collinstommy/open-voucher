@@ -3,6 +3,8 @@
  */
 
 import { convexTest } from "convex-test";
+import aggregateTest from "@convex-dev/aggregate/test";
+import { voucherAggregate } from "../../convex/aggregates";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { internal } from "../../convex/_generated/api";
 import schema from "../../convex/schema";
@@ -213,6 +215,7 @@ describe("Failed Uploads", () => {
 			vi.useFakeTimers();
 			setupFetchMock("missing_valid_from");
 			const t = convexTest(schema, modules);
+			aggregateTest.register(t, "voucherAgg");
 			const chatId = "123456789";
 
 			// Create user with createUser helper
@@ -261,6 +264,7 @@ describe("Failed Uploads", () => {
 			vi.useFakeTimers();
 			setupFetchMock("invalid_type");
 			const t = convexTest(schema, modules);
+			aggregateTest.register(t, "voucherAgg");
 			const chatId = "111222333";
 
 			const userId = await createUser(t, { telegramChatId: chatId });
@@ -296,6 +300,7 @@ describe("Failed Uploads", () => {
 			vi.useFakeTimers();
 			setupFetchMock("missing_expiry");
 			const t = convexTest(schema, modules);
+			aggregateTest.register(t, "voucherAgg");
 			const chatId = "444555666";
 
 			// Create user with createUser helper
@@ -335,6 +340,7 @@ describe("Failed Uploads", () => {
 			vi.useFakeTimers();
 			setupFetchMock("expired");
 			const t = convexTest(schema, modules);
+			aggregateTest.register(t, "voucherAgg");
 			const chatId = "777888999";
 
 			// Create user with createUser helper
@@ -370,6 +376,7 @@ describe("Failed Uploads", () => {
 			vi.useFakeTimers();
 			setupFetchMock("too_late_today");
 			const t = convexTest(schema, modules);
+			aggregateTest.register(t, "voucherAgg");
 
 			// Set time to 21:30 (9:30 PM)
 			const now = new Date();
@@ -411,6 +418,7 @@ describe("Failed Uploads", () => {
 			vi.useFakeTimers();
 			setupFetchMock("missing_barcode");
 			const t = convexTest(schema, modules);
+			aggregateTest.register(t, "voucherAgg");
 			const chatId = "202020202";
 
 			// Create user with createUser helper
@@ -447,6 +455,7 @@ describe("Failed Uploads", () => {
 			vi.useFakeTimers();
 			setupFetchMock("valid_10");
 			const t = convexTest(schema, modules);
+			aggregateTest.register(t, "voucherAgg");
 			const chatId = "303030303";
 
 			// Create user with createUser helper
@@ -455,7 +464,7 @@ describe("Failed Uploads", () => {
 			// Create existing voucher with same barcode
 			await t.run(async (ctx) => {
 				const futureDate = Date.now() + 14 * 24 * 60 * 60 * 1000;
-				await ctx.db.insert("vouchers", {
+				const voucherId = await ctx.db.insert("vouchers", {
 					type: "10",
 					status: "available",
 					imageStorageId: await ctx.storage.store(new Blob(["old-image"])),
@@ -464,6 +473,10 @@ describe("Failed Uploads", () => {
 					barcodeNumber: "1234567890002", // Same barcode from valid_10 scenario
 					createdAt: Date.now(),
 				});
+				const doc = await ctx.db.get(voucherId);
+				if (doc) {
+					await voucherAggregate.insertIfDoesNotExist(ctx, doc);
+				}
 			});
 
 			const imageStorageId = await t.run(async (ctx) => {
@@ -507,6 +520,7 @@ describe("Failed Uploads", () => {
 			vi.useFakeTimers();
 			setupFetchMock("gemini_api_error");
 			const t = convexTest(schema, modules);
+			aggregateTest.register(t, "voucherAgg");
 			const chatId = "404040404";
 
 			// Create user with createUser helper
@@ -553,6 +567,7 @@ describe("Failed Uploads", () => {
 			vi.useFakeTimers();
 			setupFetchMock("missing_barcode");
 			const t = convexTest(schema, modules);
+			aggregateTest.register(t, "voucherAgg");
 			const chatId = "505050505";
 
 			// Create user with createUser helper
@@ -584,6 +599,7 @@ describe("Failed Uploads", () => {
 			vi.useFakeTimers();
 			setupFetchMock("invalid_type");
 			const t = convexTest(schema, modules);
+			aggregateTest.register(t, "voucherAgg");
 			const chatId = "606060606";
 
 			// Create user with createUser helper
@@ -617,6 +633,7 @@ describe("Failed Uploads", () => {
 			vi.useFakeTimers();
 			setupFetchMock("expired");
 			const t = convexTest(schema, modules);
+			aggregateTest.register(t, "voucherAgg");
 			const chatId = "707070707";
 
 			// Create user with createUser helper
@@ -665,6 +682,7 @@ describe("Failed Uploads", () => {
 			vi.useFakeTimers();
 			setupFetchMock("missing_barcode");
 			const t = convexTest(schema, modules);
+			aggregateTest.register(t, "voucherAgg");
 			const chatId = "808080808";
 
 			// Create user with createUser helper
@@ -698,6 +716,7 @@ describe("Failed Uploads", () => {
 			vi.useFakeTimers();
 			setupFetchMock("three_plus");
 			const t = convexTest(schema, modules);
+			aggregateTest.register(t, "voucherAgg");
 			const chatId = "909090909";
 
 			const userId = await createUser(t, { telegramChatId: chatId });
