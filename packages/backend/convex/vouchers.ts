@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import dayjs from "dayjs";
+import { firstMatchingBarcode } from "../src/lib/barcode";
 import { applyCoinDelta } from "../src/lib/coinLedger";
 import { CLAIM_COSTS, UPLOAD_REWARDS } from "../src/lib/constants";
 import { recalculateReportCounts } from "../src/lib/reportCounts";
@@ -40,10 +41,12 @@ function canReportClaimedVoucher(
 export const getVoucherByBarcode = internalQuery({
 	args: { barcodeNumber: v.string() },
 	handler: async (ctx, { barcodeNumber }) => {
-		return await ctx.db
-			.query("vouchers")
-			.withIndex("by_barcode", (q) => q.eq("barcodeNumber", barcodeNumber))
-			.first();
+		return await firstMatchingBarcode(barcodeNumber, (key) =>
+			ctx.db
+				.query("vouchers")
+				.withIndex("by_barcode", (q) => q.eq("barcodeNumber", key))
+				.first(),
+		);
 	},
 });
 
