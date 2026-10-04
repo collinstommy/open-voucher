@@ -510,9 +510,12 @@ export const requestReplacement = internalMutation({
 				q.eq("status", "available").eq("type", originalVoucher.type),
 			)
 			.filter((q) =>
-				q.or(
-					q.eq(q.field("validFrom"), undefined),
-					q.lte(q.field("validFrom"), now),
+				q.and(
+					q.gt(q.field("expiryDate"), now),
+					q.or(
+						q.eq(q.field("validFrom"), undefined),
+						q.lte(q.field("validFrom"), now),
+					),
 				),
 			)
 			.first();

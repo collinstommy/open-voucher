@@ -295,10 +295,76 @@ describe("Report Flow", () => {
 		expect(replacementTx?.amount).toBe(0);
 		expect(replacementTx?.voucherId).toBe(replacementVoucherId);
 
-		const claimerAfterReplacement = await t.run(async (ctx) =>
-			ctx.db.get(claimerId2),
+	const claimerAfterReplacement = await t.run(async (ctx) =>
+		ctx.db.get(claimerId2),
+	);
+	expect(claimerAfterReplacement?.coins).toBe(10);
+	});
+
+	test("requestReplacement refuses expired vouchers and refunds coins once", async () => {
+		const t = convexTest(schema, modules);
+
+		const uploaderId = await createUser(t, {
+			telegramChatId: "uploader_expired",
+			coins: 10,
+		});
+
+		const claimerId = await createUser(t, {
+			telegramChatId: "claimer_expired",
+			coins: 10,
+		});
+
+		const voucherId = await createVoucher(t, {
+			type: "10",
+			uploaderId,
+			status: "claimed",
+			claimerId,
+			claimedAt: Date.now(),
+		});
+
+		// Only replacement available is already expired.
+		const expiredVoucherId = await createVoucher(t, {
+			type: "10",
+			uploaderId,
+			status: "available",
+			expiryDate: Date.now() - 24 * 60 * 60 * 1000,
+		});
+
+		await t.mutation(internal.vouchers.reportVoucher, {
+			userId: claimerId,
+			voucherId,
+		});
+
+		const result = await t.mutation(internal.vouchers.requestReplacement, {
+			userId: claimerId,
+			originalVoucherId: voucherId,
+		});
+
+		expect(result.status).toBe("refunded");
+
+		const expiredVoucher = await t.run(async (ctx) =>
+			ctx.db.get(expiredVoucherId),
 		);
-		expect(claimerAfterReplacement?.coins).toBe(10);
+		expect(expiredVoucher?.status).toBe("available");
+		expect(expiredVoucher?.claimerId).toBeUndefined();
+
+		const claimer = await t.run(async (ctx) => ctx.db.get(claimerId));
+		expect(claimer?.coins).toBe(20);
+
+		const refundTxs = await t.run(async (ctx) =>
+			ctx.db
+				.query("transactions")
+				.withIndex("by_user", (q) => q.eq("userId", claimerId))
+				.filter((q) =>
+					q.and(
+						q.eq(q.field("type"), "refund"),
+						q.eq(q.field("voucherId"), voucherId),
+					),
+				)
+				.collect(),
+		);
+		expect(refundTxs).toHaveLength(1);
+		expect(refundTxs[0]?.amount).toBe(10);
 	});
 
 	test("refundReportedVoucher refunds coins and records transaction", async () => {
