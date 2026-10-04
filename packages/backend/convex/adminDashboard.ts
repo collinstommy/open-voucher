@@ -213,6 +213,53 @@ export const getWeeklyVouchers = adminQuery({
 	},
 });
 
+export const getWeeklyUploadAverage = adminQuery({
+	args: {},
+	handler: async (ctx) => {
+		const vouchers = await ctx.db.query("vouchers").collect();
+
+		const weeks = new Map<
+			string,
+			{ weekStart: string; label: string; uploaded: number }
+		>();
+
+		for (const v of vouchers) {
+			const monday = getWeekStart(v._creationTime);
+			const key = monday.toISOString().split("T")[0];
+			const existing = weeks.get(key);
+			if (existing) {
+				existing.uploaded++;
+			} else {
+				weeks.set(key, {
+					weekStart: key,
+					label: formatWeekLabel(monday),
+					uploaded: 1,
+				});
+			}
+		}
+
+		const now = Date.now();
+		const currentMonday = getWeekStart(now);
+		const currentKey = currentMonday.toISOString().split("T")[0];
+		if (!weeks.has(currentKey)) {
+			weeks.set(currentKey, {
+				weekStart: currentKey,
+				label: formatWeekLabel(currentMonday),
+				uploaded: 0,
+			});
+		}
+
+		const sorted = Array.from(weeks.values())
+			.sort((a, b) => a.weekStart.localeCompare(b.weekStart))
+			.slice(-12);
+		const total = sorted.reduce((sum, w) => sum + w.uploaded, 0);
+		const average =
+			sorted.length > 0 ? Math.round((total / sorted.length) * 10) / 10 : 0;
+
+		return { weeks: sorted, average };
+	},
+});
+
 export const cleanupExpiredVoucherImages = adminMutation({
 	args: {
 		token: v.string(),

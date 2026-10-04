@@ -8,6 +8,7 @@ import {
 	CartesianGrid,
 	Line,
 	LineChart,
+	ReferenceLine,
 	ResponsiveContainer,
 	Tooltip,
 	XAxis,
@@ -82,6 +83,12 @@ function HomeComponent() {
 			token ? { token } : "skip",
 		),
 	);
+	const weeklyUploadAverage = useQuery(
+		convexQuery(
+			api.adminDashboard.getWeeklyUploadAverage,
+			token ? { token } : "skip",
+		),
+	);
 
 	const cleanupMutation = useMutation({
 		mutationFn: () => {
@@ -127,6 +134,8 @@ function HomeComponent() {
 	const weekClaimed = weekDays.reduce((sum, day) => sum + day.claimed, 0);
 	const growth = userGrowth.data?.data ?? [];
 	const growthLatest = growth.at(-1)?.cumulative ?? 0;
+	const uploadWeeks = weeklyUploadAverage.data?.weeks ?? [];
+	const uploadAverage = weeklyUploadAverage.data?.average ?? 0;
 
 	return (
 		<div className="stack">
@@ -283,6 +292,91 @@ function HomeComponent() {
 							{range === "30days"
 								? "new accounts in the last 30 days"
 								: "accounts in this chart"}
+						</span>
+					</div>
+				)}
+			</section>
+
+			<section className="panel">
+				<div className="panel-head">
+					<h2>Average voucher uploads</h2>
+					{uploadWeeks.length > 0 && (
+						<span className="note">
+							{uploadWeeks.length}-week average {uploadAverage}/week
+						</span>
+					)}
+				</div>
+				{weeklyUploadAverage.isLoading ? (
+					<div className="panel-body">
+						<p className="muted">Loading chart...</p>
+					</div>
+				) : weeklyUploadAverage.error ? (
+					<div className="panel-body">
+						<p className="warn">Error loading chart</p>
+					</div>
+				) : (
+					<div className="chart-wrap">
+						<ResponsiveContainer width="100%" height="100%">
+							<LineChart data={uploadWeeks}>
+								<CartesianGrid
+									stroke="rgba(196,214,236,0.08)"
+									vertical={false}
+								/>
+								<XAxis
+									dataKey="weekStart"
+									tickFormatter={formatDate}
+									stroke="#6C7686"
+									fontSize={12}
+									tickLine={false}
+									axisLine={false}
+									interval="preserveStartEnd"
+								/>
+								<YAxis
+									stroke="#6C7686"
+									fontSize={12}
+									tickLine={false}
+									axisLine={false}
+									width={40}
+									allowDecimals={false}
+								/>
+								<Tooltip
+									contentStyle={{
+										backgroundColor: "#1B2029",
+										border: "1px solid rgba(196,214,236,0.14)",
+										borderRadius: "9px",
+										color: "#E9EDF3",
+									}}
+									labelFormatter={(label) => formatDate(label as string)}
+									formatter={(value) => [value, "Uploads"]}
+								/>
+								<ReferenceLine
+									y={uploadAverage}
+									stroke="#E6B25C"
+									strokeDasharray="6 4"
+									label={{
+										value: `Avg ${uploadAverage}`,
+										fill: "#E6B25C",
+										fontSize: 12,
+										position: "insideTopRight",
+									}}
+								/>
+								<Line
+									type="monotone"
+									dataKey="uploaded"
+									stroke="var(--blue)"
+									strokeWidth={2.2}
+									dot={false}
+									activeDot={{ r: 5, fill: "var(--blue)" }}
+								/>
+							</LineChart>
+						</ResponsiveContainer>
+					</div>
+				)}
+				{uploadWeeks.length > 0 && (
+					<div className="panel-foot">
+						<span>
+							<b>{uploadAverage}</b> average uploads per week across the
+							last {uploadWeeks.length} weeks
 						</span>
 					</div>
 				)}
