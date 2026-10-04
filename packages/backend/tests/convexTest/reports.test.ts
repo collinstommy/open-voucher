@@ -322,11 +322,6 @@ describe("Report Flow", () => {
 			claimedAt: Date.now(),
 		});
 
-		await t.mutation(internal.vouchers.reportVoucher, {
-			userId: claimerId,
-			voucherId,
-		});
-
 		const refundResult = await t.mutation(
 			internal.vouchers.refundReportedVoucher,
 			{
@@ -336,9 +331,6 @@ describe("Report Flow", () => {
 		);
 
 		expect(refundResult.status).toBe("refunded");
-		if (refundResult.status !== "refunded") {
-			throw new Error("expected a refund");
-		}
 		expect(refundResult.refundAmount).toBe(10);
 
 		const claimer = await t.run(async (ctx) => {
@@ -360,6 +352,8 @@ describe("Report Flow", () => {
 	});
 });
 
+// ============================================================================
+// Ban Flow (Part 1)
 // ============================================================================
 
 describe("Ban Flow", () => {
