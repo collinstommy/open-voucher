@@ -322,6 +322,11 @@ describe("Report Flow", () => {
 			claimedAt: Date.now(),
 		});
 
+		await t.mutation(internal.vouchers.reportVoucher, {
+			userId: claimerId,
+			voucherId,
+		});
+
 		const refundResult = await t.mutation(
 			internal.vouchers.refundReportedVoucher,
 			{
@@ -331,6 +336,9 @@ describe("Report Flow", () => {
 		);
 
 		expect(refundResult.status).toBe("refunded");
+		if (refundResult.status !== "refunded") {
+			throw new Error("expected a refund");
+		}
 		expect(refundResult.refundAmount).toBe(10);
 
 		const claimer = await t.run(async (ctx) => {
@@ -349,6 +357,319 @@ describe("Report Flow", () => {
 		);
 		expect(refundTx).toBeTruthy();
 		expect(refundTx?.amount).toBe(10);
+	});
+});
+
+// ============================================================================
+// Report Settlement (once-only)
+// ============================================================================
+
+describe("Report settlement is once-only", () => {
+	async function settleFixture(t: any, coins = 10) {
+		const uploaderId = await createUser(t, {
+			telegramChatId: `settle_uploader_${Math.random()}`,
+		});
+		const claimerId = await createUser(t, {
+			telegramChatId: `settle_claimer_${Math.random()}`,
+			coins,
+		});
+		const voucherId = await createVoucher(t, {
+			type: "10",
+			uploaderId,
+			status: "claimed",
+			claimerId,
+			claimedAt: Date.now(),
+		});
+		await t.mutation(internal.vouchers.reportVoucher, {
+			userId: claimerId,
+			voucherId,
+		});
+		return { uploaderId, claimerId, voucherId };
+	}
+
+	test("a second refund attempt does nothing", async () => {
+		const t = convexTest(schema, modules);
+		const { claimerId, voucherId } = await settleFixture(t, 10);
+
+		const first = await t.mutation(internal.vouchers.refundReportedVoucher, {
+			userId: claimerId,
+			voucherId,
+		});
+		expect(first.status).toBe("refunded");
+
+		const second = await t.mutation(internal.vouchers.refundReportedVoucher, {
+			userId: claimerId,
+			voucherId,
+		});
+		expect(second.status).toBe("already_settled");
+
+		const [claimer, txs, report] = await t.run(async (ctx) => [
+			await ctx.db.get(claimerId),
+			await ctx.db
+				.query("transactions")
+				.withIndex("by_user", (q) => q.eq("userId", claimerId))
+				.collect(),
+			await ctx.db
+				.query("reports")
+				.withIndex("by_voucher", (q) => q.eq("voucherId", voucherId))
+				.first(),
+		]);
+		expect(claimer?.coins).toBe(20);
+		expect(txs.filter((tx: any) => tx.type === "refund")).toHaveLength(1);
+		expect(report?.settlement).toBe("refunded");
+	});
+
+	test("replacement after refund does not hand over a voucher", async () => {
+		const t = convexTest(schema, modules);
+		const { uploaderId, claimerId, voucherId } = await settleFixture(t, 10);
+
+		await t.mutation(internal.vouchers.refundReportedVoucher, {
+			userId: claimerId,
+			voucherId,
+		});
+
+		const spareVoucherId = await createVoucher(t, {
+			type: "10",
+			uploaderId,
+			status: "available",
+		});
+
+		const result = await t.mutation(internal.vouchers.requestReplacement, {
+			userId: claimerId,
+			originalVoucherId: voucherId,
+		});
+		expect(result.status).toBe("already_settled");
+
+		const [spare, claimer] = await t.run(async (ctx) => [
+			await ctx.db.get(spareVoucherId),
+			await ctx.db.get(claimerId),
+		]);
+		expect(spare?.status).toBe("available");
+		expect(claimer?.coins).toBe(20);
+	});
+
+	test("a second replacement attempt does nothing", async () => {
+		const t = convexTest(schema, modules);
+		const { uploaderId, claimerId, voucherId } = await settleFixture(t, 10);
+
+		const firstSpareId = await createVoucher(t, {
+			type: "10",
+			uploaderId,
+			status: "available",
+		});
+		const secondSpareId = await createVoucher(t, {
+			type: "10",
+			uploaderId,
+			status: "available",
+		});
+
+		const first = await t.mutation(internal.vouchers.requestReplacement, {
+			userId: claimerId,
+			originalVoucherId: voucherId,
+		});
+		expect(first.status).toBe("replaced");
+
+		const second = await t.mutation(internal.vouchers.requestReplacement, {
+			userId: claimerId,
+			originalVoucherId: voucherId,
+		});
+		expect(second.status).toBe("already_settled");
+
+		const [firstSpare, secondSpare, claimer, txs] = await t.run(
+			async (ctx) => [
+				await ctx.db.get(firstSpareId),
+				await ctx.db.get(secondSpareId),
+				await ctx.db.get(claimerId),
+				await ctx.db
+					.query("transactions")
+					.withIndex("by_user", (q) => q.eq("userId", claimerId))
+					.collect(),
+			],
+		);
+		const claimedCount = [firstSpare, secondSpare].filter(
+			(v: any) => v?.status === "claimed",
+		).length;
+		expect(claimedCount).toBe(1);
+		expect(claimer?.coins).toBe(10);
+		expect(
+			txs.filter((tx: any) => tx.type === "replacement_received"),
+		).toHaveLength(1);
+	});
+
+	test("refund after replacement does not refund", async () => {
+		const t = convexTest(schema, modules);
+		const { uploaderId, claimerId, voucherId } = await settleFixture(t, 10);
+
+		await createVoucher(t, {
+			type: "10",
+			uploaderId,
+			status: "available",
+		});
+
+		const first = await t.mutation(internal.vouchers.requestReplacement, {
+			userId: claimerId,
+			originalVoucherId: voucherId,
+		});
+		expect(first.status).toBe("replaced");
+
+		const second = await t.mutation(internal.vouchers.refundReportedVoucher, {
+			userId: claimerId,
+			voucherId,
+		});
+		expect(second.status).toBe("already_settled");
+
+		const [claimer, txs] = await t.run(async (ctx) => [
+			await ctx.db.get(claimerId),
+			await ctx.db
+				.query("transactions")
+				.withIndex("by_user", (q) => q.eq("userId", claimerId))
+				.collect(),
+		]);
+		expect(claimer?.coins).toBe(10);
+		expect(txs.filter((tx: any) => tx.type === "refund")).toHaveLength(0);
+	});
+
+	test("replacement with no stock settles as refunded once", async () => {
+		const t = convexTest(schema, modules);
+		const { claimerId, voucherId } = await settleFixture(t, 10);
+
+		const first = await t.mutation(internal.vouchers.requestReplacement, {
+			userId: claimerId,
+			originalVoucherId: voucherId,
+		});
+		expect(first.status).toBe("refunded");
+
+		const second = await t.mutation(internal.vouchers.requestReplacement, {
+			userId: claimerId,
+			originalVoucherId: voucherId,
+		});
+		expect(second.status).toBe("already_settled");
+
+		const third = await t.mutation(internal.vouchers.refundReportedVoucher, {
+			userId: claimerId,
+			voucherId,
+		});
+		expect(third.status).toBe("already_settled");
+
+		const [claimer, txs, report] = await t.run(async (ctx) => [
+			await ctx.db.get(claimerId),
+			await ctx.db
+				.query("transactions")
+				.withIndex("by_user", (q) => q.eq("userId", claimerId))
+				.collect(),
+			await ctx.db
+				.query("reports")
+				.withIndex("by_voucher", (q) => q.eq("voucherId", voucherId))
+				.first(),
+		]);
+		expect(claimer?.coins).toBe(20);
+		expect(txs.filter((tx: any) => tx.type === "refund")).toHaveLength(1);
+		expect(report?.settlement).toBe("refunded");
+	});
+
+	test("replacement skips expired stock and refunds when only expired remain", async () => {
+		const t = convexTest(schema, modules);
+		const { uploaderId, claimerId, voucherId } = await settleFixture(t, 10);
+
+		const expiredVoucherId = await createVoucher(t, {
+			type: "10",
+			uploaderId,
+			status: "available",
+			expiryDate: Date.now() - 60 * 60 * 1000,
+		});
+
+		const result = await t.mutation(internal.vouchers.requestReplacement, {
+			userId: claimerId,
+			originalVoucherId: voucherId,
+		});
+		expect(result.status).toBe("refunded");
+
+		const [expired, claimer, txs, report] = await t.run(async (ctx) => [
+			await ctx.db.get(expiredVoucherId),
+			await ctx.db.get(claimerId),
+			await ctx.db
+				.query("transactions")
+				.withIndex("by_user", (q) => q.eq("userId", claimerId))
+				.collect(),
+			await ctx.db
+				.query("reports")
+				.withIndex("by_voucher", (q) => q.eq("voucherId", voucherId))
+				.first(),
+		]);
+		expect(expired?.status).toBe("available");
+		expect(claimer?.coins).toBe(20);
+		expect(txs.filter((tx: any) => tx.type === "refund")).toHaveLength(1);
+		expect(
+			txs.filter((tx: any) => tx.type === "replacement_received"),
+		).toHaveLength(0);
+		expect(report?.settlement).toBe("refunded");
+	});
+
+	test("replacement picks the soonest-expiring qualifying voucher", async () => {
+		const t = convexTest(schema, modules);
+		const { uploaderId, claimerId, voucherId } = await settleFixture(t, 10);
+		const now = Date.now();
+
+		await createVoucher(t, {
+			type: "10",
+			uploaderId,
+			status: "available",
+			expiryDate: now - 60 * 60 * 1000,
+		});
+		const laterVoucherId = await createVoucher(t, {
+			type: "10",
+			uploaderId,
+			status: "available",
+			expiryDate: now + 7 * 24 * 60 * 60 * 1000,
+		});
+		const soonerVoucherId = await createVoucher(t, {
+			type: "10",
+			uploaderId,
+			status: "available",
+			expiryDate: now + 24 * 60 * 60 * 1000,
+		});
+
+		const result = await t.mutation(internal.vouchers.requestReplacement, {
+			userId: claimerId,
+			originalVoucherId: voucherId,
+		});
+		expect(result.status).toBe("replaced");
+		if (result.status !== "replaced") throw new Error("expected a replacement");
+		expect(result.voucher._id).toBe(soonerVoucherId);
+
+		const [sooner, later] = await t.run(async (ctx) => [
+			await ctx.db.get(soonerVoucherId),
+			await ctx.db.get(laterVoucherId),
+		]);
+		expect(sooner?.status).toBe("claimed");
+		expect(later?.status).toBe("available");
+	});
+
+	test("only the claimer can settle a report", async () => {
+		const t = convexTest(schema, modules);
+		const { claimerId, voucherId } = await settleFixture(t, 10);
+		const otherId = await createUser(t, {
+			telegramChatId: `settle_other_${Math.random()}`,
+			coins: 50,
+		});
+
+		const result = await t.mutation(internal.vouchers.refundReportedVoucher, {
+			userId: otherId,
+			voucherId,
+		});
+		expect(result.status).toBe("not_yours");
+
+		const [other, claimer, report] = await t.run(async (ctx) => [
+			await ctx.db.get(otherId),
+			await ctx.db.get(claimerId),
+			await ctx.db
+				.query("reports")
+				.withIndex("by_voucher", (q) => q.eq("voucherId", voucherId))
+				.first(),
+		]);
+		expect(other?.coins).toBe(50);
+		expect(claimer?.coins).toBe(10);
+		expect(report?.settlement).toBeUndefined();
 	});
 });
 
@@ -1066,6 +1387,146 @@ describe("Report Confirmation Flow", () => {
 				m.text?.includes("No replacement vouchers available"),
 		);
 		expect(reportMsg).toBeDefined();
+	});
+
+	test("double tap on 'No thanks' refunds only once", async () => {
+		const t = convexTest(schema, modules);
+		const chatId = "222333444";
+
+		const uploaderId = await createUser(t, {
+			telegramChatId: "tap_uploader",
+			coins: 0,
+		});
+		const claimerId = await createUser(t, {
+			telegramChatId: chatId,
+			coins: 10,
+		});
+		const voucherId = await createVoucher(t, {
+			type: "10",
+			uploaderId,
+			status: "claimed",
+			claimerId,
+			claimedAt: Date.now(),
+		});
+
+		const tap = (id: string, data: string) =>
+			t.action(internal.telegram.handleTelegramCallback, {
+				callbackQuery: {
+					id,
+					from: { id: chatId, is_bot: false, first_name: "TestUser" },
+					message: {
+						message_id: 7001,
+						chat: { id: chatId, type: "private" },
+						text: "Here's your €10 voucher!",
+					},
+					data,
+				},
+			});
+
+		await tap("tap_confirm", reportData("report_confirm", String(voucherId)));
+		await tap(
+			"tap_no_1",
+			reportData("report_replacement_no", String(voucherId)),
+		);
+		await tap(
+			"tap_no_2",
+			reportData("report_replacement_no", String(voucherId)),
+		);
+
+		const refundMessages = sentMessages.filter((m) =>
+			m.text?.includes("coins have been refunded"),
+		);
+		expect(refundMessages).toHaveLength(1);
+
+		const claimer = await t.run(async (ctx) => ctx.db.get(claimerId));
+		expect(claimer?.coins).toBe(20);
+
+		const txs = await t.run(async (ctx) =>
+			ctx.db
+				.query("transactions")
+				.withIndex("by_user", (q) => q.eq("userId", claimerId))
+				.collect(),
+		);
+		expect(txs.filter((tx) => tx.type === "refund")).toHaveLength(1);
+	});
+
+	test("double tap on 'Yes, send a replacement' hands over one voucher", async () => {
+		const t = convexTest(schema, modules);
+		const chatId = "555666777";
+
+		const uploaderId = await createUser(t, {
+			telegramChatId: "tap_yes_uploader",
+			coins: 0,
+		});
+		const claimerId = await createUser(t, {
+			telegramChatId: chatId,
+			coins: 10,
+		});
+		const voucherId = await createVoucher(t, {
+			type: "10",
+			uploaderId,
+			status: "claimed",
+			claimerId,
+			claimedAt: Date.now(),
+		});
+		const spareVoucherId = await createVoucher(t, {
+			type: "10",
+			uploaderId,
+			status: "available",
+		});
+		const secondSpareVoucherId = await createVoucher(t, {
+			type: "10",
+			uploaderId,
+			status: "available",
+		});
+
+		const tap = (id: string, data: string) =>
+			t.action(internal.telegram.handleTelegramCallback, {
+				callbackQuery: {
+					id,
+					from: { id: chatId, is_bot: false, first_name: "TestUser" },
+					message: {
+						message_id: 7002,
+						chat: { id: chatId, type: "private" },
+						text: "Here's your €10 voucher!",
+					},
+					data,
+				},
+			});
+
+		await tap("tap_confirm", reportData("report_confirm", String(voucherId)));
+		await tap(
+			"tap_yes_1",
+			reportData("report_replacement_yes", String(voucherId)),
+		);
+		await tap(
+			"tap_yes_2",
+			reportData("report_replacement_yes", String(voucherId)),
+		);
+		// The other button must not pay out on top of the replacement.
+		await tap(
+			"tap_no",
+			reportData("report_replacement_no", String(voucherId)),
+		);
+
+		const replacementMessages = sentPhotos.filter((p) =>
+			p.caption?.includes("Here is a replacement"),
+		);
+		expect(replacementMessages).toHaveLength(1);
+		expect(
+			sentMessages.filter((m) => m.text?.includes("coins have been refunded")),
+		).toHaveLength(0);
+
+		const [spare, secondSpare, claimer] = await t.run(async (ctx) => [
+			await ctx.db.get(spareVoucherId),
+			await ctx.db.get(secondSpareVoucherId),
+			await ctx.db.get(claimerId),
+		]);
+		const claimedCount = [spare, secondSpare].filter(
+			(v) => v?.status === "claimed",
+		).length;
+		expect(claimedCount).toBe(1);
+		expect(claimer?.coins).toBe(10);
 	});
 });
 
