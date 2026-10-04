@@ -37,7 +37,9 @@ export default defineSchema({
 				v.literal("onboarding_tutorial"),
 			),
 		),
-	}).index("by_chat_id", ["telegramChatId"]),
+	})
+		.index("by_chat_id", ["telegramChatId"])
+		.index("by_is_banned", ["isBanned"]),
 
 	messages: defineTable({
 		telegramMessageId: v.number(),

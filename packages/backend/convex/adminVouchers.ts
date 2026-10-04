@@ -30,38 +30,6 @@ export const getImageUploadsSince = internalQuery({
 	},
 });
 
-export const getTodaysVouchers = adminQuery({
-	args: {},
-	handler: async (ctx) => {
-		const now = new Date();
-		const startOfDay = new Date(
-			now.getFullYear(),
-			now.getMonth(),
-			now.getDate(),
-		).getTime();
-
-		const vouchers = await ctx.db
-			.query("vouchers")
-			.filter((q) => q.gte(q.field("createdAt"), startOfDay))
-			.collect();
-
-		const vouchersWithImages = await Promise.all(
-			vouchers.map(async (v) => ({
-				_id: v._id,
-				type: v.type,
-				status: v.status,
-				createdAt: v.createdAt,
-				expiryDate: v.expiryDate,
-				uploaderId: v.uploaderId,
-				claimerId: v.claimerId,
-				imageUrl: await ctx.storage.getUrl(v.imageStorageId),
-			})),
-		);
-
-		return { vouchers: vouchersWithImages };
-	},
-});
-
 export const getAllVouchers = adminQuery({
 	args: {
 		paginationOpts: v.object({

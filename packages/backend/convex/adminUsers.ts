@@ -4,27 +4,6 @@ import { reportCountsTowardLimits } from "../src/lib/reportOutcome";
 import { internalMutation, internalQuery } from "./_generated/server";
 import { adminMutation, adminQuery } from "./adminGuards";
 
-export const getAllUsers = adminQuery({
-	args: {},
-	handler: async (ctx) => {
-		const users = await ctx.db.query("users").collect();
-
-		return {
-			users: users.map((u) => ({
-				_id: u._id,
-				telegramChatId: u.telegramChatId,
-				username: u.username,
-				firstName: u.firstName,
-				coins: u.coins,
-				isBanned: u.isBanned,
-				createdAt: u.createdAt,
-				lastActiveAt: u.lastActiveAt,
-			})),
-			totalCount: users.length,
-		};
-	},
-});
-
 export const banUser = adminMutation({
 	args: {
 		userId: v.id("users"),
@@ -158,7 +137,7 @@ export const getBannedUsers = adminQuery({
 	handler: async (ctx) => {
 		const bannedUsers = await ctx.db
 			.query("users")
-			.filter((q) => q.eq(q.field("isBanned"), true))
+			.withIndex("by_is_banned", (q) => q.eq("isBanned", true))
 			.collect();
 
 		return await Promise.all(
@@ -191,7 +170,7 @@ export const getBannedUsersInternal = internalQuery({
 	handler: async (ctx) => {
 		const bannedUsers = await ctx.db
 			.query("users")
-			.filter((q) => q.eq(q.field("isBanned"), true))
+			.withIndex("by_is_banned", (q) => q.eq("isBanned", true))
 			.collect();
 
 		return bannedUsers.sort((a, b) => (b.bannedAt || 0) - (a.bannedAt || 0));

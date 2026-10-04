@@ -77,17 +77,6 @@ export const getUserById = internalQuery({
 	},
 });
 
-/**
- * Get all users.
- * Internal query.
- */
-export const getAllUsers = internalQuery({
-	args: {},
-	handler: async (ctx) => {
-		return await ctx.db.query("users").collect();
-	},
-});
-
 export const storeMessage = internalMutation({
 	args: {
 		telegramMessageId: v.number(),
