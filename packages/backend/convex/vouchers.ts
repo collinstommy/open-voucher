@@ -38,6 +38,18 @@ function canReportClaimedVoucher(
 	return getVoucherExpiryCalendarDay(expiryDate) >= getIrishCalendarDay(now);
 }
 
+function pickVoucherFromEarliestDay<
+	T extends { expiryDate: number },
+>(vouchers: T[]): T | undefined {
+	if (vouchers.length === 0) return undefined;
+	const earliestExpiry = Math.min(...vouchers.map((v) => v.expiryDate));
+	const earliestDay = Math.floor(earliestExpiry / 86_400_000);
+	const pool = vouchers.filter(
+		(v) => Math.floor(v.expiryDate / 86_400_000) === earliestDay,
+	);
+	return pool[Math.floor(Math.random() * pool.length)];
+}
+
 export const getVoucherByBarcode = internalQuery({
 	args: { barcodeNumber: v.string() },
 	handler: async (ctx, { barcodeNumber }) => {
@@ -152,7 +164,13 @@ export const requestVoucher = internalMutation({
 			};
 		}
 
-		const voucher = vouchers.sort((a, b) => a.expiryDate - b.expiryDate)[0];
+		const voucher = pickVoucherFromEarliestDay(vouchers);
+		if (!voucher) {
+			return {
+				success: false,
+				error: `No €${type} vouchers currently available.`,
+			};
+		}
 
 		const imageUrl = await ctx.storage.getUrl(voucher.imageStorageId);
 		if (!imageUrl) {
@@ -504,7 +522,7 @@ export const requestReplacement = internalMutation({
 
 		const now = Date.now();
 
-		const replacement = await ctx.db
+		const replacements = await ctx.db
 			.query("vouchers")
 			.withIndex("by_status_type", (q) =>
 				q.eq("status", "available").eq("type", originalVoucher.type),
@@ -518,7 +536,8 @@ export const requestReplacement = internalMutation({
 					),
 				),
 			)
-			.first();
+			.collect();
+		const replacement = pickVoucherFromEarliestDay(replacements);
 
 		if (!replacement) {
 			await applyCoinDelta(ctx, {
