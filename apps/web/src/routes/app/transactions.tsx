@@ -23,6 +23,8 @@ function formatType(type: string): string {
 			return "Upload Denied";
 		case "admin_expiry_deduction":
 			return "Deduction (Voucher Expired)";
+		case "admin_removed":
+			return "Voucher removed";
 		case "admin_manual_deduction":
 			return "Admin Deduction";
 		case "admin_report_deduction":

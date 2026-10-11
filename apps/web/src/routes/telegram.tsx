@@ -4,7 +4,7 @@ const BOT_URL = "https://t.me/DunnesVoucherBot";
 
 export const Route = createFileRoute("/telegram")({
 	component: () => (
-		<div className="flex items-center justify-center min-h-screen bg-gray-50 font-[Inter]">
+		<div className="flex items-center justify-center min-h-screen bg-gray-50 font-sans">
 			<div className="text-center">
 				<p className="text-gray-600 text-lg">Opening Telegram…</p>
 				<a

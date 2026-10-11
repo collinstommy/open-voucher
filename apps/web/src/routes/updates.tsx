@@ -21,7 +21,7 @@ export const Route = createFileRoute("/updates")({
 	}),
 
 	component: () => (
-		<div className="bg-gray-50 text-gray-800 flex flex-col min-h-screen font-[Inter]">
+		<div className="bg-gray-50 text-gray-800 flex flex-col min-h-screen font-sans">
 			<LandingNav />
 			<div className="container mx-auto px-6 py-3 bg-white border-t border-gray-200">
 				<nav className="text-sm text-gray-500" aria-label="Breadcrumb">

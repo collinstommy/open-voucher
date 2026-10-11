@@ -1,38 +1,32 @@
 import { v } from "convex/values";
-import { CLAIM_COSTS, UPLOAD_REWARDS } from "../src/lib/constants";
 import { applyCoinDelta } from "../src/lib/coinLedger";
+import { CLAIM_COSTS, UPLOAD_REWARDS } from "../src/lib/constants";
 import { recalculateReportCounts } from "../src/lib/reportCounts";
+import type { Id } from "./_generated/dataModel";
+import { internalQuery } from "./_generated/server";
 import { adminMutation, adminQuery } from "./adminGuards";
 
-export const getTodaysVouchers = adminQuery({
-	args: {},
-	handler: async (ctx) => {
-		const now = new Date();
-		const startOfDay = new Date(
-			now.getFullYear(),
-			now.getMonth(),
-			now.getDate(),
-		).getTime();
-
-		const vouchers = await ctx.db
+/**
+ * Lists voucher images created since `since`, with fresh download URLs.
+ * Backs the incremental image backup in scripts/backup.sh — the CLI runs
+ * it with deployment credentials, and only reads the recent index range.
+ */
+export const getImageUploadsSince = internalQuery({
+	args: { since: v.number() },
+	handler: async (ctx, { since }) => {
+		const rows = await ctx.db
 			.query("vouchers")
-			.filter((q) => q.gte(q.field("createdAt"), startOfDay))
+			.withIndex("by_creation_time", (q) => q.gt("_creationTime", since))
 			.collect();
 
-		const vouchersWithImages = await Promise.all(
-			vouchers.map(async (v) => ({
-				_id: v._id,
-				type: v.type,
-				status: v.status,
-				createdAt: v.createdAt,
-				expiryDate: v.expiryDate,
-				uploaderId: v.uploaderId,
-				claimerId: v.claimerId,
-				imageUrl: await ctx.storage.getUrl(v.imageStorageId),
+		return await Promise.all(
+			rows.map(async (voucher) => ({
+				voucherId: voucher._id,
+				createdAt: voucher.createdAt,
+				imageStorageId: voucher.imageStorageId,
+				url: await ctx.storage.getUrl(voucher.imageStorageId),
 			})),
 		);
-
-		return { vouchers: vouchersWithImages };
 	},
 });
 
@@ -114,6 +108,69 @@ export const expireVoucherAndDeductCoins = adminMutation({
 	},
 });
 
+export const removeVoucherAndReverseCoins = adminMutation({
+	args: {
+		voucherId: v.id("vouchers"),
+	},
+	handler: async (ctx, { voucherId }) => {
+		const voucher = await ctx.db.get(voucherId);
+		if (!voucher) {
+			throw new Error("Voucher not found");
+		}
+		if (voucher.status === "removed") {
+			throw new Error("Voucher is already removed");
+		}
+
+		const ledger = await ctx.db
+			.query("transactions")
+			.withIndex("by_voucher", (q) => q.eq("voucherId", voucherId))
+			.collect();
+
+		const netByUser = new Map<Id<"users">, number>();
+		for (const entry of ledger) {
+			netByUser.set(
+				entry.userId,
+				(netByUser.get(entry.userId) ?? 0) + entry.amount,
+			);
+		}
+
+		const reversals: Array<{
+			userId: Id<"users">;
+			amount: number;
+			newBalance: number;
+		}> = [];
+		for (const [userId, net] of netByUser) {
+			if (net === 0) continue;
+			const { newBalance } = await applyCoinDelta(ctx, {
+				userId,
+				delta: -net,
+				type: "admin_removed",
+				voucherId,
+			});
+			reversals.push({ userId, amount: -net, newBalance });
+		}
+
+		await ctx.db.patch(voucherId, { status: "removed" });
+
+		const uploader = await ctx.db.get(voucher.uploaderId);
+		if (uploader) {
+			await ctx.db.patch(voucher.uploaderId, {
+				uploadCount: Math.max(0, (uploader.uploadCount ?? 0) - 1),
+			});
+		}
+		if (voucher.claimerId) {
+			const claimer = await ctx.db.get(voucher.claimerId);
+			if (claimer) {
+				await ctx.db.patch(voucher.claimerId, {
+					claimCount: Math.max(0, (claimer.claimCount ?? 0) - 1),
+				});
+			}
+		}
+
+		return { success: true, reversals };
+	},
+});
+
 export const reverseClaim = adminMutation({
 	args: {
 		voucherId: v.id("vouchers"),
@@ -182,7 +239,10 @@ export const clearReportAndUpdateVoucher = adminMutation({
 
 		await ctx.db.patch(report.voucherId, { status: newVoucherStatus });
 
-		await ctx.db.delete(reportId);
+		await ctx.db.patch(reportId, {
+			outcome: "admin_cleared",
+			resolvedAt: Date.now(),
+		});
 		await recalculateReportCounts(ctx, [report.reporterId, report.uploaderId]);
 
 		return {

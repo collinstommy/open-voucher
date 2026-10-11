@@ -6,13 +6,16 @@
 
 @theme {
 	--font-sans:
-		"Inter", "Geist", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji",
-		"Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+		"Inter", "Geist", ui-sans-serif, system-ui, -apple-system,
+		BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial,
+		"Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji",
+		"Segoe UI Symbol", "Noto Color Emoji";
 }
 
 html,
 body {
 	@apply bg-white dark:bg-gray-950;
+	font-family: var(--font-sans);
 
 	@media (prefers-color-scheme: dark) {
 		color-scheme: dark;

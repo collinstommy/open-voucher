@@ -35,11 +35,40 @@ if ! command -v doppler &> /dev/null; then
     exit 1
 fi
 
-# Check if Doppler is logged in
-if ! doppler me &> /dev/null; then
-    echo "Error: Not logged into Doppler"
-    echo "Please run: doppler login"
-    exit 1
+# Doppler stores the CLI token in the system keyring. KWallet on this machine
+# has no secret-service "default" alias, so `doppler me` fails even after a
+# successful login. The token is already in ~/.doppler/.doppler.yaml; use it
+# directly and point the CLI at an empty config dir so it never touches KWallet.
+if ! doppler_err=$(doppler me --no-check-version 2>&1 >/dev/null); then
+    if [[ "$doppler_err" != *keyring* && "$doppler_err" != *"Alias default"* ]]; then
+        echo "Error: doppler me failed:"
+        echo "$doppler_err"
+        exit 1
+    fi
+    echo "KWallet cannot provide the Doppler token. Using the saved CLI token."
+    DOPPLER_TOKEN=$(python3 - << 'PY'
+from pathlib import Path
+text = Path.home().joinpath(".doppler/.doppler.yaml").read_text()
+scope = None
+for line in text.splitlines():
+    if line.startswith("    /:"):
+        scope = "/"
+        continue
+    if scope == "/" and line.startswith("        token:"):
+        print(line.split(":", 1)[1].strip())
+        break
+    if scope == "/" and line.startswith("    /"):
+        break
+PY
+)
+    if [ -z "$DOPPLER_TOKEN" ]; then
+        echo "Error: no CLI token saved in ~/.doppler/.doppler.yaml"
+        exit 1
+    fi
+    export DOPPLER_TOKEN
+    export DOPPLER_PROJECT=open-voucher
+    DOPPLER_CONFIG_DIR=$(mktemp -d)
+    export DOPPLER_CONFIG_DIR
 fi
 
 # Check if npx is available

@@ -1,7 +1,6 @@
 import { api } from "@open-voucher/backend/convex/_generated/api";
 import { createFileRoute } from "@tanstack/react-router";
 import { useConvex } from "convex/react";
-import { CheckCircle2, ClipboardCheck, RefreshCw, XCircle } from "lucide-react";
 import { useState } from "react";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
 
@@ -48,24 +47,6 @@ type IntentEvalsResponse = {
 	results: IntentEvalResult[];
 };
 
-const LABEL_COLORS: Record<string, string> = {
-	return_voucher:
-		"bg-blue-100 text-blue-700 dark:bg-blue-950/30 dark:text-blue-300",
-	revoke_upload:
-		"bg-amber-100 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300",
-	report_not_working:
-		"bg-red-100 text-red-700 dark:bg-red-950/30 dark:text-red-300",
-	how_does_it_work:
-		"bg-purple-100 text-purple-700 dark:bg-purple-950/30 dark:text-purple-300",
-	balance:
-		"bg-emerald-100 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300",
-	limits_question:
-		"bg-cyan-100 text-cyan-700 dark:bg-cyan-950/30 dark:text-cyan-300",
-	praise_or_noise:
-		"bg-green-100 text-green-700 dark:bg-green-950/30 dark:text-green-300",
-	unknown: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
-};
-
 const TEST_IMAGE_FILES = [
 	"23dec-5jan.jpg",
 	"29dec-7jan.jpg",
@@ -104,55 +85,45 @@ function OcrEvalCard({ group }: { group: GroupedOcrResults }) {
 	const passed = group.results.filter((r) => r.success).length;
 
 	return (
-		<div className="overflow-hidden rounded-lg border shadow-sm">
-			<div className="grid grid-cols-[350px_1fr]">
-				<div className="bg-muted/30 p-4">
-					<img
-						src={imageUrl}
-						alt={group.filename}
-						className="h-auto w-full rounded border bg-white object-contain"
-					/>
+		<article className="panel">
+			<div className="ocr">
+				<div className="ocr-side">
+					<img src={imageUrl} alt={group.filename} />
 				</div>
-				<div className="p-4">
-					<div className="mb-3 flex items-center justify-between">
-						<h3 className="font-semibold">{group.filename}</h3>
-						<span className="text-muted-foreground text-sm">
+				<div className="panel-body">
+					<div className="vhead">
+						<h3 className="display" style={{ fontSize: 20 }}>
+							{group.filename}
+						</h3>
+						<span className="note">
 							{passed}/{group.results.length} passed
 						</span>
 					</div>
-					<div className="grid grid-cols-3 gap-4">
+					<div className="grid" style={{ marginTop: 16 }}>
 						{group.results.map((result) => (
 							<div
 								key={result.testDate}
-								className={`rounded border p-3 ${
-									result.success
-										? "border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950/30"
-										: "border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/30"
-								}`}
+								className={result.success ? "result ok" : "result bad"}
 							>
-								<div className="mb-2 flex items-center gap-2">
-									{result.success ? (
-										<CheckCircle2 className="h-4 w-4 text-green-600" />
-									) : (
-										<XCircle className="h-4 w-4 text-red-600" />
-									)}
-									<span className="font-medium text-sm">{result.testDate}</span>
-								</div>
+								<span
+									className={
+										result.success ? "status s-available" : "status s-failed"
+									}
+								>
+									<i />
+									{result.testDate}
+								</span>
 								{result.error ? (
-									<p className="text-red-600 text-xs">{result.error}</p>
+									<p className="warn">{result.error}</p>
 								) : (
-									<div className="space-y-1 text-xs">
-										<div className="text-muted-foreground">
+									<div className="meta-line">
+										<span>
 											Exp: {result.expectedValidFrom} → {result.expectedExpiry}
-										</div>
-										<div
-											className={
-												result.success ? "text-green-600" : "text-red-600"
-											}
-										>
+										</span>
+										<span>
 											Act: {result.actualValidFrom ?? "N/A"} →{" "}
 											{result.actualExpiry ?? "N/A"}
-										</div>
+										</span>
 									</div>
 								)}
 							</div>
@@ -160,45 +131,28 @@ function OcrEvalCard({ group }: { group: GroupedOcrResults }) {
 					</div>
 				</div>
 			</div>
-		</div>
+		</article>
 	);
 }
 
 function IntentResultCard({ result }: { result: IntentEvalResult }) {
-	const expectedColor = LABEL_COLORS[result.expected] ?? LABEL_COLORS.unknown;
-	const predictedColor = LABEL_COLORS[result.predicted] ?? LABEL_COLORS.unknown;
-
 	return (
-		<div
-			className={`rounded-lg border p-4 ${
-				result.correct
-					? "border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950/30"
-					: "border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/30"
-			}`}
-		>
-			<div className="mb-2 flex items-center gap-2">
-				{result.correct ? (
-					<CheckCircle2 className="h-4 w-4 text-green-600" />
-				) : (
-					<XCircle className="h-4 w-4 text-red-600" />
-				)}
-				<span className="font-medium text-sm">
-					{result.correct ? "Correct" : "Mismatch"}
+		<article className={result.correct ? "result ok" : "result bad"}>
+			<span
+				className={result.correct ? "status s-available" : "status s-failed"}
+			>
+				<i />
+				{result.correct ? "correct" : "mismatch"}
+			</span>
+			<p className="msg-text">{result.text}</p>
+			<div className="meta-line">
+				<span className="intent">Expected {result.expected}</span>
+				<span className="intent">Predicted {result.predicted}</span>
+				<span className="note">
+					conf {Math.round(result.confidence * 100)}%
 				</span>
 			</div>
-			<p className="mb-3 text-sm">{result.text}</p>
-			<div className="flex flex-wrap items-center gap-2 text-xs">
-				<span className={`rounded px-2 py-1 ${expectedColor}`}>
-					Expected: {result.expected}
-				</span>
-				<span className={`rounded px-2 py-1 ${predictedColor}`}>
-					Predicted: {result.predicted}
-				</span>
-				<span className="text-muted-foreground">
-					conf: {Math.round(result.confidence * 100)}%
-				</span>
-			</div>
-		</div>
+		</article>
 	);
 }
 
@@ -210,9 +164,8 @@ function EvalsPage() {
 	const [ocrLoading, setOcrLoading] = useState(false);
 	const [useOpenRouter, setUseOpenRouter] = useState(false);
 
-	const [intentResults, setIntentResults] = useState<IntentEvalsResponse | null>(
-		null,
-	);
+	const [intentResults, setIntentResults] =
+		useState<IntentEvalsResponse | null>(null);
 	const [intentLoading, setIntentLoading] = useState(false);
 
 	const handleRunOcrEvals = async () => {
@@ -234,7 +187,7 @@ function EvalsPage() {
 					convex.action(api.telegram.runSingleOcrEval, {
 						token,
 						filename,
-						imageBase64: imagesMap.get(filename)!,
+						imageBase64: imagesMap.get(filename) ?? "",
 						useOpenRouter,
 					}),
 				),
@@ -283,86 +236,59 @@ function EvalsPage() {
 	};
 
 	return (
-		<div className="mx-auto w-full max-w-4xl p-6">
-			<div className="mb-6 flex items-center gap-3">
-				<div className="rounded-lg bg-purple-100 p-2 dark:bg-purple-900">
-					<ClipboardCheck className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+		<div className="stack">
+			<div className="masthead">
+				<div>
+					<h1 className="display">Evals</h1>
+					<p className="lede">OCR date reads and intent classification.</p>
 				</div>
-				<h1 className="font-bold text-2xl">Evaluations</h1>
 			</div>
 
-			{!token && (
-				<p className="mb-4 text-muted-foreground">
-					Please log in to run evaluations.
-				</p>
-			)}
-
-			{/* OCR Evals Section */}
-			<section className="mb-10">
-				<div className="mb-4 flex items-center gap-3">
-					<h2 className="font-semibold text-xl">OCR Evaluations</h2>
+			<section className="stack">
+				<div className="panel-head" style={{ padding: 0, border: 0 }}>
+					<h2>OCR evaluations</h2>
 				</div>
-
-				<div className="mb-6 flex items-center gap-4">
+				<div className="actions">
 					<button
 						type="button"
+						className="btn btn-gold"
 						onClick={handleRunOcrEvals}
 						disabled={!token || ocrLoading}
-						className="flex items-center gap-2 rounded-lg bg-purple-600 px-4 py-2 text-white transition-colors hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-50"
 					>
-						{ocrLoading ? (
-							<>
-								<RefreshCw className="h-4 w-4 animate-spin" />
-								Running OCR Evals...
-							</>
-						) : (
-							<>
-								<RefreshCw className="h-4 w-4" />
-								Run OCR Evals
-							</>
-						)}
+						{ocrLoading ? "Running OCR evals..." : "Run OCR evals"}
 					</button>
-
-					<label className="flex items-center gap-2 text-sm">
+					<label className="check">
 						<input
 							type="checkbox"
 							checked={useOpenRouter}
 							onChange={(e) => setUseOpenRouter(e.target.checked)}
-							className="rounded border-gray-300"
 						/>
-						Use OpenRouter (fallback)
+						Use OpenRouter
 					</label>
 				</div>
 
 				{ocrResults && (
-					<div className="space-y-6">
-						<div
-							className={`rounded-lg border p-4 shadow-sm ${
-								ocrResults.overallSuccess
-									? "border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950/30"
-									: "border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/30"
-							}`}
+					<div className="stack">
+						<article
+							className={ocrResults.overallSuccess ? "result ok" : "result bad"}
 						>
-							<div className="flex items-center gap-3">
-								{ocrResults.overallSuccess ? (
-									<CheckCircle2 className="h-6 w-6 text-green-600 dark:text-green-400" />
-								) : (
-									<XCircle className="h-6 w-6 text-red-600 dark:text-red-400" />
-								)}
-								<div>
-									<h3 className="font-semibold text-foreground">
-										{ocrResults.overallSuccess
-											? "All Tests Passed"
-											: "Some Tests Failed"}
-									</h3>
-									<p className="text-muted-foreground text-sm">
-										{ocrResults.passed} of {ocrResults.total} tests passed
-									</p>
-								</div>
+							<div className="result-row">
+								<span
+									className={
+										ocrResults.overallSuccess
+											? "status s-available"
+											: "status s-failed"
+									}
+								>
+									<i />
+									{ocrResults.overallSuccess ? "passed" : "failed"}
+								</span>
+								<h3>
+									{ocrResults.passed} of {ocrResults.total} tests passed
+								</h3>
 							</div>
-						</div>
-
-						<div className="space-y-4">
+						</article>
+						<div className="stack">
 							{Object.entries(
 								ocrResults.results.reduce<Record<string, OcrEvalResult[]>>(
 									(acc, result) => {
@@ -386,89 +312,76 @@ function EvalsPage() {
 			</section>
 
 			{/* Intent Evals Section */}
-			<section>
-				<div className="mb-4 flex items-center gap-3">
-					<h2 className="font-semibold text-xl">Intent Evaluations</h2>
+			<section className="stack">
+				<div className="panel-head" style={{ padding: 0, border: 0 }}>
+					<h2>Intent evaluations</h2>
 				</div>
-
-				<div className="mb-6 flex items-center gap-4">
+				<div className="actions">
 					<button
 						type="button"
+						className="btn btn-gold"
 						onClick={handleRunIntentEvals}
 						disabled={!token || intentLoading}
-						className="flex items-center gap-2 rounded-lg bg-purple-600 px-4 py-2 text-white transition-colors hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-50"
 					>
-						{intentLoading ? (
-							<>
-								<RefreshCw className="h-4 w-4 animate-spin" />
-								Running Intent Evals...
-							</>
-						) : (
-							<>
-								<RefreshCw className="h-4 w-4" />
-								Run Intent Evals
-							</>
-						)}
+						{intentLoading ? "Running intent evals..." : "Run intent evals"}
 					</button>
 				</div>
 
 				{intentResults && (
-					<div className="space-y-6">
-						<div
-							className={`rounded-lg border p-4 shadow-sm ${
-								intentResults.accuracy === 1
-									? "border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950/30"
-									: "border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/30"
-							}`}
+					<div className="stack">
+						<article
+							className={
+								intentResults.accuracy === 1 ? "result ok" : "result bad"
+							}
 						>
-							<div className="flex items-center gap-3">
-								{intentResults.accuracy === 1 ? (
-									<CheckCircle2 className="h-6 w-6 text-green-600 dark:text-green-400" />
-								) : (
-									<XCircle className="h-6 w-6 text-red-600 dark:text-red-400" />
-								)}
-								<div>
-									<h3 className="font-semibold text-foreground">
-										{intentResults.accuracy === 1
-											? "All Tests Passed"
-											: "Some Tests Failed"}
-									</h3>
-									<p className="text-muted-foreground text-sm">
-										{intentResults.correct} of {intentResults.total} tests passed (
-										{Math.round(intentResults.accuracy * 100)}%)
-									</p>
-								</div>
+							<div className="result-row">
+								<span
+									className={
+										intentResults.accuracy === 1
+											? "status s-available"
+											: "status s-failed"
+									}
+								>
+									<i />
+									{intentResults.accuracy === 1 ? "passed" : "failed"}
+								</span>
+								<h3>
+									{intentResults.correct} of {intentResults.total} tests passed
+									({Math.round(intentResults.accuracy * 100)}%)
+								</h3>
 							</div>
-						</div>
+						</article>
 
-						<div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+						<div className="stats">
 							{Object.entries(intentResults.byExpected)
 								.sort()
 								.map(([label, stats]) => (
-									<div key={label} className="rounded-md border p-3">
-										<div className="mb-1 text-muted-foreground text-xs">
-											{label}
-										</div>
-										<div className="font-semibold text-xl">
+									<div key={label} className="stat">
+										<div className="k">{label}</div>
+										<div className="v num">
 											{stats.correct}/{stats.total}
 										</div>
-										<div className="text-muted-foreground text-xs">
+										<div className="n">
 											{Math.round((stats.correct / stats.total) * 100) || 0}%
 										</div>
 									</div>
 								))}
 						</div>
 
-						<div>
-							<h3 className="mb-4 font-medium">
-								Results{" "}
-								<span className="text-muted-foreground text-sm">
-									({intentResults.results.length} cases)
+						<div className="stack">
+							<h3 className="display" style={{ fontSize: 22 }}>
+								Results
+								<span className="note">
+									{" "}
+									{intentResults.results.length} cases
 								</span>
 							</h3>
-							<div className="space-y-3">
-								{intentResults.results.map((result, index) => (
-									<IntentResultCard key={index} result={result} />
+							<div className="stack">
+								{intentResults.results.map((result) => (
+									<IntentResultCard
+										key={`${result.expected}:${result.predicted}:${result.text}`}
+										result={result}
+									/>
 								))}
 							</div>
 						</div>

@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import dayjs from "dayjs";
+import { firstMatchingBarcode, stripBarcodeSpaces } from "../src/lib/barcode";
 import { applyCoinDelta } from "../src/lib/coinLedger";
 import { UPLOAD_REWARDS } from "../src/lib/constants";
 import { callGeminiApi } from "../src/lib/gemini";
@@ -1091,7 +1092,8 @@ export const storeVoucherFromOcr = internalMutation({
 			};
 		}
 
-		if (!barcode) {
+		const barcodeNumber = barcode ? stripBarcodeSpaces(barcode) : "";
+		if (!barcodeNumber) {
 			await recordFailedUpload(
 				ctx,
 				uploadId,
@@ -1109,10 +1111,12 @@ export const storeVoucherFromOcr = internalMutation({
 			return { success: false, reason: "COULD_NOT_READ_BARCODE" };
 		}
 
-		const existing = await ctx.db
-			.query("vouchers")
-			.withIndex("by_barcode", (q) => q.eq("barcodeNumber", barcode))
-			.first();
+		const existing = await firstMatchingBarcode(barcodeNumber, (key) =>
+			ctx.db
+				.query("vouchers")
+				.withIndex("by_barcode", (q) => q.eq("barcodeNumber", key))
+				.first(),
+		);
 
 		if (existing) {
 			await recordFailedUpload(
@@ -1124,7 +1128,7 @@ export const storeVoucherFromOcr = internalMutation({
 				{
 					rawResponse,
 					type,
-					barcode,
+					barcode: barcodeNumber,
 					expiryDate,
 					validFrom,
 				},
@@ -1151,7 +1155,7 @@ export const storeVoucherFromOcr = internalMutation({
 							0,
 						)
 					: undefined,
-			barcodeNumber: barcode,
+			barcodeNumber,
 			ocrRawResponse: rawResponse,
 			createdAt: nowMs,
 		});
@@ -1171,7 +1175,7 @@ export const storeVoucherFromOcr = internalMutation({
 		await markUploadSucceeded(ctx, uploadId, voucherId);
 
 		console.log(
-			`Voucher created: ${voucherId} (type=${type}, barcode=${barcode})`,
+			`Voucher created: ${voucherId} (type=${type}, barcode=${barcodeNumber})`,
 		);
 
 		return { success: true, voucherId, type, reward, newBalance };

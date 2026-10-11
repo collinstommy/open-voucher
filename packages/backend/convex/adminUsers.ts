@@ -1,12 +1,13 @@
 import { v } from "convex/values";
 import { applyCoinDelta } from "../src/lib/coinLedger";
-import { adminMutation, adminQuery } from "./adminGuards";
+import { reportCountsTowardLimits } from "../src/lib/reportOutcome";
 import type { Doc } from "./_generated/dataModel";
 import {
 	internalMutation,
 	internalQuery,
 	type QueryCtx,
 } from "./_generated/server";
+import { adminMutation, adminQuery } from "./adminGuards";
 
 /**
  * Admin messages are keyed by telegramChatId; chatless (Google-only) users
@@ -26,27 +27,6 @@ async function countAdminMessages(
 		.collect();
 	return messages.length;
 }
-
-export const getAllUsers = adminQuery({
-	args: {},
-	handler: async (ctx) => {
-		const users = await ctx.db.query("users").collect();
-
-		return {
-			users: users.map((u) => ({
-				_id: u._id,
-				telegramChatId: u.telegramChatId,
-				username: u.username,
-				firstName: u.firstName,
-				coins: u.coins,
-				isBanned: u.isBanned,
-				createdAt: u.createdAt,
-				lastActiveAt: u.lastActiveAt,
-			})),
-			totalCount: users.length,
-		};
-	},
-});
 
 export const banUser = adminMutation({
 	args: {
@@ -172,7 +152,7 @@ export const getBannedUsers = adminQuery({
 	handler: async (ctx) => {
 		const bannedUsers = await ctx.db
 			.query("users")
-			.filter((q) => q.eq(q.field("isBanned"), true))
+			.withIndex("by_is_banned", (q) => q.eq("isBanned", true))
 			.collect();
 
 		return await Promise.all(
@@ -196,7 +176,7 @@ export const getBannedUsersInternal = internalQuery({
 	handler: async (ctx) => {
 		const bannedUsers = await ctx.db
 			.query("users")
-			.filter((q) => q.eq(q.field("isBanned"), true))
+			.withIndex("by_is_banned", (q) => q.eq("isBanned", true))
 			.collect();
 
 		return bannedUsers.sort((a, b) => (b.bannedAt || 0) - (a.bannedAt || 0));
@@ -243,7 +223,7 @@ export const getUserDetails = adminQuery({
 
 		const claimedVouchers = await ctx.db
 			.query("vouchers")
-			.filter((q) => q.eq(q.field("claimerId"), userId))
+			.withIndex("by_claimer_claimed_at", (q) => q.eq("claimerId", userId))
 			.collect();
 
 		const uploadedVouchersWithDetails = await Promise.all(
@@ -495,6 +475,8 @@ export const backfillUserStats = internalMutation({
 		}
 
 		for (const report of allReports) {
+			if (!reportCountsTowardLimits(report)) continue;
+
 			const uploaderId = report.uploaderId.toString();
 			const reporterId = report.reporterId.toString();
 
@@ -560,7 +542,7 @@ export const clearUserData = internalMutation({
 
 		const claimedVouchers = await ctx.db
 			.query("vouchers")
-			.filter((q) => q.eq(q.field("claimerId"), userId))
+			.withIndex("by_claimer_claimed_at", (q) => q.eq("claimerId", userId))
 			.collect();
 
 		for (const voucher of claimedVouchers) {

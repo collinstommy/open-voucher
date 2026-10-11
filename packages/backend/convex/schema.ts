@@ -1,5 +1,6 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
+import { reportOutcome } from "../src/lib/reportOutcome";
 
 export default defineSchema({
 	inviteCodes: defineTable({
@@ -38,7 +39,9 @@ export default defineSchema({
 				v.literal("onboarding_tutorial"),
 			),
 		),
-	}).index("by_chat_id", ["telegramChatId"]),
+	})
+		.index("by_chat_id", ["telegramChatId"])
+		.index("by_is_banned", ["isBanned"]),
 
 	// Google (and later Apple) identities. Telegram identity intentionally
 	// stays on users.telegramChatId — no "telegram" rows here.
@@ -107,6 +110,7 @@ export default defineSchema({
 			v.literal("uploader_admitted_used"),
 			v.literal("uploader_denied"),
 			v.literal("invalidated"),
+			v.literal("removed"),
 		),
 		imageStorageId: v.id("_storage"),
 		barcodeNumber: v.optional(v.string()),
@@ -136,6 +140,8 @@ export default defineSchema({
 		reason: v.string(),
 		replacementVoucherId: v.optional(v.id("vouchers")),
 		createdAt: v.number(),
+		outcome: v.optional(reportOutcome),
+		resolvedAt: v.optional(v.number()),
 	})
 		.index("by_voucher", ["voucherId"])
 		.index("by_uploader", ["uploaderId"])
@@ -159,11 +165,14 @@ export default defineSchema({
 			v.literal("claim_returned"),
 			v.literal("replacement_received"),
 			v.literal("fork_merge_clawback"),
+			v.literal("admin_removed"),
 		),
 		amount: v.number(),
 		voucherId: v.optional(v.id("vouchers")),
 		createdAt: v.number(),
-	}).index("by_user", ["userId"]),
+	})
+		.index("by_user", ["userId"])
+		.index("by_voucher", ["voucherId"]),
 
 	failedUploads: defineTable({
 		userId: v.id("users"),
@@ -220,6 +229,28 @@ export default defineSchema({
 		createdAt: v.number(),
 		expiresAt: v.number(),
 	}).index("by_token", ["token"]),
+
+	dunnesSessions: defineTable({
+		username: v.string(),
+		accessToken: v.string(),
+		refreshToken: v.optional(v.string()),
+		expiresAtMs: v.number(),
+	}).index("by_username", ["username"]),
+
+	voucherChecks: defineTable({
+		voucherId: v.id("vouchers"),
+		userId: v.id("users"),
+		result: v.union(
+			v.literal("claimed"),
+			v.literal("redeemed"),
+			v.literal("unlinked"),
+			v.literal("other"),
+		),
+		rawJson: v.string(),
+		createdAt: v.number(),
+	})
+		.index("by_voucher", ["voucherId"])
+		.index("by_user", ["userId"]),
 
 	errors: defineTable({
 		errorType: v.string(),

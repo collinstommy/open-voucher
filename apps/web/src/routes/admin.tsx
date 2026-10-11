@@ -1,6 +1,7 @@
+import { createFileRoute, Outlet } from "@tanstack/react-router";
 import { AdminApp } from "@/components/AdminApp";
 import { NavigationLayout } from "@/components/NavigationLayout";
-import { Outlet, createFileRoute } from "@tanstack/react-router";
+import "@/admin.css";
 
 export const Route = createFileRoute("/admin")({
 	component: AdminLayout,
@@ -9,10 +10,9 @@ export const Route = createFileRoute("/admin")({
 function AdminLayout() {
 	return (
 		<AdminApp>
-			<div className="mx-auto max-w-7xl px-4 py-3 sm:px-6">
-				<NavigationLayout />
+			<NavigationLayout>
 				<Outlet />
-			</div>
+			</NavigationLayout>
 		</AdminApp>
 	);
 }

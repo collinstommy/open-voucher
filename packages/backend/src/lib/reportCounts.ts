@@ -1,5 +1,8 @@
 import type { Id } from "../../convex/_generated/dataModel";
 import type { MutationCtx } from "../../convex/_generated/server";
+import { reportCountsTowardLimits } from "./reportOutcome";
+
+export { reportCountsTowardLimits } from "./reportOutcome";
 
 export async function recalculateReportCounts(
 	ctx: MutationCtx,
@@ -21,8 +24,9 @@ export async function recalculateReportCounts(
 			]);
 
 			await ctx.db.patch(userId, {
-				uploadReportCount: uploadReports.length,
-				claimReportCount: claimReports.length,
+				uploadReportCount: uploadReports.filter(reportCountsTowardLimits)
+					.length,
+				claimReportCount: claimReports.filter(reportCountsTowardLimits).length,
 			});
 		}),
 	);

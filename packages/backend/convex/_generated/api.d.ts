@@ -9,7 +9,6 @@
  */
 
 import type * as admin from "../admin.js";
-import type * as admin_auth from "../admin/auth.js";
 import type * as adminAnalytics from "../adminAnalytics.js";
 import type * as adminDashboard from "../adminDashboard.js";
 import type * as adminEvals from "../adminEvals.js";
@@ -23,6 +22,7 @@ import type * as auth from "../auth.js";
 import type * as crons from "../crons.js";
 import type * as devSeed from "../devSeed.js";
 import type * as devTest from "../devTest.js";
+import type * as dunnesVoucherDetails from "../dunnesVoucherDetails.js";
 import type * as errors from "../errors.js";
 import type * as http from "../http.js";
 import type * as messages from "../messages.js";
@@ -42,7 +42,6 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   admin: typeof admin;
-  "admin/auth": typeof admin_auth;
   adminAnalytics: typeof adminAnalytics;
   adminDashboard: typeof adminDashboard;
   adminEvals: typeof adminEvals;
@@ -56,6 +55,7 @@ declare const fullApi: ApiFromModules<{
   crons: typeof crons;
   devSeed: typeof devSeed;
   devTest: typeof devTest;
+  dunnesVoucherDetails: typeof dunnesVoucherDetails;
   errors: typeof errors;
   http: typeof http;
   messages: typeof messages;
