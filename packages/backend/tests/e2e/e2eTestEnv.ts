@@ -216,6 +216,12 @@ async function start(): Promise<E2EEnv> {
 			`CONVEX_URL/CONVEX_SITE_URL missing from ${ENV_FILE}. Is the local deployment provisioned? Output:\n${stdout}`,
 		);
 	}
+	const LOOPBACK_URL = /^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?(\/|$)/;
+	if (!LOOPBACK_URL.test(convexUrl) || !LOOPBACK_URL.test(siteUrl)) {
+		throw new Error(
+			`Refusing to write env vars: CONVEX_URL/CONVEX_SITE_URL are not loopback (${convexUrl}, ${siteUrl}).`,
+		);
+	}
 
 	// Function env vars for the local backend. The fake Bot API port changes per
 	// run, so TELEGRAM_API_BASE is re-pointed every time.
