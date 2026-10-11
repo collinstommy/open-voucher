@@ -4,7 +4,7 @@ import { createFileRoute, notFound } from "@tanstack/react-router";
 import { useMutation, useQuery } from "convex/react";
 import { type FormEvent, useRef, useState } from "react";
 import { useJwtAuth } from "@/auth/JwtAuthProvider";
-import { getDevAuthUrl } from "@/auth/jwtStorage";
+import { GoogleSignInButton } from "@/components/GoogleSignInButton";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useUserAuth } from "@/hooks/useUserAuth";
@@ -52,7 +52,6 @@ function WebUploadTester() {
 	const [uploadId, setUploadId] = useState<Id<"uploads"> | null>(null);
 	const [dailyLimit, setDailyLimit] = useState<DailyLimitResult | null>(null);
 	const [submitError, setSubmitError] = useState<string | null>(null);
-	const [mintBusy, setMintBusy] = useState(false);
 
 	const upload = useQuery(
 		api.vouchers.getUpload,
@@ -62,26 +61,6 @@ function WebUploadTester() {
 	const jwtPayload = jwt ? decodeJwtPayload(jwt) : null;
 	const jwtClient =
 		typeof jwtPayload?.client === "string" ? jwtPayload.client : null;
-
-	async function mintWebJwt() {
-		setMintBusy(true);
-		setSubmitError(null);
-		try {
-			const res = await fetch(getDevAuthUrl(), {
-				method: "POST",
-				headers: { "X-OpenVoucher-Client": "web" },
-			});
-			const data = (await res.json()) as { jwt?: string; error?: string };
-			if (!res.ok || typeof data.jwt !== "string") {
-				throw new Error(data.error ?? "Dev auth failed");
-			}
-			setJwt(data.jwt);
-		} catch (err) {
-			setSubmitError(err instanceof Error ? err.message : String(err));
-		} finally {
-			setMintBusy(false);
-		}
-	}
 
 	async function handleSubmit(event: FormEvent) {
 		event.preventDefault();
@@ -159,8 +138,7 @@ function WebUploadTester() {
 					)}
 					{!isLoading && !error && !user && (
 						<p className="text-amber-400">
-							Not signed in. On localhost, /api/dev-auth should mint a JWT with
-							X-OpenVoucher-Client: web.
+							Not signed in. Sign in with Google to get a web JWT.
 						</p>
 					)}
 					{user && (
@@ -186,16 +164,7 @@ function WebUploadTester() {
 								(web / android / ios), not telegram.
 							</p>
 						)}
-					{(!jwt || jwtClient !== "web") && (
-						<Button
-							type="button"
-							variant="outline"
-							onClick={() => void mintWebJwt()}
-							disabled={mintBusy}
-						>
-							{mintBusy ? "Minting…" : "Mint web JWT via /api/dev-auth"}
-						</Button>
-					)}
+					{!isLoading && !user && <GoogleSignInButton onSignedIn={setJwt} />}
 				</CardContent>
 			</Card>
 
