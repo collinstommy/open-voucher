@@ -4,7 +4,7 @@ import type { AppClient } from "./client";
 
 const ISSUER = "https://www.openvouchers.org";
 const AUDIENCE = "open-voucher";
-const KID = "open-voucher-key-1";
+const KID = process.env.JWT_KEY_ID ?? "open-voucher-key-1";
 export const JWT_EXPIRY = "30d";
 
 export async function issueJwt(
